@@ -4084,6 +4084,9 @@
             
             // 初始化R2自动同步
             initR2AutoSync();
+
+            // 自动同步启用时，启动后静默从云端拉取一次最新数据
+            autoSyncFromR2OnStartup();
         }
 
         // ==================== IndexedDB for large files ====================
@@ -8007,6 +8010,51 @@
             }
         }
 
+        // Re-apply everything derived from appData.settings / appData.* to the DOM.
+        // Called after any full-data refresh (manual cloud restore or startup auto pull)
+        // so the user doesn't need to reload the page to see updated settings.
+        function refreshAllUIFromAppData() {
+            try { applySettings(); } catch (e) { console.warn('applySettings failed', e); }
+            try { renderLibrary(); } catch (e) { console.warn('renderLibrary failed', e); }
+            try { renderNotesPage(); } catch (e) { console.warn('renderNotesPage failed', e); }
+            // Keep the R2 auto-sync timer consistent with the (possibly new) config
+            try { initR2AutoSync(); } catch (e) { console.warn('initR2AutoSync failed', e); }
+        }
+
+        // On app startup, if auto-sync is enabled and R2 is configured, pull the
+        // latest metadata once in the background so the user sees the newest data.
+        // Silent: no toast on success, logs on failure. Does not pull PDF files
+        // (those are pulled on demand by the existing flow when a doc is opened).
+        async function autoSyncFromR2OnStartup() {
+            const config = appData.settings && appData.settings.r2Config;
+            if (!config || !config.accessKeyId || !config.autoSyncEnabled) return;
+            if (r2SyncInProgress) return;
+            r2SyncInProgress = true;
+            try {
+                const metadataStr = await r2GetObject('metadata.json');
+                if (!metadataStr) return;
+                const metadata = JSON.parse(metadataStr);
+                const localR2Config = appData.settings.r2Config;
+                appData.books = metadata.books || [];
+                appData.papers = metadata.papers || [];
+                appData.notes = metadata.notes || {};
+                appData.archived = metadata.archived || [];
+                appData.lectures = metadata.lectures || {};
+                appData.drafts = metadata.drafts || {};
+                appData.lectureDrafts = metadata.lectureDrafts || appData.lectureDrafts || {};
+                appData.settings = { ...metadata.settings, r2Config: localR2Config };
+                saveData();
+                refreshAllUIFromAppData();
+                if (config.lastSyncTime || metadata.syncedAt) {
+                    r2LastSyncTime = metadata.syncedAt || config.lastSyncTime;
+                }
+            } catch (err) {
+                console.warn('Startup auto-sync failed:', err);
+            } finally {
+                r2SyncInProgress = false;
+            }
+        }
+
         async function syncFromR2() {
             const config = appData.settings.r2Config;
             if (!config || !config.accessKeyId) {
@@ -8065,6 +8113,10 @@
                 
                 renderLibrary();
                 renderNotesPage();
+                // Also re-apply settings so avatar / AI name / AI persona / theme
+                // immediately reflect the restored data without needing a refresh.
+                try { applySettings(); } catch (e) { console.warn('applySettings failed', e); }
+                try { initR2AutoSync(); } catch (e) { console.warn('initR2AutoSync failed', e); }
                 showToast(`恢复完成! 下载了 ${downloadedFiles} 个文件`);
             } catch (err) {
                 console.error('Sync from R2 failed:', err);
