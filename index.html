@@ -10,6 +10,8 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="数学阅读">
+    <link rel="apple-touch-icon" href="icon-infinity-white.svg">
+    <link rel="icon" href="icon-infinity-white.svg" type="image/svg+xml">
     <!-- PDF.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <!-- KaTeX for LaTeX -->
@@ -9963,7 +9965,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
         // ==================== Notification Helper ====================
         function sendNotification(title, body) {
             if (appData.settings.notify && 'Notification' in window && Notification.permission === 'granted') {
-                new Notification(title, { body: body, icon: 'icon-192.svg' });
+                new Notification(title, { body: body, icon: 'icon-infinity-white.svg' });
             }
         }
 
