@@ -2806,6 +2806,15 @@
     <!-- Toast -->
     <div class="toast" id="toast"></div>
 
+    <!-- Debug Log Panel -->
+    <div id="debugPanel" style="display:none;position:fixed;top:0;left:0;right:0;bottom:50%;background:rgba(0,0,0,0.95);color:#0f0;font-family:monospace;font-size:11px;padding:10px;overflow-y:auto;z-index:9999;white-space:pre-wrap;word-break:break-all;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+            <span style="color:#fff;font-weight:bold;">Debug Log</span>
+            <button onclick="document.getElementById('debugPanel').style.display='none'" style="background:#f00;color:#fff;border:none;padding:2px 8px;border-radius:4px;">Close</button>
+        </div>
+        <div id="debugLog"></div>
+    </div>
+
     <!-- ==================== Page 1: Library ==================== -->
     <div class="page active" id="page1">
         <div class="page1-header">
@@ -3685,6 +3694,24 @@
     </div>
 
     <script>
+        // ==================== Debug Log ====================
+        function debugLog(msg) {
+            const panel = document.getElementById('debugPanel');
+            const log = document.getElementById('debugLog');
+            if (panel && log) {
+                panel.style.display = 'block';
+                const time = new Date().toLocaleTimeString();
+                log.innerHTML += '[' + time + '] ' + msg + '\n';
+                log.scrollTop = log.scrollHeight;
+            }
+            console.log(msg);
+        }
+
+        function clearDebugLog() {
+            const log = document.getElementById('debugLog');
+            if (log) log.innerHTML = '';
+        }
+
         // ==================== Data Store ====================
         let appData = {
             books: [],
@@ -6932,19 +6959,54 @@
                 return;
             }
             
+            // 验证endpoint格式
+            if (!config.endpoint.startsWith('https://')) {
+                showToast('Endpoint必须以https://开头');
+                return;
+            }
+            
             showToast('测试连接中...');
+            clearDebugLog();
+            debugLog('=== R2 连接测试开始 ===');
+            debugLog('Endpoint: ' + config.endpoint);
+            debugLog('Bucket: ' + config.bucketName);
+            debugLog('AccessKeyId: ' + config.accessKeyId.substring(0, 8) + '...');
+            debugLog('UserAgent: ' + navigator.userAgent);
             
             try {
                 const testKey = '_test_connection_' + Date.now();
                 const testData = 'test';
                 
-                await r2PutObject(testKey, testData, 'text/plain');
-                await r2DeleteObject(testKey);
+                debugLog('准备PUT请求...');
+                debugLog('URL: ' + config.endpoint + '/' + config.bucketName + '/' + testKey);
                 
+                await r2PutObject(testKey, testData, 'text/plain');
+                debugLog('PUT成功!');
+                
+                debugLog('准备DELETE请求...');
+                await r2DeleteObject(testKey);
+                debugLog('DELETE成功!');
+                
+                debugLog('=== 测试通过 ===');
                 showToast('连接成功!');
             } catch (err) {
-                console.error('R2 connection test failed:', err);
-                showToast('连接失败: ' + err.message);
+                debugLog('错误类型: ' + err.name);
+                debugLog('错误信息: ' + err.message);
+                debugLog('错误堆栈: ' + (err.stack || 'N/A'));
+                
+                let errorMsg = err.message || '未知错误';
+                
+                // 提供更具体的错误提示
+                if (errorMsg.includes('Failed to fetch') || errorMsg.includes('Load failed') || errorMsg.includes('NetworkError')) {
+                    debugLog('判断为网络/CORS错误');
+                    errorMsg = '网络错误';
+                } else if (errorMsg.includes('403')) {
+                    errorMsg = '权限被拒绝';
+                } else if (errorMsg.includes('404')) {
+                    errorMsg = 'Bucket不存在';
+                }
+                
+                showToast('连接失败: ' + errorMsg);
             }
         }
 
@@ -7032,21 +7094,86 @@
             const url = config.endpoint + '/' + path;
             
             const payload = typeof data === 'string' ? data : JSON.stringify(data);
-            const headers = { 'content-type': contentType };
             
-            await r2Sign('PUT', path, headers, payload);
+            // 构建请求头 - 不包含浏览器禁止的头
+            const headers = new Headers();
+            headers.set('Content-Type', contentType);
             
-            const response = await fetch(url, {
-                method: 'PUT',
-                headers: headers,
-                body: payload
-            });
+            // 计算签名所需的信息
+            const endpoint = new URL(config.endpoint);
+            const host = endpoint.host;
+            const region = 'auto';
+            const service = 's3';
             
-            if (!response.ok) {
-                throw new Error(`Upload failed: ${response.status}`);
+            const now = new Date();
+            const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, '');
+            const dateStamp = amzDate.slice(0, 8);
+            const contentSha256 = await sha256Hex(payload);
+            
+            // 签名用的头（包含host用于计算，但不发送）
+            const headersToSign = {
+                'content-type': contentType,
+                'host': host,
+                'x-amz-content-sha256': contentSha256,
+                'x-amz-date': amzDate
+            };
+            
+            const signedHeaderKeys = Object.keys(headersToSign).sort();
+            const signedHeadersStr = signedHeaderKeys.join(';');
+            const canonicalHeaders = signedHeaderKeys.map(k => k + ':' + headersToSign[k]).join('\n') + '\n';
+            
+            const canonicalRequest = [
+                'PUT',
+                '/' + path,
+                '',
+                canonicalHeaders,
+                signedHeadersStr,
+                contentSha256
+            ].join('\n');
+            
+            const algorithm = 'AWS4-HMAC-SHA256';
+            const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
+            const stringToSign = [
+                algorithm,
+                amzDate,
+                credentialScope,
+                await sha256Hex(canonicalRequest)
+            ].join('\n');
+            
+            const signingKey = await getSignatureKey(config.secretKey, dateStamp, region, service);
+            const signature = await hmacHex(signingKey, stringToSign);
+            
+            const authorization = `${algorithm} Credential=${config.accessKeyId}/${credentialScope}, SignedHeaders=${signedHeadersStr}, Signature=${signature}`;
+            
+            // 设置实际发送的头（不设置host）
+            headers.set('x-amz-date', amzDate);
+            headers.set('x-amz-content-sha256', contentSha256);
+            headers.set('Authorization', authorization);
+            
+            debugLog('发起fetch请求: PUT ' + url);
+            debugLog('Headers: x-amz-date=' + amzDate);
+            
+            try {
+                const response = await fetch(url, {
+                    method: 'PUT',
+                    headers: headers,
+                    body: payload,
+                    mode: 'cors'
+                });
+                
+                debugLog('响应状态: ' + response.status + ' ' + response.statusText);
+                
+                if (!response.ok) {
+                    const errText = await response.text().catch(() => '');
+                    debugLog('响应内容: ' + errText);
+                    throw new Error(`Upload failed: ${response.status} ${errText}`);
+                }
+                
+                return true;
+            } catch (fetchErr) {
+                debugLog('Fetch异常: ' + fetchErr.name + ' - ' + fetchErr.message);
+                throw fetchErr;
             }
-            
-            return true;
         }
 
         async function r2GetObject(key) {
@@ -7054,12 +7181,58 @@
             const path = config.bucketName + '/' + key;
             const url = config.endpoint + '/' + path;
             
-            const headers = {};
-            await r2Sign('GET', path, headers, '');
+            const endpoint = new URL(config.endpoint);
+            const host = endpoint.host;
+            const region = 'auto';
+            const service = 's3';
+            
+            const now = new Date();
+            const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, '');
+            const dateStamp = amzDate.slice(0, 8);
+            const contentSha256 = await sha256Hex('');
+            
+            const headersToSign = {
+                'host': host,
+                'x-amz-content-sha256': contentSha256,
+                'x-amz-date': amzDate
+            };
+            
+            const signedHeaderKeys = Object.keys(headersToSign).sort();
+            const signedHeadersStr = signedHeaderKeys.join(';');
+            const canonicalHeaders = signedHeaderKeys.map(k => k + ':' + headersToSign[k]).join('\n') + '\n';
+            
+            const canonicalRequest = [
+                'GET',
+                '/' + path,
+                '',
+                canonicalHeaders,
+                signedHeadersStr,
+                contentSha256
+            ].join('\n');
+            
+            const algorithm = 'AWS4-HMAC-SHA256';
+            const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
+            const stringToSign = [
+                algorithm,
+                amzDate,
+                credentialScope,
+                await sha256Hex(canonicalRequest)
+            ].join('\n');
+            
+            const signingKey = await getSignatureKey(config.secretKey, dateStamp, region, service);
+            const signature = await hmacHex(signingKey, stringToSign);
+            
+            const authorization = `${algorithm} Credential=${config.accessKeyId}/${credentialScope}, SignedHeaders=${signedHeadersStr}, Signature=${signature}`;
+            
+            const headers = new Headers();
+            headers.set('x-amz-date', amzDate);
+            headers.set('x-amz-content-sha256', contentSha256);
+            headers.set('Authorization', authorization);
             
             const response = await fetch(url, {
                 method: 'GET',
-                headers: headers
+                headers: headers,
+                mode: 'cors'
             });
             
             if (response.status === 404) {
@@ -7078,28 +7251,121 @@
             const path = config.bucketName + '/' + key;
             const url = config.endpoint + '/' + path;
             
-            const headers = {};
-            await r2Sign('DELETE', path, headers, '');
+            const endpoint = new URL(config.endpoint);
+            const host = endpoint.host;
+            const region = 'auto';
+            const service = 's3';
+            
+            const now = new Date();
+            const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, '');
+            const dateStamp = amzDate.slice(0, 8);
+            const contentSha256 = await sha256Hex('');
+            
+            const headersToSign = {
+                'host': host,
+                'x-amz-content-sha256': contentSha256,
+                'x-amz-date': amzDate
+            };
+            
+            const signedHeaderKeys = Object.keys(headersToSign).sort();
+            const signedHeadersStr = signedHeaderKeys.join(';');
+            const canonicalHeaders = signedHeaderKeys.map(k => k + ':' + headersToSign[k]).join('\n') + '\n';
+            
+            const canonicalRequest = [
+                'DELETE',
+                '/' + path,
+                '',
+                canonicalHeaders,
+                signedHeadersStr,
+                contentSha256
+            ].join('\n');
+            
+            const algorithm = 'AWS4-HMAC-SHA256';
+            const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
+            const stringToSign = [
+                algorithm,
+                amzDate,
+                credentialScope,
+                await sha256Hex(canonicalRequest)
+            ].join('\n');
+            
+            const signingKey = await getSignatureKey(config.secretKey, dateStamp, region, service);
+            const signature = await hmacHex(signingKey, stringToSign);
+            
+            const authorization = `${algorithm} Credential=${config.accessKeyId}/${credentialScope}, SignedHeaders=${signedHeadersStr}, Signature=${signature}`;
+            
+            const headers = new Headers();
+            headers.set('x-amz-date', amzDate);
+            headers.set('x-amz-content-sha256', contentSha256);
+            headers.set('Authorization', authorization);
             
             const response = await fetch(url, {
                 method: 'DELETE',
-                headers: headers
+                headers: headers,
+                mode: 'cors'
             });
             
-            return response.ok;
+            return response.ok || response.status === 404;
         }
 
         async function r2ListObjects(prefix = '') {
             const config = appData.settings.r2Config;
-            const path = config.bucketName + '?list-type=2' + (prefix ? '&prefix=' + encodeURIComponent(prefix) : '');
-            const url = config.endpoint + '/' + path;
+            const queryString = 'list-type=2' + (prefix ? '&prefix=' + encodeURIComponent(prefix) : '');
+            const path = config.bucketName;
+            const url = config.endpoint + '/' + path + '?' + queryString;
             
-            const headers = {};
-            await r2Sign('GET', path, headers, '');
+            const endpoint = new URL(config.endpoint);
+            const host = endpoint.host;
+            const region = 'auto';
+            const service = 's3';
+            
+            const now = new Date();
+            const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, '');
+            const dateStamp = amzDate.slice(0, 8);
+            const contentSha256 = await sha256Hex('');
+            
+            const headersToSign = {
+                'host': host,
+                'x-amz-content-sha256': contentSha256,
+                'x-amz-date': amzDate
+            };
+            
+            const signedHeaderKeys = Object.keys(headersToSign).sort();
+            const signedHeadersStr = signedHeaderKeys.join(';');
+            const canonicalHeaders = signedHeaderKeys.map(k => k + ':' + headersToSign[k]).join('\n') + '\n';
+            
+            const canonicalRequest = [
+                'GET',
+                '/' + path,
+                queryString,
+                canonicalHeaders,
+                signedHeadersStr,
+                contentSha256
+            ].join('\n');
+            
+            const algorithm = 'AWS4-HMAC-SHA256';
+            const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
+            const stringToSign = [
+                algorithm,
+                amzDate,
+                credentialScope,
+                await sha256Hex(canonicalRequest)
+            ].join('\n');
+            
+            const signingKey = await getSignatureKey(config.secretKey, dateStamp, region, service);
+            const signature = await hmacHex(signingKey, stringToSign);
+            
+            const authorization = `${algorithm} Credential=${config.accessKeyId}/${credentialScope}, SignedHeaders=${signedHeadersStr}, Signature=${signature}`;
+            
+            const headers = new Headers();
+            headers.set('x-amz-date', amzDate);
+            headers.set('x-amz-content-sha256', contentSha256);
+            headers.set('Authorization', authorization);
             
             const response = await fetch(url, {
                 method: 'GET',
-                headers: headers
+                headers: headers,
+                mode: 'cors'
             });
             
             if (!response.ok) {
