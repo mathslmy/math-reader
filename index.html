@@ -891,6 +891,7 @@
         .notes-column {
             background: var(--bg-primary);
             padding: 16px;
+            padding-bottom: 20px;
             display: flex;
             flex-direction: column;
             overflow: hidden;
@@ -900,10 +901,11 @@
             flex: 1;
             overflow-y: auto;
             -webkit-overflow-scrolling: touch;
+            padding: 0 20px;
         }
 
         #notesFolderContent {
-            padding-bottom: 30px;
+            padding-bottom: 80px;
         }
 
         .notes-column-header {
@@ -6369,6 +6371,8 @@
                     </div>`;
                 });
             }
+            // 添加底部占位，防止被导航栏遮挡
+            html += '<div style="height:60px;"></div>';
             container.innerHTML = html;
         }
 
