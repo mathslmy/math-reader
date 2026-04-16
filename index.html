@@ -874,7 +874,7 @@
         }
 
         /* ==================== Page 3: Notes Collection ==================== */
-        #page3 { padding-top: 0; }
+        #page3 { padding-top: 0; padding-bottom: 0; }
         #page3.active { display: flex; flex-direction: column; }
 
         .notes-grid {
@@ -885,16 +885,23 @@
             background: var(--border-color);
             border-radius: 0;
             overflow: hidden;
-            margin: -20px;
-            margin-top: 0;
+            margin: 0 -20px;
+            margin-bottom: 0;
         }
 
         .notes-column {
             background: var(--bg-primary);
             padding: 16px;
+            padding-bottom: 20px;
             display: flex;
             flex-direction: column;
             overflow: hidden;
+        }
+
+        #notesFolderView {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 0 20px 0;
         }
 
         .notes-column-header {
@@ -2806,15 +2813,6 @@
     <!-- Toast -->
     <div class="toast" id="toast"></div>
 
-    <!-- Debug Log Panel -->
-    <div id="debugPanel" style="display:none;position:fixed;top:0;left:0;right:0;bottom:50%;background:rgba(0,0,0,0.95);color:#0f0;font-family:monospace;font-size:11px;padding:10px;overflow-y:auto;z-index:9999;white-space:pre-wrap;word-break:break-all;">
-        <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-            <span style="color:#fff;font-weight:bold;">Debug Log</span>
-            <button onclick="document.getElementById('debugPanel').style.display='none'" style="background:#f00;color:#fff;border:none;padding:2px 8px;border-radius:4px;">Close</button>
-        </div>
-        <div id="debugLog"></div>
-    </div>
-
     <!-- ==================== Page 1: Library ==================== -->
     <div class="page active" id="page1">
         <div class="page1-header">
@@ -3694,24 +3692,6 @@
     </div>
 
     <script>
-        // ==================== Debug Log ====================
-        function debugLog(msg) {
-            const panel = document.getElementById('debugPanel');
-            const log = document.getElementById('debugLog');
-            if (panel && log) {
-                panel.style.display = 'block';
-                const time = new Date().toLocaleTimeString();
-                log.innerHTML += '[' + time + '] ' + msg + '\n';
-                log.scrollTop = log.scrollHeight;
-            }
-            console.log(msg);
-        }
-
-        function clearDebugLog() {
-            const log = document.getElementById('debugLog');
-            if (log) log.innerHTML = '';
-        }
-
         // ==================== Data Store ====================
         let appData = {
             books: [],
@@ -6241,7 +6221,7 @@
                 // 计算总体进度
                 let totalProgress = 0;
                 if (count > 0) {
-                    const progressSum = lectureData.chapters.reduce((sum, ch) => sum + (ch.progress || 0), 0);
+                    const progressSum = lectureData.chapters.reduce((sum, ch) => sum + (ch.maxProgress || ch.progress || 0), 0);
                     totalProgress = Math.round(progressSum / count);
                 }
 
@@ -6370,7 +6350,7 @@
                 }
             } else {
                 lectureData.chapters.forEach((chapter, idx) => {
-                    const progress = chapter.progress || 0;
+                    const progress = chapter.maxProgress || chapter.progress || 0;
                     const statusIcon = chapter.status === 'generating' 
                         ? '<div class="generating-spinner" style="width:12px;height:12px;"></div>'
                         : (chapter.status === 'ready' ? '' : '');
@@ -6959,49 +6939,29 @@
                 return;
             }
             
-            // 验证endpoint格式
             if (!config.endpoint.startsWith('https://')) {
                 showToast('Endpoint必须以https://开头');
                 return;
             }
             
             showToast('测试连接中...');
-            clearDebugLog();
-            debugLog('=== R2 连接测试开始 ===');
-            debugLog('Endpoint: ' + config.endpoint);
-            debugLog('Bucket: ' + config.bucketName);
-            debugLog('AccessKeyId: ' + config.accessKeyId.substring(0, 8) + '...');
-            debugLog('UserAgent: ' + navigator.userAgent);
             
             try {
                 const testKey = '_test_connection_' + Date.now();
                 const testData = 'test';
                 
-                debugLog('准备PUT请求...');
-                debugLog('URL: ' + config.endpoint + '/' + config.bucketName + '/' + testKey);
-                
                 await r2PutObject(testKey, testData, 'text/plain');
-                debugLog('PUT成功!');
-                
-                debugLog('准备DELETE请求...');
                 await r2DeleteObject(testKey);
-                debugLog('DELETE成功!');
                 
-                debugLog('=== 测试通过 ===');
                 showToast('连接成功!');
             } catch (err) {
-                debugLog('错误类型: ' + err.name);
-                debugLog('错误信息: ' + err.message);
-                debugLog('错误堆栈: ' + (err.stack || 'N/A'));
-                
+                console.error('R2 connection test failed:', err);
                 let errorMsg = err.message || '未知错误';
                 
-                // 提供更具体的错误提示
                 if (errorMsg.includes('Failed to fetch') || errorMsg.includes('Load failed') || errorMsg.includes('NetworkError')) {
-                    debugLog('判断为网络/CORS错误');
-                    errorMsg = '网络错误';
+                    errorMsg = '网络错误，请检查Endpoint和CORS配置';
                 } else if (errorMsg.includes('403')) {
-                    errorMsg = '权限被拒绝';
+                    errorMsg = '权限被拒绝，请检查密钥';
                 } else if (errorMsg.includes('404')) {
                     errorMsg = 'Bucket不存在';
                 }
@@ -7152,30 +7112,19 @@
             headers.set('x-amz-content-sha256', contentSha256);
             headers.set('Authorization', authorization);
             
-            debugLog('发起fetch请求: PUT ' + url);
-            debugLog('Headers: x-amz-date=' + amzDate);
+            const response = await fetch(url, {
+                method: 'PUT',
+                headers: headers,
+                body: payload,
+                mode: 'cors'
+            });
             
-            try {
-                const response = await fetch(url, {
-                    method: 'PUT',
-                    headers: headers,
-                    body: payload,
-                    mode: 'cors'
-                });
-                
-                debugLog('响应状态: ' + response.status + ' ' + response.statusText);
-                
-                if (!response.ok) {
-                    const errText = await response.text().catch(() => '');
-                    debugLog('响应内容: ' + errText);
-                    throw new Error(`Upload failed: ${response.status} ${errText}`);
-                }
-                
-                return true;
-            } catch (fetchErr) {
-                debugLog('Fetch异常: ' + fetchErr.name + ' - ' + fetchErr.message);
-                throw fetchErr;
+            if (!response.ok) {
+                const errText = await response.text().catch(() => '');
+                throw new Error(`Upload failed: ${response.status} ${errText}`);
             }
+            
+            return true;
         }
 
         async function r2GetObject(key) {
@@ -7398,26 +7347,8 @@
             }
             
             showToast('同步中...');
-            clearDebugLog();
-            debugLog('=== 开始同步到云端 ===');
             
             try {
-                // 检查annotations数据
-                debugLog('Books数量: ' + appData.books.length);
-                appData.books.forEach((b, i) => {
-                    debugLog('Book[' + i + ']: ' + b.title);
-                    debugLog('  annotations: ' + (b.annotations ? b.annotations.length + '个' : '无'));
-                    if (b.annotations && b.annotations.length > 0) {
-                        debugLog('  第一个annotation类型: ' + b.annotations[0].type);
-                    }
-                });
-                
-                debugLog('Papers数量: ' + appData.papers.length);
-                appData.papers.forEach((p, i) => {
-                    debugLog('Paper[' + i + ']: ' + p.title);
-                    debugLog('  annotations: ' + (p.annotations ? p.annotations.length + '个' : '无'));
-                });
-                
                 // 1. 上传元数据 (不包含PDF数据，但保留annotations)
                 const metadata = {
                     books: appData.books.map(b => ({ ...b, data: undefined })),
@@ -7430,17 +7361,7 @@
                     syncedAt: new Date().toISOString()
                 };
                 
-                // 验证metadata中的annotations
-                debugLog('--- 验证metadata ---');
-                metadata.books.forEach((b, i) => {
-                    debugLog('metadata.books[' + i + '].annotations: ' + (b.annotations ? b.annotations.length + '个' : '无'));
-                });
-                
-                const metadataStr = JSON.stringify(metadata);
-                debugLog('metadata大小: ' + metadataStr.length + ' 字节');
-                
-                await r2PutObject('metadata.json', metadataStr, 'application/json');
-                debugLog('metadata.json 上传成功');
+                await r2PutObject('metadata.json', JSON.stringify(metadata), 'application/json');
                 
                 // 2. 上传PDF文件 (从IndexedDB获取)
                 let uploadedFiles = 0;
@@ -7452,14 +7373,11 @@
                         const fileKey = 'files/' + doc.id + '.pdf';
                         await r2PutObject(fileKey, fileData, 'application/pdf');
                         uploadedFiles++;
-                        debugLog('上传文件: ' + doc.title);
                     }
                 }
                 
-                debugLog('=== 同步完成 ===');
                 showToast(`同步完成! 上传了 ${uploadedFiles} 个文件`);
             } catch (err) {
-                debugLog('同步失败: ' + err.message);
                 console.error('Sync to R2 failed:', err);
                 showToast('同步失败: ' + err.message);
             }
