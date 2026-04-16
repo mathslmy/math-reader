@@ -1058,6 +1058,212 @@
             padding: 8px 20px 14px;
         }
 
+        /* User profile card */
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 20px;
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            margin-bottom: 16px;
+        }
+
+        .user-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: var(--accent);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: 600;
+            cursor: pointer;
+            overflow: hidden;
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .user-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .user-avatar:hover::after {
+            content: '编辑';
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: white;
+        }
+
+        .user-name-edit {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .user-name-input {
+            font-size: 20px;
+            font-weight: 600;
+            border: none;
+            background: transparent;
+            color: var(--text-primary);
+            width: 100%;
+            padding: 4px 0;
+            border-bottom: 2px solid transparent;
+            font-family: inherit;
+        }
+
+        .user-name-input:focus {
+            outline: none;
+            border-bottom-color: var(--accent);
+        }
+
+        .edit-hint {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        /* AI avatar small (for AI settings row) */
+        .ai-avatar-small {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: var(--bg-tertiary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+
+        .ai-avatar-small img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* AI persona editor */
+        .ai-persona-edit {
+            padding: 0 20px 16px;
+        }
+
+        .ai-persona-edit textarea {
+            width: 100%;
+            height: 100px;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 12px;
+            font-size: 14px;
+            resize: none;
+            font-family: inherit;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            box-sizing: border-box;
+        }
+
+        .ai-persona-edit textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        /* Right-aligned compact input in settings rows */
+        .settings-input {
+            border: none;
+            background: transparent;
+            text-align: right;
+            font-size: 14px;
+            color: var(--text-secondary);
+            padding: 8px;
+            width: 140px;
+            font-family: inherit;
+        }
+
+        .settings-input:focus {
+            outline: none;
+            color: var(--text-primary);
+        }
+
+        /* Arrow that rotates when expanded */
+        .settings-item-arrow {
+            color: var(--text-muted);
+            transition: transform 0.2s;
+            display: inline-block;
+        }
+        .settings-item-arrow.expanded {
+            transform: rotate(90deg);
+        }
+
+        /* Upload Modal Styles (avatar modals) */
+        .upload-options {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .upload-btn {
+            display: block;
+            padding: 14px;
+            background: var(--accent);
+            color: white;
+            text-align: center;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .upload-url-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .upload-url-group .form-input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 13px;
+            box-sizing: border-box;
+            font-family: inherit;
+        }
+
+        .url-confirm-btn {
+            padding: 12px;
+            background: var(--bg-secondary);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .url-confirm-btn:hover {
+            background: var(--bg-tertiary);
+        }
+
+        body.dark-theme .user-avatar {
+            background: #ffffff;
+            color: #000000;
+        }
+
+        body.dark-theme .upload-btn {
+            background: #ffffff;
+            color: #000000;
+        }
+
         .theme-options {
             display: flex;
             gap: 16px;
@@ -2021,6 +2227,60 @@
 
         .draft-textarea:focus {
             outline: none;
+        }
+
+        /* Rich-text editable draft area */
+        .draft-editor {
+            flex: 1;
+            width: 100%;
+            border: none;
+            background: var(--bg-primary);
+            padding: 12px 16px;
+            font-size: 14px;
+            font-family: inherit;
+            color: var(--text-primary);
+            box-sizing: border-box;
+            line-height: 1.6;
+            overflow-y: auto;
+            outline: none;
+            word-break: break-word;
+            -webkit-user-select: text;
+            user-select: text;
+        }
+
+        .draft-editor:empty::before {
+            content: attr(data-placeholder);
+            color: var(--text-muted);
+            pointer-events: none;
+        }
+
+        .draft-editor b, .draft-editor strong { font-weight: 700; }
+        .draft-editor i, .draft-editor em { font-style: italic; }
+        .draft-editor s, .draft-editor strike, .draft-editor del { text-decoration: line-through; }
+
+        /* Todo block inside draft */
+        .draft-todo {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            padding: 4px 0;
+        }
+        .draft-todo-checkbox {
+            width: 16px;
+            height: 16px;
+            margin-top: 3px;
+            flex-shrink: 0;
+            cursor: pointer;
+            accent-color: var(--accent);
+        }
+        .draft-todo-text {
+            flex: 1;
+            outline: none;
+            min-height: 1.4em;
+        }
+        .draft-todo.done .draft-todo-text {
+            text-decoration: line-through;
+            color: var(--text-muted);
         }
 
         .draft-canvas-wrapper {
@@ -3006,18 +3266,21 @@
             </div>
             <div style="flex:1;"></div>
             <!-- 文字格式 -->
-            <button class="draft-tool-btn" onclick="formatDraftText('bold')" title="加粗">
+            <button class="draft-tool-btn" onmousedown="event.preventDefault()" onclick="formatDraftText('bold')" title="加粗">
                 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.6 10.79c.97-.67 1.65-1.77 1.65-2.79 0-2.26-1.75-4-4-4H7v14h7.04c2.09 0 3.71-1.7 3.71-3.79 0-1.52-.86-2.82-2.15-3.42zM10 6.5h3c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5h-3v-3zm3.5 9H10v-3h3.5c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5z"/></svg>
             </button>
-            <button class="draft-tool-btn" onclick="formatDraftText('italic')" title="斜体">
+            <button class="draft-tool-btn" onmousedown="event.preventDefault()" onclick="formatDraftText('italic')" title="斜体">
                 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 4v3h2.21l-3.42 8H6v3h8v-3h-2.21l3.42-8H18V4z"/></svg>
             </button>
-            <button class="draft-tool-btn" onclick="formatDraftText('todo')" title="待办">
+            <button class="draft-tool-btn" onmousedown="event.preventDefault()" onclick="formatDraftText('strike')" title="删除线">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12h16"/><path d="M17.5 7.5c-.5-2-2.5-3.5-5.5-3.5-3 0-5 1.5-5 4 0 1.5 1 2.5 3 3"/><path d="M7 16c.5 2 2.5 3.5 5.5 3.5 3 0 5-1.5 5-4"/></svg>
+            </button>
+            <button class="draft-tool-btn" onmousedown="event.preventDefault()" onclick="formatDraftText('todo')" title="待办">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 12l2 2 4-4"/></svg>
             </button>
         </div>
         <div class="draft-content">
-            <textarea class="draft-textarea" id="draftTextarea" placeholder="在这里写草稿..." oninput="saveDraft()"></textarea>
+            <div class="draft-editor" id="draftTextarea" contenteditable="true" data-placeholder="在这里写草稿..." oninput="saveDraft()"></div>
             <div class="draft-canvas-wrapper" id="draftCanvasWrapper">
                 <canvas class="draft-canvas" id="draftCanvas"></canvas>
             </div>
@@ -3089,23 +3352,18 @@
             <span style="font-size:20px;font-weight:700;">设置</span>
         </div>
 
+        <!-- User Profile -->
+        <div class="user-profile">
+            <div class="user-avatar" id="userAvatar" onclick="showAvatarOptions()">U</div>
+            <div class="user-name-edit">
+                <input type="text" id="userName" value="" placeholder="你的名字" class="user-name-input" oninput="saveUserName()">
+                <span class="edit-hint">点击编辑</span>
+            </div>
+        </div>
+
         <!-- User Settings -->
         <div class="settings-section">
             <div class="settings-section-title">用户设置</div>
-            <div class="setting-item">
-                <div class="setting-item-left">
-                    <div class="setting-item-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                    </div>
-                    <div>
-                        <div class="setting-item-label">用户名</div>
-                        <div class="setting-item-desc">AI 问候时使用</div>
-                    </div>
-                </div>
-            </div>
-            <div class="setting-input-row">
-                <input class="setting-input" id="userName" type="text" placeholder="你的名字" oninput="saveSettings()">
-            </div>
 
             <div class="setting-item" onclick="showAPIModal()">
                 <div class="setting-item-left">
@@ -3140,6 +3398,48 @@
             </div>
         </div>
 
+        <!-- AI Settings -->
+        <div class="settings-section">
+            <div class="settings-section-title">AI 设置</div>
+            <div class="setting-item" onclick="showAIAvatarModal()">
+                <div class="setting-item-left">
+                    <div class="ai-avatar-small" id="aiAvatarSmall">AI</div>
+                    <div>
+                        <div class="setting-item-label">AI 头像</div>
+                    </div>
+                </div>
+                <div class="setting-item-right">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                </div>
+            </div>
+            <div class="setting-item">
+                <div class="setting-item-left">
+                    <div class="setting-item-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 016-6h4a6 6 0 016 6v1"/></svg>
+                    </div>
+                    <div>
+                        <div class="setting-item-label">AI 名称</div>
+                    </div>
+                </div>
+                <input type="text" id="aiName" value="AI助手" class="settings-input" onblur="saveAIName()">
+            </div>
+            <div class="setting-item" onclick="toggleAIPersona()">
+                <div class="setting-item-left">
+                    <div class="setting-item-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                    </div>
+                    <div>
+                        <div class="setting-item-label">AI 人设</div>
+                        <div class="setting-item-desc">仅在"不知道，给我建议"时生效</div>
+                    </div>
+                </div>
+                <span class="settings-item-arrow" id="aiPersonaArrow">›</span>
+            </div>
+            <div class="ai-persona-edit" id="aiPersonaEdit" style="display: none;">
+                <textarea id="aiPersonaText" placeholder="描述你希望AI具有的性格特点..." onblur="saveAIPersona()">你是一个温柔且有耐心的助手，善于鼓励用户完成任务。</textarea>
+            </div>
+        </div>
+
         <!-- Theme Settings (faithful to original) -->
         <div class="settings-section">
             <div style="padding:16px 20px 12px;display:flex;justify-content:space-between;align-items:center;">
@@ -3156,23 +3456,23 @@
                     <span>日间模式</span>
                 </div>
                 <div class="theme-option" data-color="blue" onclick="setColorTheme('blue')">
-                    <div class="theme-preview" style="background:linear-gradient(180deg,#1e3a5f 50%,#243555 50%);"></div>
+                    <div class="theme-preview" id="themePreviewBlue"></div>
                     <span>蓝调</span>
                 </div>
                 <div class="theme-option" data-color="green" onclick="setColorTheme('green')">
-                    <div class="theme-preview" style="background:linear-gradient(180deg,#1a3a2a 50%,#2d4a3a 50%);"></div>
+                    <div class="theme-preview" id="themePreviewGreen"></div>
                     <span>森绿</span>
                 </div>
                 <div class="theme-option" data-color="orange" onclick="setColorTheme('orange')">
-                    <div class="theme-preview" style="background:linear-gradient(180deg,#faf6f1 50%,#f0e8dd 50%);"></div>
+                    <div class="theme-preview" id="themePreviewOrange"></div>
                     <span>暖橙</span>
                 </div>
                 <div class="theme-option" data-color="pink" onclick="setColorTheme('pink')">
-                    <div class="theme-preview" style="background:linear-gradient(180deg,#fff0f5 50%,#ffe0eb 50%);"></div>
+                    <div class="theme-preview" id="themePreviewPink"></div>
                     <span>樱粉</span>
                 </div>
                 <div class="theme-option" data-color="purple" onclick="setColorTheme('purple')">
-                    <div class="theme-preview" style="background:linear-gradient(180deg,#1a1033 50%,#2d1f4e 50%);"></div>
+                    <div class="theme-preview" id="themePreviewPurple"></div>
                     <span>靛紫</span>
                 </div>
             </div>
@@ -3185,6 +3485,46 @@
                 </div>
                 <div class="setting-item-right">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- User Avatar Modal -->
+        <div class="modal-overlay" id="avatarModal" onclick="hideModal('avatarModal')">
+            <div class="modal-content" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <span class="modal-title">设置用户头像</span>
+                    <button class="modal-close" onclick="hideModal('avatarModal')">&times;</button>
+                </div>
+                <div class="upload-options">
+                    <label class="upload-btn">
+                        上传图片
+                        <input type="file" id="avatarFile" accept="image/*" onchange="uploadAvatar(event)" style="display: none;">
+                    </label>
+                    <div class="upload-url-group">
+                        <input type="text" id="avatarUrl" placeholder="或输入图片链接" class="form-input">
+                        <button onclick="setAvatarUrl()" class="url-confirm-btn">确定</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Avatar Modal -->
+        <div class="modal-overlay" id="aiAvatarModal" onclick="hideModal('aiAvatarModal')">
+            <div class="modal-content" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <span class="modal-title">设置AI头像</span>
+                    <button class="modal-close" onclick="hideModal('aiAvatarModal')">&times;</button>
+                </div>
+                <div class="upload-options">
+                    <label class="upload-btn">
+                        上传图片
+                        <input type="file" id="aiAvatarFile" accept="image/*" onchange="uploadAIAvatar(event)" style="display: none;">
+                    </label>
+                    <div class="upload-url-group">
+                        <input type="text" id="aiAvatarUrl" placeholder="或输入图片链接" class="form-input">
+                        <button onclick="setAIAvatarUrl()" class="url-confirm-btn">确定</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -3638,18 +3978,21 @@
             </div>
             <div style="flex:1;"></div>
             <!-- 文字格式 -->
-            <button class="draft-tool-btn" onclick="formatLectureDraftText('bold')" title="加粗">
+            <button class="draft-tool-btn" onmousedown="event.preventDefault()" onclick="formatLectureDraftText('bold')" title="加粗">
                 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.6 10.79c.97-.67 1.65-1.77 1.65-2.79 0-2.26-1.75-4-4-4H7v14h7.04c2.09 0 3.71-1.7 3.71-3.79 0-1.52-.86-2.82-2.15-3.42zM10 6.5h3c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5h-3v-3zm3.5 9H10v-3h3.5c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5z"/></svg>
             </button>
-            <button class="draft-tool-btn" onclick="formatLectureDraftText('italic')" title="斜体">
+            <button class="draft-tool-btn" onmousedown="event.preventDefault()" onclick="formatLectureDraftText('italic')" title="斜体">
                 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 4v3h2.21l-3.42 8H6v3h8v-3h-2.21l3.42-8H18V4z"/></svg>
             </button>
-            <button class="draft-tool-btn" onclick="formatLectureDraftText('todo')" title="待办">
+            <button class="draft-tool-btn" onmousedown="event.preventDefault()" onclick="formatLectureDraftText('strike')" title="删除线">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12h16"/><path d="M17.5 7.5c-.5-2-2.5-3.5-5.5-3.5-3 0-5 1.5-5 4 0 1.5 1 2.5 3 3"/><path d="M7 16c.5 2 2.5 3.5 5.5 3.5 3 0 5-1.5 5-4"/></svg>
+            </button>
+            <button class="draft-tool-btn" onmousedown="event.preventDefault()" onclick="formatLectureDraftText('todo')" title="待办">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 12l2 2 4-4"/></svg>
             </button>
         </div>
         <div class="draft-content">
-            <textarea class="draft-textarea" id="lectureDraftTextarea" placeholder="在这里写草稿..." oninput="saveLectureDraft()"></textarea>
+            <div class="draft-editor" id="lectureDraftTextarea" contenteditable="true" data-placeholder="在这里写草稿..." oninput="saveLectureDraft()"></div>
             <div class="draft-canvas-wrapper" id="lectureDraftCanvasWrapper">
                 <canvas class="draft-canvas" id="lectureDraftCanvas"></canvas>
             </div>
@@ -3709,7 +4052,12 @@
                 mathpixAppKey: '',
                 theme: 'light',
                 bgImage: '',
-                notify: false
+                notify: false,
+                userName: '',
+                userAvatar: '',
+                aiName: 'AI助手',
+                aiAvatar: '',
+                aiPersona: '你是一个温柔且有耐心的助手，善于鼓励用户完成任务。'
             }
         };
 
@@ -3894,12 +4242,19 @@
 
         function loadDraft() {
             if (!currentDoc) return;
-            const draftData = appData.drafts?.[currentDoc.id] || { text: '', canvas: null };
+            const editor = document.getElementById('draftTextarea');
+            const draftData = appData.drafts?.[currentDoc.id] || { html: '', canvas: null };
+            let htmlToLoad = '';
             if (typeof draftData === 'string') {
-                document.getElementById('draftTextarea').value = draftData;
-            } else {
-                document.getElementById('draftTextarea').value = draftData.text || '';
+                htmlToLoad = legacyDraftTextToHtml(draftData);
+            } else if (draftData && typeof draftData.html === 'string') {
+                htmlToLoad = draftData.html;
+            } else if (draftData && typeof draftData.text === 'string') {
+                const t = draftData.text;
+                htmlToLoad = /<[a-zA-Z][^>]*>/.test(t) ? t : legacyDraftTextToHtml(t);
             }
+            editor.innerHTML = htmlToLoad;
+            wireDraftEditor(editor, saveDraft);
             document.getElementById('draftPanelTitle').textContent = currentDoc.title + ' - 草稿';
             updateDraftInfo();
             // 重置历史
@@ -3911,13 +4266,14 @@
             if (!currentDoc) return;
             if (!appData.drafts) appData.drafts = {};
             
-            const text = document.getElementById('draftTextarea').value;
+            const editor = document.getElementById('draftTextarea');
+            const html = editor ? editor.innerHTML : '';
             let canvasData = null;
             if (draftCanvas) {
                 canvasData = draftCanvas.toDataURL();
             }
             
-            appData.drafts[currentDoc.id] = { text, canvas: canvasData };
+            appData.drafts[currentDoc.id] = { html: html, text: '', canvas: canvasData };
             updateDraftInfo();
             saveData();
         }
@@ -4053,8 +4409,8 @@
         }
 
         function updateDraftInfo() {
-            const text = document.getElementById('draftTextarea').value;
-            const charCount = text.length;
+            const editor = document.getElementById('draftTextarea');
+            const charCount = editor ? (editor.innerText || '').replace(/\n+$/,'').length : 0;
             document.getElementById('draftInfo').textContent = charCount + ' 字';
         }
 
@@ -4208,48 +4564,156 @@
             }
         }
 
+        // ==================== Rich-text draft helpers ====================
+        // Escape raw user text so it can safely become HTML
+        function escapeDraftText(s) {
+            return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        // Convert old-style saved drafts (plain text possibly containing
+        // **bold**, *italic*, ~~strike~~, [ ] todo / [x] todo) into the HTML
+        // format the contenteditable editor uses. Safe: escapes raw text first.
+        function legacyDraftTextToHtml(raw) {
+            if (!raw) return '';
+            const lines = String(raw).split(/\r?\n/);
+            const out = [];
+            for (let i = 0; i < lines.length; i++) {
+                let line = lines[i];
+                const todoMatch = line.match(/^\[( |x|X)\]\s?(.*)$/);
+                if (todoMatch) {
+                    const done = todoMatch[1].toLowerCase() === 'x';
+                    let inner = escapeDraftText(todoMatch[2]);
+                    inner = applyInlineMarkdown(inner);
+                    out.push(buildTodoHtml(done, inner));
+                    continue;
+                }
+                let esc = escapeDraftText(line);
+                esc = applyInlineMarkdown(esc);
+                if (esc === '') {
+                    out.push('<div><br></div>');
+                } else {
+                    out.push('<div>' + esc + '</div>');
+                }
+            }
+            return out.join('');
+        }
+
+        function applyInlineMarkdown(escaped) {
+            // Already escaped. Convert **..**, *..*, ~~..~~ to real tags.
+            let s = escaped;
+            s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+            s = s.replace(/~~([^~]+)~~/g, '<s>$1</s>');
+            s = s.replace(/(^|[^*])\*([^*]+)\*(?!\*)/g, '$1<em>$2</em>');
+            return s;
+        }
+
+        function buildTodoHtml(done, innerHtml) {
+            const checked = done ? ' checked' : '';
+            const doneClass = done ? ' done' : '';
+            return '<div class="draft-todo' + doneClass + '" contenteditable="false">' +
+                '<input type="checkbox" class="draft-todo-checkbox"' + checked + '>' +
+                '<div class="draft-todo-text" contenteditable="true">' + (innerHtml || '') + '</div>' +
+                '</div>';
+        }
+
+        // Wire a draft-editor: checkbox toggling + empty-state cleanup.
+        // Safe to call multiple times; guards via a flag on the element.
+        function wireDraftEditor(editor, onChange) {
+            if (!editor || editor._wired) return;
+            editor._wired = true;
+            editor.addEventListener('click', function(e) {
+                const cb = e.target.closest && e.target.closest('.draft-todo-checkbox');
+                if (cb) {
+                    const todo = cb.closest('.draft-todo');
+                    if (todo) todo.classList.toggle('done', cb.checked);
+                    if (typeof onChange === 'function') onChange();
+                }
+            });
+            // When the user presses Enter inside a todo text, break out to a new
+            // normal line so todos stay single-line blocks.
+            editor.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    const sel = window.getSelection();
+                    if (!sel || sel.rangeCount === 0) return;
+                    const node = sel.anchorNode;
+                    if (!node) return;
+                    const todoText = (node.nodeType === 1 ? node : node.parentElement)?.closest?.('.draft-todo-text');
+                    if (todoText) {
+                        e.preventDefault();
+                        const todoBlock = todoText.closest('.draft-todo');
+                        const newDiv = document.createElement('div');
+                        newDiv.innerHTML = '<br>';
+                        todoBlock.parentNode.insertBefore(newDiv, todoBlock.nextSibling);
+                        const range = document.createRange();
+                        range.setStart(newDiv, 0);
+                        range.collapse(true);
+                        sel.removeAllRanges();
+                        sel.addRange(range);
+                        if (typeof onChange === 'function') onChange();
+                    }
+                }
+            });
+        }
+
+        // Insert a todo block at / before the current selection inside the editor.
+        function insertTodoAtSelection(editor, selectedText) {
+            editor.focus();
+            const sel = window.getSelection();
+            if (!sel || sel.rangeCount === 0) {
+                // No selection: just append at the end.
+                const holder = document.createElement('div');
+                holder.innerHTML = buildTodoHtml(false, escapeDraftText(selectedText || ''));
+                editor.appendChild(holder.firstChild);
+                return;
+            }
+            const range = sel.getRangeAt(0);
+            // Make sure the range is inside our editor.
+            if (!editor.contains(range.startContainer)) {
+                const holder = document.createElement('div');
+                holder.innerHTML = buildTodoHtml(false, escapeDraftText(selectedText || ''));
+                editor.appendChild(holder.firstChild);
+                return;
+            }
+            const textForTodo = selectedText || (range.toString() || '');
+            // Remove the selected text so the todo replaces/precedes it cleanly.
+            range.deleteContents();
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = buildTodoHtml(false, escapeDraftText(textForTodo));
+            const todoNode = wrapper.firstChild;
+            range.insertNode(todoNode);
+            // Place caret inside the todo text for immediate typing.
+            const todoTextEl = todoNode.querySelector('.draft-todo-text');
+            if (todoTextEl) {
+                const r = document.createRange();
+                r.selectNodeContents(todoTextEl);
+                r.collapse(false);
+                sel.removeAllRanges();
+                sel.addRange(r);
+            }
+        }
+
+        // Apply a document.execCommand style (bold/italic/strikeThrough) to the
+        // current selection in a specific editor, ensuring focus sits inside it.
+        function applyDraftStyle(editor, cmd) {
+            if (!editor) return;
+            editor.focus();
+            // Ensure selection is inside this editor; if not, do nothing.
+            const sel = window.getSelection();
+            if (sel && sel.rangeCount > 0 && !editor.contains(sel.anchorNode)) return;
+            try { document.execCommand(cmd, false, null); } catch (e) {}
+        }
+
         function formatDraftText(type) {
-            const textarea = document.getElementById('draftTextarea');
-            const start = textarea.selectionStart;
-            const end = textarea.selectionEnd;
-            const text = textarea.value;
-            const selected = text.substring(start, end);
-            
-            let formatted = '';
-            let cursorOffset = 0;
-            
-            switch(type) {
-                case 'bold':
-                    formatted = `**${selected}**`;
-                    cursorOffset = 2;
-                    break;
-                case 'italic':
-                    formatted = `*${selected}*`;
-                    cursorOffset = 1;
-                    break;
-                case 'highlight':
-                    formatted = `==${selected}==`;
-                    cursorOffset = 2;
-                    break;
-                case 'strike':
-                    formatted = `~~${selected}~~`;
-                    cursorOffset = 2;
-                    break;
-                case 'todo':
-                    formatted = `[ ] ${selected}`;
-                    cursorOffset = 4;
-                    break;
+            const editor = document.getElementById('draftTextarea');
+            if (!editor) return;
+            if (type === 'bold') applyDraftStyle(editor, 'bold');
+            else if (type === 'italic') applyDraftStyle(editor, 'italic');
+            else if (type === 'strike') applyDraftStyle(editor, 'strikeThrough');
+            else if (type === 'todo') {
+                const sel = window.getSelection();
+                const selText = (sel && sel.rangeCount > 0 && editor.contains(sel.anchorNode)) ? sel.toString() : '';
+                insertTodoAtSelection(editor, selText);
             }
-            
-            textarea.value = text.substring(0, start) + formatted + text.substring(end);
-            textarea.focus();
-            
-            if (selected.length === 0) {
-                textarea.setSelectionRange(start + cursorOffset, start + cursorOffset);
-            } else {
-                textarea.setSelectionRange(start, start + formatted.length);
-            }
-            
             saveDraft();
         }
 
@@ -6389,6 +6853,30 @@
             const s = appData.settings;
             document.getElementById('userName').value = s.userName || '';
 
+            // Apply user avatar
+            if (s.userAvatar) {
+                const ua = document.getElementById('userAvatar');
+                if (ua) ua.innerHTML = '<img src="' + s.userAvatar + '" alt="avatar">';
+            }
+
+            // Apply AI name
+            if (typeof s.aiName === 'string') {
+                const aiNameInput = document.getElementById('aiName');
+                if (aiNameInput) aiNameInput.value = s.aiName || 'AI助手';
+            }
+
+            // Apply AI avatar
+            if (s.aiAvatar) {
+                const aa = document.getElementById('aiAvatarSmall');
+                if (aa) aa.innerHTML = '<img src="' + s.aiAvatar + '" alt="AI">';
+            }
+
+            // Apply AI persona
+            if (typeof s.aiPersona === 'string' && s.aiPersona) {
+                const personaTa = document.getElementById('aiPersonaText');
+                if (personaTa) personaTa.value = s.aiPersona;
+            }
+
             // Apply theme
             isDarkMode = s.isDark || false;
             currentColorTheme = s.colorTheme || 'default';
@@ -6433,6 +6921,113 @@
         function saveSettings() {
             appData.settings.userName = document.getElementById('userName').value;
             saveData();
+        }
+
+        // User name / avatar
+        function saveUserName() {
+            appData.settings.userName = document.getElementById('userName').value;
+            saveData();
+        }
+
+        function showAvatarOptions() {
+            showModal('avatarModal');
+        }
+
+        function uploadAvatar(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                setAvatarImage(e.target.result);
+                hideModal('avatarModal');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function setAvatarUrl() {
+            const url = document.getElementById('avatarUrl').value.trim();
+            if (url) {
+                setAvatarImage(url);
+                hideModal('avatarModal');
+            }
+        }
+
+        function setAvatarImage(src) {
+            const avatar = document.getElementById('userAvatar');
+            if (avatar) avatar.innerHTML = '<img src="' + src + '" alt="avatar">';
+            appData.settings.userAvatar = src;
+            saveData();
+        }
+
+        // AI name / avatar / persona
+        function saveAIName() {
+            appData.settings.aiName = document.getElementById('aiName').value || 'AI助手';
+            saveData();
+        }
+
+        function toggleAIPersona() {
+            const edit = document.getElementById('aiPersonaEdit');
+            const arrow = document.getElementById('aiPersonaArrow');
+            if (!edit) return;
+            if (edit.style.display === 'none') {
+                edit.style.display = 'block';
+                if (arrow) arrow.classList.add('expanded');
+            } else {
+                edit.style.display = 'none';
+                if (arrow) arrow.classList.remove('expanded');
+            }
+        }
+
+        function saveAIPersona() {
+            appData.settings.aiPersona = document.getElementById('aiPersonaText').value;
+            saveData();
+        }
+
+        function showAIAvatarModal() {
+            showModal('aiAvatarModal');
+        }
+
+        function uploadAIAvatar(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                setAIAvatarImage(e.target.result);
+                hideModal('aiAvatarModal');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function setAIAvatarUrl() {
+            const url = document.getElementById('aiAvatarUrl').value.trim();
+            if (url) {
+                setAIAvatarImage(url);
+                hideModal('aiAvatarModal');
+            }
+        }
+
+        function setAIAvatarImage(src) {
+            const avatar = document.getElementById('aiAvatarSmall');
+            if (avatar) avatar.innerHTML = '<img src="' + src + '" alt="AI">';
+            appData.settings.aiAvatar = src;
+            saveData();
+        }
+
+        // Getters used by chat rendering
+        function getUserName() {
+            return (document.getElementById('userName')?.value) || appData.settings.userName || 'User';
+        }
+        function getUserAvatar() {
+            return appData.settings.userAvatar || '';
+        }
+        function getAIName() {
+            return (document.getElementById('aiName')?.value) || appData.settings.aiName || 'AI助手';
+        }
+        function getAIAvatar() {
+            return appData.settings.aiAvatar || '';
+        }
+        function getAIPersona() {
+            return (document.getElementById('aiPersonaText')?.value) || appData.settings.aiPersona || '你是一个温柔且有耐心的助手，善于鼓励用户完成任务。';
         }
         
         // ==================== API Modal (照抄index.html) ====================
@@ -6604,6 +7199,29 @@
                 const preview = opt.querySelector('.theme-preview');
                 if (preview && opt.dataset.color === 'default') {
                     preview.className = 'theme-preview ' + (isDarkMode ? 'dark' : 'light');
+                }
+            });
+
+            // Update colored previews to match current day/night mode
+            updateAllThemePreviews(isDarkMode ? 'dark' : 'light');
+        }
+
+        // Preview gradients for each color theme
+        const colorThemeColors = {
+            blue:   { light: ['#f0f4f8','#dbe4ee'], dark: ['#172033','#2a4070'] },
+            green:  { light: ['#f2f7f2','#e0ece0'], dark: ['#142214','#1e4a2a'] },
+            orange: { light: ['#fdf6f0','#f5e6d8'], dark: ['#241a10','#5a3518'] },
+            pink:   { light: ['#fdf2f8','#fce7f3'], dark: ['#24101c','#5a1a40'] },
+            purple: { light: ['#f5f3ff','#ede9fe'], dark: ['#1a1430','#3a2860'] }
+        };
+
+        function updateAllThemePreviews(mode) {
+            const m = mode || (isDarkMode ? 'dark' : 'light');
+            Object.keys(colorThemeColors).forEach(function(color) {
+                const el = document.getElementById('themePreview' + color.charAt(0).toUpperCase() + color.slice(1));
+                if (el) {
+                    const c = colorThemeColors[color][m];
+                    el.style.background = 'linear-gradient(180deg, ' + c[0] + ' 50%, ' + c[1] + ' 50%)';
                 }
             });
         }
@@ -7534,7 +8152,10 @@
             if (!currentDoc) return;
             const container = document.getElementById('readerChatContainer');
             const history = loadReaderChatHistory(currentDoc.id);
-            const userName = appData.settings.userName || 'User';
+            const userName = getUserName();
+            const userAvatar = getUserAvatar();
+            const aiName = getAIName();
+            const aiAvatar = getAIAvatar();
 
             container.innerHTML = '';
             history.forEach((msg, index) => {
@@ -7542,9 +8163,13 @@
 
                 let avatarHtml = '';
                 if (isUser) {
-                    avatarHtml = `<div class="chat-avatar">${userName.charAt(0).toUpperCase()}</div>`;
+                    avatarHtml = userAvatar
+                        ? `<div class="chat-avatar"><img src="${userAvatar}" alt="${escapeHtml(userName)}"></div>`
+                        : `<div class="chat-avatar">${(userName || 'U').charAt(0).toUpperCase()}</div>`;
                 } else {
-                    avatarHtml = `<div class="chat-avatar">AI</div>`;
+                    avatarHtml = aiAvatar
+                        ? `<div class="chat-avatar"><img src="${aiAvatar}" alt="${escapeHtml(aiName)}"></div>`
+                        : `<div class="chat-avatar">${(aiName || 'AI').charAt(0).toUpperCase()}</div>`;
                 }
 
                 const messageDiv = document.createElement('div');
@@ -7659,8 +8284,13 @@
             const loadingDiv = document.createElement('div');
             loadingDiv.className = 'chat-message ai';
             loadingDiv.id = 'readerChatLoading';
+            const _aiAvatar1 = getAIAvatar();
+            const _aiName1 = getAIName();
+            const _aiAvatarHtml1 = _aiAvatar1
+                ? `<div class="chat-avatar"><img src="${_aiAvatar1}" alt="${escapeHtml(_aiName1)}"></div>`
+                : `<div class="chat-avatar">${(_aiName1 || 'AI').charAt(0).toUpperCase()}</div>`;
             loadingDiv.innerHTML = `
-                <div class="chat-avatar">AI</div>
+                ${_aiAvatarHtml1}
                 <div class="chat-bubble">
                     <div class="chat-typing"><span></span><span></span><span></span></div>
                 </div>
@@ -7819,7 +8449,7 @@
 
         // ==================== AI Modal ====================
         function showAIModal() {
-            const userName = appData.settings.userName || 'User';
+            const userName = getUserName();
             document.getElementById('aiGreeting').textContent = 'Hi, ' + userName + '! 你需要我做什么?';
             showModal('aiModal');
         }
@@ -8585,17 +9215,24 @@ ${book.subject ? '学科：' + book.subject : ''}
             
             if (!appData.lectureDrafts) appData.lectureDrafts = {};
             const draft = appData.lectureDrafts[key];
-            
+            const editor = document.getElementById('lectureDraftTextarea');
+            let htmlToLoad = '';
             if (typeof draft === 'string') {
-                document.getElementById('lectureDraftTextarea').value = draft;
-            } else if (draft) {
-                document.getElementById('lectureDraftTextarea').value = draft.text || '';
+                htmlToLoad = legacyDraftTextToHtml(draft);
+            } else if (draft && typeof draft.html === 'string') {
+                htmlToLoad = draft.html;
                 if (draft.canvas && lectureDraftCanvas) {
                     loadLectureDraftCanvasData(draft.canvas);
                 }
-            } else {
-                document.getElementById('lectureDraftTextarea').value = '';
+            } else if (draft && typeof draft.text === 'string') {
+                const t = draft.text;
+                htmlToLoad = /<[a-zA-Z][^>]*>/.test(t) ? t : legacyDraftTextToHtml(t);
+                if (draft.canvas && lectureDraftCanvas) {
+                    loadLectureDraftCanvasData(draft.canvas);
+                }
             }
+            if (editor) editor.innerHTML = htmlToLoad;
+            wireDraftEditor(editor, saveLectureDraft);
             updateLectureDraftInfo();
             lectureDraftHistory = [];
             lectureDraftHistoryIndex = -1;
@@ -8607,10 +9244,11 @@ ${book.subject ? '学科：' + book.subject : ''}
             
             if (!appData.lectureDrafts) appData.lectureDrafts = {};
             
-            const text = document.getElementById('lectureDraftTextarea').value;
+            const editor = document.getElementById('lectureDraftTextarea');
+            const html = editor ? editor.innerHTML : '';
             const canvasData = lectureDraftCanvas ? lectureDraftCanvas.toDataURL() : null;
             
-            appData.lectureDrafts[key] = { text, canvas: canvasData };
+            appData.lectureDrafts[key] = { html: html, text: '', canvas: canvasData };
             updateLectureDraftInfo();
             saveData();
         }
@@ -8657,8 +9295,9 @@ ${book.subject ? '学科：' + book.subject : ''}
         }
 
         function updateLectureDraftInfo() {
-            const text = document.getElementById('lectureDraftTextarea').value;
-            document.getElementById('lectureDraftInfo').textContent = text.length + ' 字';
+            const editor = document.getElementById('lectureDraftTextarea');
+            const charCount = editor ? (editor.innerText || '').replace(/\n+$/,'').length : 0;
+            document.getElementById('lectureDraftInfo').textContent = charCount + ' 字';
         }
 
         function initLectureDraftCanvas() {
@@ -8798,22 +9437,16 @@ ${book.subject ? '学科：' + book.subject : ''}
         }
 
         function formatLectureDraftText(type) {
-            const ta = document.getElementById('lectureDraftTextarea');
-            const start = ta.selectionStart;
-            const end = ta.selectionEnd;
-            const text = ta.value;
-            const selected = text.substring(start, end);
-            let insert = '';
-
-            switch(type) {
-                case 'bold': insert = `**${selected || '粗体'}**`; break;
-                case 'italic': insert = `*${selected || '斜体'}*`; break;
-                case 'todo': insert = `[ ] ${selected || '待办事项'}`; break;
+            const editor = document.getElementById('lectureDraftTextarea');
+            if (!editor) return;
+            if (type === 'bold') applyDraftStyle(editor, 'bold');
+            else if (type === 'italic') applyDraftStyle(editor, 'italic');
+            else if (type === 'strike') applyDraftStyle(editor, 'strikeThrough');
+            else if (type === 'todo') {
+                const sel = window.getSelection();
+                const selText = (sel && sel.rangeCount > 0 && editor.contains(sel.anchorNode)) ? sel.toString() : '';
+                insertTodoAtSelection(editor, selText);
             }
-
-            ta.value = text.substring(0, start) + insert + text.substring(end);
-            ta.focus();
-            ta.setSelectionRange(start + insert.length, start + insert.length);
             saveLectureDraft();
         }
 
@@ -9182,12 +9815,19 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
         }
 
         function addChatMessage(container, isUser, text) {
-            const userName = appData.settings.userName || 'User';
+            const userName = getUserName();
+            const userAvatar = getUserAvatar();
+            const aiName = getAIName();
+            const aiAvatar = getAIAvatar();
             let avatarHtml = '';
             if (isUser) {
-                avatarHtml = `<div class="chat-avatar">${userName.charAt(0).toUpperCase()}</div>`;
+                avatarHtml = userAvatar
+                    ? `<div class="chat-avatar"><img src="${userAvatar}" alt="${escapeHtml(userName)}"></div>`
+                    : `<div class="chat-avatar">${(userName || 'U').charAt(0).toUpperCase()}</div>`;
             } else {
-                avatarHtml = `<div class="chat-avatar">AI</div>`;
+                avatarHtml = aiAvatar
+                    ? `<div class="chat-avatar"><img src="${aiAvatar}" alt="${escapeHtml(aiName)}"></div>`
+                    : `<div class="chat-avatar">${(aiName || 'AI').charAt(0).toUpperCase()}</div>`;
             }
 
             const messageDiv = document.createElement('div');
@@ -9204,8 +9844,13 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             const typing = document.createElement('div');
             typing.className = 'chat-message ai';
             typing.id = 'typingIndicator';
+            const aiAvatar = getAIAvatar();
+            const aiName = getAIName();
+            const avatarHtml = aiAvatar
+                ? `<div class="chat-avatar"><img src="${aiAvatar}" alt="${escapeHtml(aiName)}"></div>`
+                : `<div class="chat-avatar">${(aiName || 'AI').charAt(0).toUpperCase()}</div>`;
             typing.innerHTML = `
-                <div class="chat-avatar">AI</div>
+                ${avatarHtml}
                 <div class="chat-bubble">
                     <div class="chat-typing">
                         <span></span><span></span><span></span>
@@ -9233,9 +9878,12 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             addTypingIndicator(container);
 
             try {
-                const systemPrompt = `你是一个友好、专业的数学学习助手。你的任务是帮助用户理解数学概念、解决数学问题、提供学习建议。
+                // AI 人设仅在此"不知道，给我建议"聊天中注入
+                const persona = getAIPersona();
+                const basePrompt = `你是一个友好、专业的数学学习助手。你的任务是帮助用户理解数学概念、解决数学问题、提供学习建议。
 请用清晰易懂的语言回答，必要时使用LaTeX格式的数学公式（用$...$包裹行内公式）。
 保持回答简洁但完整，如果问题复杂，可以分步骤解释。`;
+                const systemPrompt = persona ? (persona + '\n\n' + basePrompt) : basePrompt;
 
                 // 获取之前的聊天记录作为上下文
                 const chatMessages = [];
