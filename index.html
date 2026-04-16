@@ -66,6 +66,7 @@
         @supports (padding-bottom: env(safe-area-inset-bottom)) {
             body { padding-bottom: calc(56px + env(safe-area-inset-bottom)); }
             .page { height: calc(100vh - 56px - env(safe-area-inset-bottom)); }
+            #page3.active { height: calc(100vh - 56px - env(safe-area-inset-bottom)); }
             .bottom-nav { padding-bottom: env(safe-area-inset-bottom); }
         }
 
@@ -874,8 +875,8 @@
         }
 
         /* ==================== Page 3: Notes Collection ==================== */
-        #page3 { padding-top: 0; padding-bottom: 0; }
-        #page3.active { display: flex; flex-direction: column; }
+        #page3 { padding: 0; }
+        #page3.active { display: flex; flex-direction: column; height: calc(100vh - 56px); }
 
         .notes-grid {
             display: grid;
@@ -885,13 +886,11 @@
             background: var(--border-color);
             border-radius: 0;
             overflow: hidden;
-            margin: 0 -20px;
         }
 
         .notes-column {
             background: var(--bg-primary);
             padding: 16px;
-            padding-bottom: 20px;
             display: flex;
             flex-direction: column;
             overflow: hidden;
@@ -901,11 +900,7 @@
             flex: 1;
             overflow-y: auto;
             -webkit-overflow-scrolling: touch;
-            padding: 0 20px;
-        }
-
-        #notesFolderContent {
-            padding-bottom: 80px;
+            padding: 16px;
         }
 
         .notes-column-header {
@@ -6371,8 +6366,6 @@
                     </div>`;
                 });
             }
-            // 添加底部占位，防止被导航栏遮挡
-            html += '<div style="height:60px;"></div>';
             container.innerHTML = html;
         }
 
