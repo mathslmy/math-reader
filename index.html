@@ -886,13 +886,11 @@
             border-radius: 0;
             overflow: hidden;
             margin: 0 -20px;
-            margin-bottom: 0;
         }
 
         .notes-column {
             background: var(--bg-primary);
             padding: 16px;
-            padding-bottom: 20px;
             display: flex;
             flex-direction: column;
             overflow: hidden;
@@ -901,7 +899,12 @@
         #notesFolderView {
             flex: 1;
             overflow-y: auto;
-            padding: 0 0 20px 0;
+            padding: 0 20px;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        #notesFolderContent {
+            padding-bottom: 20px;
         }
 
         .notes-column-header {
