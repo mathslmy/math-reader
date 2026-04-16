@@ -7090,8 +7090,10 @@
 
         async function r2PutObject(key, data, contentType = 'application/octet-stream') {
             const config = appData.settings.r2Config;
+            // 移除endpoint末尾的斜杠
+            const endpoint = config.endpoint.replace(/\/+$/, '');
             const path = config.bucketName + '/' + key;
-            const url = config.endpoint + '/' + path;
+            const url = endpoint + '/' + path;
             
             const payload = typeof data === 'string' ? data : JSON.stringify(data);
             
@@ -7100,8 +7102,8 @@
             headers.set('Content-Type', contentType);
             
             // 计算签名所需的信息
-            const endpoint = new URL(config.endpoint);
-            const host = endpoint.host;
+            const endpointUrl = new URL(endpoint);
+            const host = endpointUrl.host;
             const region = 'auto';
             const service = 's3';
             
@@ -7178,11 +7180,13 @@
 
         async function r2GetObject(key) {
             const config = appData.settings.r2Config;
+            // 移除endpoint末尾的斜杠
+            const endpoint = config.endpoint.replace(/\/+$/, '');
             const path = config.bucketName + '/' + key;
-            const url = config.endpoint + '/' + path;
+            const url = endpoint + '/' + path;
             
-            const endpoint = new URL(config.endpoint);
-            const host = endpoint.host;
+            const endpointUrl = new URL(endpoint);
+            const host = endpointUrl.host;
             const region = 'auto';
             const service = 's3';
             
@@ -7248,11 +7252,13 @@
 
         async function r2DeleteObject(key) {
             const config = appData.settings.r2Config;
+            // 移除endpoint末尾的斜杠
+            const endpoint = config.endpoint.replace(/\/+$/, '');
             const path = config.bucketName + '/' + key;
-            const url = config.endpoint + '/' + path;
+            const url = endpoint + '/' + path;
             
-            const endpoint = new URL(config.endpoint);
-            const host = endpoint.host;
+            const endpointUrl = new URL(endpoint);
+            const host = endpointUrl.host;
             const region = 'auto';
             const service = 's3';
             
@@ -7310,12 +7316,14 @@
 
         async function r2ListObjects(prefix = '') {
             const config = appData.settings.r2Config;
+            // 移除endpoint末尾的斜杠
+            const endpoint = config.endpoint.replace(/\/+$/, '');
             const queryString = 'list-type=2' + (prefix ? '&prefix=' + encodeURIComponent(prefix) : '');
             const path = config.bucketName;
-            const url = config.endpoint + '/' + path + '?' + queryString;
+            const url = endpoint + '/' + path + '?' + queryString;
             
-            const endpoint = new URL(config.endpoint);
-            const host = endpoint.host;
+            const endpointUrl = new URL(endpoint);
+            const host = endpointUrl.host;
             const region = 'auto';
             const service = 's3';
             
@@ -7390,9 +7398,27 @@
             }
             
             showToast('同步中...');
+            clearDebugLog();
+            debugLog('=== 开始同步到云端 ===');
             
             try {
-                // 1. 上传元数据 (不包含PDF数据)
+                // 检查annotations数据
+                debugLog('Books数量: ' + appData.books.length);
+                appData.books.forEach((b, i) => {
+                    debugLog('Book[' + i + ']: ' + b.title);
+                    debugLog('  annotations: ' + (b.annotations ? b.annotations.length + '个' : '无'));
+                    if (b.annotations && b.annotations.length > 0) {
+                        debugLog('  第一个annotation类型: ' + b.annotations[0].type);
+                    }
+                });
+                
+                debugLog('Papers数量: ' + appData.papers.length);
+                appData.papers.forEach((p, i) => {
+                    debugLog('Paper[' + i + ']: ' + p.title);
+                    debugLog('  annotations: ' + (p.annotations ? p.annotations.length + '个' : '无'));
+                });
+                
+                // 1. 上传元数据 (不包含PDF数据，但保留annotations)
                 const metadata = {
                     books: appData.books.map(b => ({ ...b, data: undefined })),
                     papers: appData.papers.map(p => ({ ...p, data: undefined })),
@@ -7400,10 +7426,21 @@
                     archived: appData.archived,
                     settings: { ...appData.settings, r2Config: undefined },
                     lectures: appData.lectures,
+                    drafts: appData.drafts || {},
                     syncedAt: new Date().toISOString()
                 };
                 
-                await r2PutObject('metadata.json', JSON.stringify(metadata), 'application/json');
+                // 验证metadata中的annotations
+                debugLog('--- 验证metadata ---');
+                metadata.books.forEach((b, i) => {
+                    debugLog('metadata.books[' + i + '].annotations: ' + (b.annotations ? b.annotations.length + '个' : '无'));
+                });
+                
+                const metadataStr = JSON.stringify(metadata);
+                debugLog('metadata大小: ' + metadataStr.length + ' 字节');
+                
+                await r2PutObject('metadata.json', metadataStr, 'application/json');
+                debugLog('metadata.json 上传成功');
                 
                 // 2. 上传PDF文件 (从IndexedDB获取)
                 let uploadedFiles = 0;
@@ -7415,11 +7452,14 @@
                         const fileKey = 'files/' + doc.id + '.pdf';
                         await r2PutObject(fileKey, fileData, 'application/pdf');
                         uploadedFiles++;
+                        debugLog('上传文件: ' + doc.title);
                     }
                 }
                 
+                debugLog('=== 同步完成 ===');
                 showToast(`同步完成! 上传了 ${uploadedFiles} 个文件`);
             } catch (err) {
+                debugLog('同步失败: ' + err.message);
                 console.error('Sync to R2 failed:', err);
                 showToast('同步失败: ' + err.message);
             }
@@ -7453,12 +7493,13 @@
                 // 保留本地R2配置
                 const localR2Config = appData.settings.r2Config;
                 
-                // 恢复数据
+                // 恢复数据（包含annotations的books和papers）
                 appData.books = metadata.books || [];
                 appData.papers = metadata.papers || [];
                 appData.notes = metadata.notes || {};
                 appData.archived = metadata.archived || [];
                 appData.lectures = metadata.lectures || {};
+                appData.drafts = metadata.drafts || {};
                 appData.settings = { ...metadata.settings, r2Config: localR2Config };
                 
                 saveData();
