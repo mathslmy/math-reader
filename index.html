@@ -6960,13 +6960,16 @@
             const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, '');
             const dateStamp = amzDate.slice(0, 8);
             
-            headers['host'] = host;
-            headers['x-amz-date'] = amzDate;
-            headers['x-amz-content-sha256'] = await sha256Hex(payload || '');
+            // 用于签名计算的headers（包含host）
+            const signHeaders = { ...headers };
+            signHeaders['host'] = host;
+            signHeaders['x-amz-date'] = amzDate;
+            signHeaders['x-amz-content-sha256'] = await sha256Hex(payload || '');
             
-            const signedHeaders = Object.keys(headers).sort().join(';');
-            const canonicalHeaders = Object.keys(headers).sort()
-                .map(k => k.toLowerCase() + ':' + headers[k].trim()).join('\n') + '\n';
+            const signedHeaderKeys = Object.keys(signHeaders).sort();
+            const signedHeaders = signedHeaderKeys.join(';');
+            const canonicalHeaders = signedHeaderKeys
+                .map(k => k.toLowerCase() + ':' + signHeaders[k].trim()).join('\n') + '\n';
             
             const canonicalRequest = [
                 method,
@@ -6974,7 +6977,7 @@
                 '',
                 canonicalHeaders,
                 signedHeaders,
-                headers['x-amz-content-sha256']
+                signHeaders['x-amz-content-sha256']
             ].join('\n');
             
             const algorithm = 'AWS4-HMAC-SHA256';
@@ -6989,6 +6992,9 @@
             const signingKey = await getSignatureKey(config.secretKey, dateStamp, region, service);
             const signature = await hmacHex(signingKey, stringToSign);
             
+            // 实际发送的headers（不包含host，浏览器会自动添加）
+            headers['x-amz-date'] = amzDate;
+            headers['x-amz-content-sha256'] = signHeaders['x-amz-content-sha256'];
             headers['Authorization'] = `${algorithm} Credential=${config.accessKeyId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
             
             return headers;
