@@ -10149,25 +10149,37 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             let wrapper = null;
             let pinchCandidate = false; // 已满足起始条件，但尚未超过激活阈值
             let pinchStarted = false;   // 真正进入缩放模式
+            let panStarted = false;     // 已进入双指上下滚动模式
+            let lastCenterY = 0;        // 上一次 touchmove 的两指中心 Y（用于增量滚动）
+            let initialCenterX = 0;
+            let initialCenterY = 0;
+            const panActivationThreshold = 10; // 中心点位移达到此值才视为 pan 手势
+            let readerContainerEl = null;
 
             function getDistance(t1, t2) {
                 return Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
             }
+            function getCenterX(t1, t2) { return (t1.clientX + t2.clientX) / 2; }
+            function getCenterY(t1, t2) { return (t1.clientY + t2.clientY) / 2; }
 
             document.addEventListener('touchstart', (e) => {
                 const container = document.getElementById('readerContainer');
                 if (!container || !container.closest('.page.active')) return;
                 wrapper = document.getElementById('pdfCanvasWrapper');
                 if (!wrapper) return;
+                readerContainerEl = container;
 
                 if (e.touches.length === 2) {
                     const dist = getDistance(e.touches[0], e.touches[1]);
-                    // 只有双指距离足够大才作为缩放候选，但不立刻激活缩放
                     if (dist >= minPinchDistance) {
                         pinchCandidate = true;
                         pinchStarted = false;
+                        panStarted = false;
                         initialDistance = dist;
                         baseScale = currentScale;
+                        initialCenterX = getCenterX(e.touches[0], e.touches[1]);
+                        initialCenterY = getCenterY(e.touches[0], e.touches[1]);
+                        lastCenterY = initialCenterY;
                     }
                 }
             }, { passive: false });
@@ -10176,22 +10188,44 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 if (e.touches.length !== 2 || !pinchCandidate || initialDistance <= 0 || !wrapper) return;
 
                 const dist = getDistance(e.touches[0], e.touches[1]);
+                const cy = getCenterY(e.touches[0], e.touches[1]);
+                const cx = getCenterX(e.touches[0], e.touches[1]);
+                const dDist = dist - initialDistance;
+                const dCenterX = cx - initialCenterX;
+                const dCenterY = cy - initialCenterY;
 
-                // 未激活：等距离变化超过阈值再激活，阻止握持/轻触被误判为缩放
-                if (!pinchStarted) {
-                    if (Math.abs(dist - initialDistance) < pinchActivationThreshold) return;
-                    pinchStarted = true;
-                    isPinching = true;
-                    // 从激活那一刻的距离重新作为基准，避免激活瞬间产生跳变
-                    initialDistance = dist;
+                // 激活判定：距离变化优先当 pinch；否则若垂直位移达到阈值且垂直分量大于水平分量，当 pan（滚动）
+                if (!pinchStarted && !panStarted) {
+                    if (Math.abs(dDist) >= pinchActivationThreshold) {
+                        pinchStarted = true;
+                        isPinching = true;
+                        initialDistance = dist;
+                    } else if (Math.abs(dCenterY) >= panActivationThreshold && Math.abs(dCenterY) > Math.abs(dCenterX)) {
+                        panStarted = true;
+                        isPinching = true;  // 让画笔 handler 视其为非绘图
+                        lastCenterY = cy;
+                    } else {
+                        return;
+                    }
                 }
 
+                if (panStarted) {
+                    // 双指上下滑动 → 直接滚动 reader 容器（1:1 跟随）
+                    // 手指下滑（cy 增大）→ 页面应往上滚（scrollTop 减小）
+                    const deltaY = cy - lastCenterY;
+                    lastCenterY = cy;
+                    if (readerContainerEl) {
+                        readerContainerEl.scrollTop -= deltaY;
+                    }
+                    e.preventDefault();
+                    return;
+                }
+
+                // Pinch 缩放
                 e.preventDefault();
-                // 计算缩放比例，使用灵敏度来平滑缩放
                 const rawScale = dist / initialDistance;
                 const scaleDelta = (rawScale - 1) * zoomSensitivity;
                 let scale = baseScale * (1 + scaleDelta);
-
                 scale = Math.max(minScale, Math.min(maxScale, scale));
                 currentScale = scale;
                 wrapper.style.transform = `scale(${scale})`;
@@ -10203,6 +10237,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     initialDistance = 0;
                     pinchCandidate = false;
                     pinchStarted = false;
+                    panStarted = false;
                     setTimeout(() => { isPinching = false; }, 150);
                     if (currentScale < 1.05) {
                         currentScale = 1;
