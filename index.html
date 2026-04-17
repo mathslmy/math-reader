@@ -5475,6 +5475,17 @@
 
         // 把画笔交互绑定到单个页面的批注 canvas 上
         // 每页独立拥有 pointer 交互，但全局共享 strokeHistory / redoHistory（E: 全局 undo stack）
+        // 模块级：当前正在进行的画笔绘制（若有），用于被多指手势抢占时回滚已画内容
+        let activePenStroke = null; // { pageNum, annoCanvas, annoCtx, cancel: () => void }
+
+        // 从外部中止当前画笔并回滚已画内容（用于双指落下时抢占画笔）
+        function rollbackActivePenStroke() {
+            if (activePenStroke && typeof activePenStroke.cancel === 'function') {
+                activePenStroke.cancel();
+                activePenStroke = null;
+            }
+        }
+
         function attachPenInteraction(annoCanvas, annoCtx, pageNum, viewport) {
             let drawing = false;
             let lastX, lastY;
@@ -5488,6 +5499,20 @@
                 return { x: (e.clientX - rect.left) * rx, y: (e.clientY - rect.top) * ry };
             }
 
+            // 结束当前笔画（不 commit），把 canvas 恢复到本次 pointerdown 之前的状态
+            function cancelCurrentStroke() {
+                if (!drawing) return;
+                drawing = false;
+                annoCtx.globalCompositeOperation = 'source-over';
+                // strokeHistory 栈顶就是 pointerdown 时入栈的 pre-stroke 快照
+                const top = strokeHistory[strokeHistory.length - 1];
+                if (top && top.annoCanvas === annoCanvas) {
+                    strokeHistory.pop();
+                    annoCtx.putImageData(top.imageData, 0, 0);
+                    updateUndoRedoButtons();
+                }
+            }
+
             annoCanvas.addEventListener('pointerdown', (e) => {
                 if (isPinching) return;
                 if (!penMode) return;
@@ -5496,6 +5521,8 @@
                 drawing = true;
                 currentAnnoCanvas = annoCanvas;
                 currentAnnoCtx = annoCtx;
+                // 把"当前活动画笔"暴露出去，让多指手势能抢占
+                activePenStroke = { pageNum, annoCanvas, annoCtx, cancel: cancelCurrentStroke };
                 const p = pointerToCanvasXY(e);
                 lastX = p.x; lastY = p.y;
                 if (readerEraserMode) {
@@ -5513,7 +5540,11 @@
             });
 
             annoCanvas.addEventListener('pointermove', (e) => {
-                if (isPinching) { drawing = false; return; }
+                if (isPinching) { 
+                    // 多指手势已抢占，若还在 drawing，回滚并退出
+                    if (drawing) cancelCurrentStroke();
+                    return; 
+                }
                 if (!penMode || !drawing) return;
                 const p = pointerToCanvasXY(e);
                 annoCtx.beginPath();
@@ -5525,8 +5556,9 @@
             });
 
             annoCanvas.addEventListener('pointerup', () => {
-                if (!penMode || !drawing) { drawing = false; return; }
+                if (!penMode || !drawing) { drawing = false; activePenStroke = null; return; }
                 drawing = false;
+                activePenStroke = null;
                 redoHistory = [];
                 updateUndoRedoButtons();
                 annoCtx.globalCompositeOperation = 'source-over';
@@ -5534,19 +5566,17 @@
             });
 
             annoCanvas.addEventListener('pointerleave', () => {
-                if (!penMode || !drawing) { drawing = false; return; }
+                if (!penMode || !drawing) { drawing = false; activePenStroke = null; return; }
                 drawing = false;
+                activePenStroke = null;
                 annoCtx.globalCompositeOperation = 'source-over';
                 saveDrawingForPage(pageNum, annoCanvas);
             });
 
             annoCanvas.addEventListener('pointercancel', () => {
                 if (penMode && drawing) {
-                    drawing = false;
-                    // 取消时撤回刚入的 history
-                    if (strokeHistory.length > 0) strokeHistory.pop();
-                    updateUndoRedoButtons();
-                    annoCtx.globalCompositeOperation = 'source-over';
+                    cancelCurrentStroke();
+                    activePenStroke = null;
                 }
             });
         }
@@ -10170,6 +10200,12 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 readerContainerEl = container;
 
                 if (e.touches.length === 2) {
+                    // 第二根手指一落下就立刻中止任何正在进行的画笔，并回滚已画出的短线。
+                    // 不等 touchmove 判定，否则头几帧的移动还会被画笔响应。
+                    isPinching = true;
+                    if (typeof rollbackActivePenStroke === 'function') {
+                        rollbackActivePenStroke();
+                    }
                     const dist = getDistance(e.touches[0], e.touches[1]);
                     if (dist >= minPinchDistance) {
                         pinchCandidate = true;
