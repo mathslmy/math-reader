@@ -9977,10 +9977,17 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             let baseScale = 1;
             const minScale = 1;
             const maxScale = 4;
-            const minPinchDistance = 50; // 最小双指距离，防止误触
-            const zoomSensitivity = 0.4; // 缩放灵敏度，0-1之间，越小越平滑
+            // 最小双指距离：两指间距至少达到这个值才考虑作为缩放候选
+            const minPinchDistance = 120;
+            // 激活阈值：双指间距变化超过此值后，才真正进入缩放模式（防止握持/稳定触摸被误判为缩放）
+            const pinchActivationThreshold = 20;
+            // 缩放灵敏度，0-1之间，越小越平滑
+            const zoomSensitivity = 0.25;
+            // 双击放大目标倍率
+            const doubleTapZoomTarget = 1.5;
             let wrapper = null;
-            let pinchStarted = false;
+            let pinchCandidate = false; // 已满足起始条件，但尚未超过激活阈值
+            let pinchStarted = false;   // 真正进入缩放模式
 
             function getDistance(t1, t2) {
                 return Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
@@ -9994,10 +10001,10 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
 
                 if (e.touches.length === 2) {
                     const dist = getDistance(e.touches[0], e.touches[1]);
-                    // 只有双指距离足够大才开始缩放
+                    // 只有双指距离足够大才作为缩放候选，但不立刻激活缩放
                     if (dist >= minPinchDistance) {
-                        e.preventDefault();
-                        pinchStarted = true;
+                        pinchCandidate = true;
+                        pinchStarted = false;
                         initialDistance = dist;
                         baseScale = currentScale;
                     }
@@ -10005,26 +10012,35 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             }, { passive: false });
 
             document.addEventListener('touchmove', (e) => {
-                if (e.touches.length === 2 && pinchStarted && initialDistance > 0 && wrapper) {
-                    e.preventDefault();
+                if (e.touches.length !== 2 || !pinchCandidate || initialDistance <= 0 || !wrapper) return;
+
+                const dist = getDistance(e.touches[0], e.touches[1]);
+
+                // 未激活：等距离变化超过阈值再激活，阻止握持/轻触被误判为缩放
+                if (!pinchStarted) {
+                    if (Math.abs(dist - initialDistance) < pinchActivationThreshold) return;
+                    pinchStarted = true;
                     isPinching = true;
-                    const dist = getDistance(e.touches[0], e.touches[1]);
-                    
-                    // 计算缩放比例，使用灵敏度来平滑缩放
-                    const rawScale = dist / initialDistance;
-                    const scaleDelta = (rawScale - 1) * zoomSensitivity;
-                    let scale = baseScale * (1 + scaleDelta);
-                    
-                    scale = Math.max(minScale, Math.min(maxScale, scale));
-                    currentScale = scale;
-                    wrapper.style.transform = `scale(${scale})`;
-                    wrapper.style.transformOrigin = 'center top';
+                    // 从激活那一刻的距离重新作为基准，避免激活瞬间产生跳变
+                    initialDistance = dist;
                 }
+
+                e.preventDefault();
+                // 计算缩放比例，使用灵敏度来平滑缩放
+                const rawScale = dist / initialDistance;
+                const scaleDelta = (rawScale - 1) * zoomSensitivity;
+                let scale = baseScale * (1 + scaleDelta);
+
+                scale = Math.max(minScale, Math.min(maxScale, scale));
+                currentScale = scale;
+                wrapper.style.transform = `scale(${scale})`;
+                wrapper.style.transformOrigin = 'center top';
             }, { passive: false });
 
             document.addEventListener('touchend', (e) => {
                 if (e.touches.length < 2) {
                     initialDistance = 0;
+                    pinchCandidate = false;
                     pinchStarted = false;
                     setTimeout(() => { isPinching = false; }, 150);
                     if (currentScale < 1.05) {
@@ -10044,7 +10060,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 const now = Date.now();
                 if (now - lastTap < 300) {
                     // Double tap - 平滑过渡
-                    const targetScale = currentScale > 1.05 ? 1 : 2;
+                    const targetScale = currentScale > 1.05 ? 1 : doubleTapZoomTarget;
                     if (wrapper) {
                         wrapper.style.transition = 'transform 0.2s ease-out';
                         wrapper.style.transform = targetScale === 1 ? '' : `scale(${targetScale})`;
