@@ -4337,8 +4337,7 @@
             // PDF 的宽度在分屏后变了，需要重渲染
             setTimeout(() => {
                 if (pdfDoc && currentDoc) {
-                    if (penMode) renderPDFPage(currentPage);
-                    else renderAllPDFPages();
+                    renderAllPDFPages();
                 }
             }, 50);
             showToast('分屏模式');
@@ -4361,8 +4360,7 @@
             // 重新渲染 PDF 以匹配恢复后的宽度
             setTimeout(() => {
                 if (pdfDoc && currentDoc) {
-                    if (penMode) renderPDFPage(currentPage);
-                    else renderAllPDFPages();
+                    renderAllPDFPages();
                 }
             }, 50);
         }
@@ -5322,12 +5320,10 @@
 
                 document.getElementById('readerPageNav').style.display = 'flex';
                 
-                // 根据模式选择渲染方式
-                if (penMode) {
-                    renderPDFPage(currentPage);
-                } else {
-                    renderAllPDFPages();
-                }
+                // 所有模式都使用连续滚动渲染
+                await renderAllPDFPages();
+                // 如果需要跳到之前的进度页
+                if (currentPage > 1) scrollToPage(currentPage);
             } catch(err) {
                 console.error('PDF load error:', err);
                 document.getElementById('pdfCanvasWrapper').innerHTML = `
@@ -5435,17 +5431,22 @@
             placeholder.classList.add('pdf-page-wrapper');
             placeholder.classList.remove('pdf-page-placeholder');
 
-            // 添加批注层（非画笔模式下不可交互）
+            // 添加批注层（画笔模式下可交互）
             const annoCanvas = document.createElement('canvas');
             annoCanvas.className = 'annotation-canvas';
+            annoCanvas.dataset.pageNum = pageNum;
             annoCanvas.width = viewport.width * window.devicePixelRatio;
             annoCanvas.height = viewport.height * window.devicePixelRatio;
             annoCanvas.style.width = viewport.width + 'px';
             annoCanvas.style.height = viewport.height + 'px';
-            annoCanvas.style.pointerEvents = 'none';
+            annoCanvas.style.pointerEvents = penMode ? 'auto' : 'none';
 
             const annoCtx = annoCanvas.getContext('2d');
             annoCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
+
+            // 保存引用到 pageData 供其他模块使用
+            pageData.annoCanvas = annoCanvas;
+            pageData.annoCtx = annoCtx;
 
             // 恢复该页的绘图数据
             const pageDrawing = getDocAnnotation(currentDoc.id, pageNum, 'drawing');
@@ -5457,6 +5458,9 @@
                 img.src = pageDrawing;
             }
 
+            // 画笔交互逻辑 —— 每页自带
+            attachPenInteraction(annoCanvas, annoCtx, pageNum, viewport);
+
             placeholder.appendChild(annoCanvas);
 
             // 添加长按添加笔记功能
@@ -5467,6 +5471,84 @@
 
             pageData.rendered = true;
             renderedPages.add(pageNum);
+        }
+
+        // 把画笔交互绑定到单个页面的批注 canvas 上
+        // 每页独立拥有 pointer 交互，但全局共享 strokeHistory / redoHistory（E: 全局 undo stack）
+        function attachPenInteraction(annoCanvas, annoCtx, pageNum, viewport) {
+            let drawing = false;
+            let lastX, lastY;
+
+            function pointerToCanvasXY(e) {
+                const rect = annoCanvas.getBoundingClientRect();
+                const cssW = parseFloat(annoCanvas.style.width) || rect.width;
+                const cssH = parseFloat(annoCanvas.style.height) || rect.height;
+                const rx = rect.width > 0 ? (cssW / rect.width) : 1;
+                const ry = rect.height > 0 ? (cssH / rect.height) : 1;
+                return { x: (e.clientX - rect.left) * rx, y: (e.clientY - rect.top) * ry };
+            }
+
+            annoCanvas.addEventListener('pointerdown', (e) => {
+                if (isPinching) return;
+                if (!penMode) return;
+                // 入栈当前页快照，供撤销回滚（全局 stack 里带 pageNum）
+                saveStrokeState(pageNum, annoCanvas);
+                drawing = true;
+                currentAnnoCanvas = annoCanvas;
+                currentAnnoCtx = annoCtx;
+                const p = pointerToCanvasXY(e);
+                lastX = p.x; lastY = p.y;
+                if (readerEraserMode) {
+                    annoCtx.globalCompositeOperation = 'destination-out';
+                    annoCtx.strokeStyle = 'rgba(0,0,0,1)';
+                    annoCtx.lineWidth = Math.max(penSize * 6, 16);
+                } else {
+                    annoCtx.globalCompositeOperation = 'source-over';
+                    annoCtx.strokeStyle = penColor;
+                    annoCtx.lineWidth = penSize;
+                }
+                annoCtx.lineCap = 'round';
+                annoCtx.lineJoin = 'round';
+                // pointerdown 不 preventDefault（避免 iPad Safari 失去多指手势识别）
+            });
+
+            annoCanvas.addEventListener('pointermove', (e) => {
+                if (isPinching) { drawing = false; return; }
+                if (!penMode || !drawing) return;
+                const p = pointerToCanvasXY(e);
+                annoCtx.beginPath();
+                annoCtx.moveTo(lastX, lastY);
+                annoCtx.lineTo(p.x, p.y);
+                annoCtx.stroke();
+                lastX = p.x; lastY = p.y;
+                e.preventDefault();
+            });
+
+            annoCanvas.addEventListener('pointerup', () => {
+                if (!penMode || !drawing) { drawing = false; return; }
+                drawing = false;
+                redoHistory = [];
+                updateUndoRedoButtons();
+                annoCtx.globalCompositeOperation = 'source-over';
+                saveDrawingForPage(pageNum, annoCanvas);
+            });
+
+            annoCanvas.addEventListener('pointerleave', () => {
+                if (!penMode || !drawing) { drawing = false; return; }
+                drawing = false;
+                annoCtx.globalCompositeOperation = 'source-over';
+                saveDrawingForPage(pageNum, annoCanvas);
+            });
+
+            annoCanvas.addEventListener('pointercancel', () => {
+                if (penMode && drawing) {
+                    drawing = false;
+                    // 取消时撤回刚入的 history
+                    if (strokeHistory.length > 0) strokeHistory.pop();
+                    updateUndoRedoButtons();
+                    annoCtx.globalCompositeOperation = 'source-over';
+                }
+            });
         }
 
         function setupPageLongPress(pageWrapper, pageNum) {
@@ -5522,6 +5604,7 @@
             const docNotes = getDocAnnotations(currentDoc.id, pageNum, 'note');
             docNotes.forEach((n, i) => {
                 const markerContainer = document.createElement('div');
+                markerContainer.dataset.noteMarker = '1';
                 markerContainer.style.cssText = `position:absolute;left:${n.x * 100}%;top:${n.y * 100}%;z-index:10;`;
 
                 const marker = document.createElement('div');
@@ -5667,275 +5750,20 @@
         let currentAnnoCanvas = null;
         let currentAnnoCtx = null;
 
+        // renderPDFPage 原本是画笔模式的单页渲染。
+        // 现在所有模式都使用连续滚动，此函数变成"跳转到目标页"的转发器，
+        // 保留是为了不用改全局所有调用点。
         async function renderPDFPage(pageNum) {
             if (!pdfDoc) return;
-
-            const page = await pdfDoc.getPage(pageNum);
-            const scale = getReaderRenderScale(page);
-            const viewport = page.getViewport({ scale: Math.min(scale, 2) });
-
+            // 确保 placeholder 已创建（首次打开时可能还没 renderAllPDFPages 过）
             const wrapper = document.getElementById('pdfCanvasWrapper');
-            wrapper.innerHTML = '';
-
-            const pageWrapper = document.createElement('div');
-            pageWrapper.className = 'pdf-page-wrapper';
-            pageWrapper.style.width = viewport.width + 'px';
-            pageWrapper.style.height = viewport.height + 'px';
-
-            const canvas = document.createElement('canvas');
-            canvas.width = viewport.width * window.devicePixelRatio;
-            canvas.height = viewport.height * window.devicePixelRatio;
-            canvas.style.width = viewport.width + 'px';
-            canvas.style.height = viewport.height + 'px';
-
-            const ctx = canvas.getContext('2d');
-            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-
-            await page.render({ canvasContext: ctx, viewport: viewport }).promise;
-
-            pageWrapper.appendChild(canvas);
-
-            // Annotation canvas overlay
-            const annoCanvas = document.createElement('canvas');
-            annoCanvas.className = 'annotation-canvas';
-            annoCanvas.width = viewport.width * window.devicePixelRatio;
-            annoCanvas.height = viewport.height * window.devicePixelRatio;
-            annoCanvas.style.width = viewport.width + 'px';
-            annoCanvas.style.height = viewport.height + 'px';
-
-            const annoCtx = annoCanvas.getContext('2d');
-            annoCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
-
-            currentAnnoCanvas = annoCanvas;
-            currentAnnoCtx = annoCtx;
-
-            // Restore saved drawing data for this page
-            const pageDrawing = getDocAnnotation(currentDoc.id, currentPage, 'drawing');
-            if (pageDrawing) {
-                const img = new Image();
-                img.onload = () => {
-                    annoCtx.drawImage(img, 0, 0, viewport.width, viewport.height);
-                };
-                img.src = pageDrawing;
+            if (wrapper && !wrapper.querySelector('.pdf-page-placeholder, .pdf-page-wrapper')) {
+                await renderAllPDFPages();
             }
-
-            // Reset undo/redo for new page
-            strokeHistory = [];
-            redoHistory = [];
-            updateUndoRedoButtons();
-
-            // ---- Pointer interaction ----
-            let drawing = false;
-            let lastX, lastY;
-
-            // 把指针事件坐标换算到 canvas 的绘图坐标系（CSS 像素、未受父 transform 影响）
-            // 用 CSS 宽高 / 当前 bounding rect 的比例校正，消除 pinch-zoom 或其他父 transform 引起的偏移
-            function pointerToCanvasXY(e) {
-                const rect = annoCanvas.getBoundingClientRect();
-                const cssW = parseFloat(annoCanvas.style.width) || rect.width;
-                const cssH = parseFloat(annoCanvas.style.height) || rect.height;
-                const rx = rect.width > 0 ? (cssW / rect.width) : 1;
-                const ry = rect.height > 0 ? (cssH / rect.height) : 1;
-                return {
-                    x: (e.clientX - rect.left) * rx,
-                    y: (e.clientY - rect.top) * ry
-                };
-            }
-
-            annoCanvas.addEventListener('pointerdown', (e) => {
-                if (isPinching) return;
-                if (penMode) {
-                    saveStrokeState();
-                    drawing = true;
-                    const p = pointerToCanvasXY(e);
-                    lastX = p.x;
-                    lastY = p.y;
-                    if (readerEraserMode) {
-                        annoCtx.globalCompositeOperation = 'destination-out';
-                        annoCtx.strokeStyle = 'rgba(0,0,0,1)';
-                        annoCtx.lineWidth = Math.max(penSize * 6, 16);
-                    } else {
-                        annoCtx.globalCompositeOperation = 'source-over';
-                        annoCtx.strokeStyle = penColor;
-                        annoCtx.lineWidth = penSize;
-                    }
-                    annoCtx.lineCap = 'round';
-                    annoCtx.lineJoin = 'round';
-                    e.preventDefault();
-                }
-            });
-
-            annoCanvas.addEventListener('pointermove', (e) => {
-                if (isPinching) { drawing = false; return; }
-                if (penMode && drawing) {
-                    const p = pointerToCanvasXY(e);
-                    annoCtx.beginPath();
-                    annoCtx.moveTo(lastX, lastY);
-                    annoCtx.lineTo(p.x, p.y);
-                    annoCtx.stroke();
-                    lastX = p.x;
-                    lastY = p.y;
-                    e.preventDefault();
-                }
-            });
-
-            annoCanvas.addEventListener('pointerup', () => {
-                if (penMode && drawing) {
-                    drawing = false;
-                    redoHistory = [];
-                    updateUndoRedoButtons();
-                    // reset composite so next stroke defaults to draw
-                    annoCtx.globalCompositeOperation = 'source-over';
-                    saveDrawingToDoc();
-                }
-                drawing = false;
-            });
-
-            annoCanvas.addEventListener('pointerleave', () => {
-                if (penMode && drawing) {
-                    drawing = false;
-                    annoCtx.globalCompositeOperation = 'source-over';
-                    saveDrawingToDoc();
-                }
-                drawing = false;
-            });
-
-            // When pen is OFF, annotation canvas should not block scrolling
-            if (!penMode) {
-                annoCanvas.style.pointerEvents = 'none';
-            }
-
-            pageWrapper.appendChild(annoCanvas);
-
-            // Long-press to add note (works when pen is OFF, on the pageWrapper)
-            let lpTimer = null;
-            let lpTriggered = false;
-            let lpStartPos = { x: 0, y: 0 };
-            let lpMoved = false;
-
-            pageWrapper.addEventListener('touchstart', (e) => {
-                if (penMode) return;
-                lpTriggered = false;
-                lpMoved = false;
-                lpStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-                lpTimer = setTimeout(() => {
-                    if (!lpMoved) {
-                        lpTriggered = true;
-                        const rect = pageWrapper.getBoundingClientRect();
-                        currentNotePosition = {
-                            page: currentPage,
-                            x: (e.touches[0].clientX - rect.left) / rect.width,
-                            y: (e.touches[0].clientY - rect.top) / rect.height
-                        };
-                        if (navigator.vibrate) navigator.vibrate(30);
-                        openNotePopup();
-                    }
-                }, 600);
-            }, { passive: true });
-
-            pageWrapper.addEventListener('touchmove', (e) => {
-                if (penMode) return;
-                const dx = e.touches[0].clientX - lpStartPos.x;
-                const dy = e.touches[0].clientY - lpStartPos.y;
-                if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
-                    lpMoved = true;
-                    if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; }
-                }
-            }, { passive: true });
-
-            pageWrapper.addEventListener('touchend', () => {
-                if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; }
-            }, { passive: true });
-
-            // Also support mouse long press (contextmenu) for desktop
-            pageWrapper.addEventListener('contextmenu', (e) => {
-                if (penMode) return;
-                e.preventDefault();
-                const rect = pageWrapper.getBoundingClientRect();
-                currentNotePosition = {
-                    page: currentPage,
-                    x: (e.clientX - rect.left) / rect.width,
-                    y: (e.clientY - rect.top) / rect.height
-                };
-                openNotePopup();
-            });
-
-            // Render existing note markers on doc
-            const docNotes = getDocAnnotations(currentDoc.id, currentPage, 'note');
-            docNotes.forEach((n, i) => {
-                const markerContainer = document.createElement('div');
-                markerContainer.style.cssText = `position:absolute;left:${n.x * 100}%;top:${n.y * 100}%;z-index:10;`;
-
-                const marker = document.createElement('div');
-                marker.className = 'annotation-marker';
-                marker.style.position = 'relative';
-                marker.style.transform = 'translate(-50%, -50%)';
-                marker.textContent = (i + 1);
-                marker.title = n.text || '笔记';
-
-                // 长按编辑
-                let pressTimer = null;
-                marker.addEventListener('touchstart', (e) => {
-                    pressTimer = setTimeout(() => {
-                        e.preventDefault();
-                        editDocNote(currentDoc.id, currentPage, i, n);
-                    }, 500);
-                });
-                marker.addEventListener('touchend', () => clearTimeout(pressTimer));
-                marker.addEventListener('touchmove', () => clearTimeout(pressTimer));
-
-                marker.onclick = (e) => {
-                    e.stopPropagation();
-                    document.querySelectorAll('.note-bubble').forEach(b => b.remove());
-                    const bubble = document.createElement('div');
-                    bubble.className = 'note-bubble';
-                    // 判断位置决定气泡方向
-                    if (n.y < 0.3) {
-                        bubble.classList.add('bubble-down');
-                    }
-                    const time = n.createdAt ? new Date(n.createdAt).toLocaleString('zh-CN', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
-                    
-                    // 创建关闭按钮
-                    const closeBtn = document.createElement('button');
-                    closeBtn.className = 'note-bubble-close';
-                    closeBtn.innerHTML = '&times;';
-                    closeBtn.onclick = (ev) => { ev.stopPropagation(); bubble.remove(); };
-                    
-                    // 创建文本div，使用textContent保留原始LaTeX
-                    const textDiv = document.createElement('div');
-                    textDiv.className = 'note-bubble-text';
-                    textDiv.textContent = n.text || '(手写笔记)';
-                    
-                    bubble.appendChild(closeBtn);
-                    bubble.appendChild(textDiv);
-                    
-                    if (time) {
-                        const timeDiv = document.createElement('div');
-                        timeDiv.className = 'note-bubble-time';
-                        timeDiv.textContent = time;
-                        bubble.appendChild(timeDiv);
-                    }
-                    
-                    marker.appendChild(bubble);
-                    // KaTeX渲染笔记气泡中的数学公式
-                    renderNoteBubbleMath(textDiv);
-                };
-
-                markerContainer.appendChild(marker);
-                pageWrapper.appendChild(markerContainer);
-            });
-
-            wrapper.appendChild(pageWrapper);
-
-            // Update UI
-            document.getElementById('pageInfo').textContent = `${currentPage} / ${totalPages}`;
-            document.getElementById('prevPageBtn').disabled = currentPage <= 1;
-            document.getElementById('nextPageBtn').disabled = currentPage >= totalPages;
-
-            // Update progress
-            currentDoc.currentPage = currentPage;
-            currentDoc.progress = Math.round((currentPage / totalPages) * 100);
-            saveData();
+            currentPage = pageNum;
+            scrollToPage(pageNum);
+            // 滚动后可能目标页尚未渲染，主动催一下
+            await renderVisiblePages();
         }
 
         // ---- Annotation storage on doc itself ----
@@ -6020,9 +5848,19 @@
             showToast('笔记已删除');
             
             if (pdfDoc && currentPage === currentNotePosition.page) {
-                if (penMode) renderPDFPage(currentPage);
-                else renderAllPDFPages();
+                refreshPageMarkers(currentPage);
             }
+        }
+
+        // 只刷新指定页的笔记标记，不重建整个 PDF 渲染，避免破坏正在画的标注
+        function refreshPageMarkers(pageNum) {
+            const pageData = pageElements[pageNum];
+            if (!pageData) return;
+            const placeholder = pageData.placeholder;
+            if (!placeholder) return;
+            // 移除旧的笔记 marker（.annotation-marker 容器是 absolute div，不含 canvas 本身）
+            placeholder.querySelectorAll('[data-note-marker="1"]').forEach(el => el.remove());
+            renderPageNoteMarkers(placeholder, pageNum);
         }
 
         // Compute PDF render scale based on actual container width (so split mode
@@ -6042,50 +5880,93 @@
             return containerW / pageCssW;
         }
 
-        function saveDrawingToDoc() {
-            if (!currentDoc || !currentAnnoCanvas) return;
-            const dataUrl = currentAnnoCanvas.toDataURL('image/png');
-            setDocAnnotation(currentDoc.id, currentPage, 'drawing', dataUrl);
+        // 把某页当前 canvas 的内容保存到文档（持久化）
+        function saveDrawingForPage(pageNum, annoCanvas) {
+            if (!currentDoc || !annoCanvas) return;
+            const dataUrl = annoCanvas.toDataURL('image/png');
+            setDocAnnotation(currentDoc.id, pageNum, 'drawing', dataUrl);
             saveData();
         }
 
+        // 旧接口，作用于 currentAnnoCanvas（保持兼容，用在导出等路径）
+        function saveDrawingToDoc() {
+            if (!currentDoc || !currentAnnoCanvas) return;
+            const pageNum = parseInt(currentAnnoCanvas.dataset.pageNum) || currentPage;
+            saveDrawingForPage(pageNum, currentAnnoCanvas);
+        }
+
         // ---- Undo / Redo ----
-        function saveStrokeState() {
-            if (!currentAnnoCtx || !currentAnnoCanvas) return;
-            const w = currentAnnoCanvas.width;
-            const h = currentAnnoCanvas.height;
-            strokeHistory.push(currentAnnoCtx.getImageData(0, 0, w, h));
-            // Limit history to 30 steps
+        // strokeHistory / redoHistory 是全局栈，每个条目是 { pageNum, annoCanvas, imageData }
+        // 按操作发生的时间顺序撤销，跨页
+        function saveStrokeState(pageNum, annoCanvas) {
+            annoCanvas = annoCanvas || currentAnnoCanvas;
+            if (!annoCanvas) return;
+            const ctx = annoCanvas.getContext('2d');
+            const w = annoCanvas.width;
+            const h = annoCanvas.height;
+            strokeHistory.push({
+                pageNum: pageNum || parseInt(annoCanvas.dataset.pageNum) || currentPage,
+                annoCanvas: annoCanvas,
+                imageData: ctx.getImageData(0, 0, w, h)
+            });
+            // 限制历史步数 30
             if (strokeHistory.length > 30) strokeHistory.shift();
         }
 
         function undoStroke() {
-            if (strokeHistory.length === 0 || !currentAnnoCtx || !currentAnnoCanvas) return;
-            const w = currentAnnoCanvas.width;
-            const h = currentAnnoCanvas.height;
-            // Save current to redo
-            redoHistory.push(currentAnnoCtx.getImageData(0, 0, w, h));
-            // Restore last
-            const prev = strokeHistory.pop();
-            currentAnnoCtx.putImageData(prev, 0, 0);
+            if (strokeHistory.length === 0) return;
+            const entry = strokeHistory.pop();
+            const canvas = entry.annoCanvas;
+            // 如果该 canvas 已被回收（翻页太远被清）则跳过
+            if (!canvas || !canvas.isConnected) {
+                updateUndoRedoButtons();
+                return undoStroke(); // 尝试下一个
+            }
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width, h = canvas.height;
+            // 当前状态入 redo
+            redoHistory.push({
+                pageNum: entry.pageNum,
+                annoCanvas: canvas,
+                imageData: ctx.getImageData(0, 0, w, h)
+            });
+            ctx.putImageData(entry.imageData, 0, 0);
+            // 如果这个页面不在当前视窗，滚动到那页以让用户看到效果
+            if (entry.pageNum !== currentPage) {
+                scrollToPage(entry.pageNum);
+            }
             updateUndoRedoButtons();
-            saveDrawingToDoc();
+            saveDrawingForPage(entry.pageNum, canvas);
         }
 
         function redoStroke() {
-            if (redoHistory.length === 0 || !currentAnnoCtx || !currentAnnoCanvas) return;
-            const w = currentAnnoCanvas.width;
-            const h = currentAnnoCanvas.height;
-            strokeHistory.push(currentAnnoCtx.getImageData(0, 0, w, h));
-            const next = redoHistory.pop();
-            currentAnnoCtx.putImageData(next, 0, 0);
+            if (redoHistory.length === 0) return;
+            const entry = redoHistory.pop();
+            const canvas = entry.annoCanvas;
+            if (!canvas || !canvas.isConnected) {
+                updateUndoRedoButtons();
+                return redoStroke();
+            }
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width, h = canvas.height;
+            strokeHistory.push({
+                pageNum: entry.pageNum,
+                annoCanvas: canvas,
+                imageData: ctx.getImageData(0, 0, w, h)
+            });
+            ctx.putImageData(entry.imageData, 0, 0);
+            if (entry.pageNum !== currentPage) {
+                scrollToPage(entry.pageNum);
+            }
             updateUndoRedoButtons();
-            saveDrawingToDoc();
+            saveDrawingForPage(entry.pageNum, canvas);
         }
 
         function updateUndoRedoButtons() {
-            document.getElementById('undoBtn').style.opacity = strokeHistory.length > 0 ? '1' : '0.3';
-            document.getElementById('redoBtn').style.opacity = redoHistory.length > 0 ? '1' : '0.3';
+            const undoBtn = document.getElementById('undoBtn');
+            const redoBtn = document.getElementById('redoBtn');
+            if (undoBtn) undoBtn.style.opacity = strokeHistory.length > 0 ? '1' : '0.3';
+            if (redoBtn) redoBtn.style.opacity = redoHistory.length > 0 ? '1' : '0.3';
         }
 
         // ---- Pen color & size ----
@@ -6118,8 +5999,10 @@
                 showToast('请先开启画笔');
                 return;
             }
-            if (!currentAnnoCanvas || !currentAnnoCtx) {
-                showToast('无法插入：请先打开文档');
+            // 使用当前页的 annoCanvas
+            const pageData = pageElements[currentPage];
+            if (!pageData || !pageData.annoCanvas) {
+                showToast('当前页尚未渲染，请滚动到目标页再试');
                 return;
             }
             const input = document.getElementById('readerImageInput');
@@ -6132,38 +6015,38 @@
         function onReaderImageSelected(event) {
             const file = event.target.files && event.target.files[0];
             if (!file) return;
-            if (!currentAnnoCanvas || !currentAnnoCtx) return;
+            const pageNum = currentPage;
+            const pageData = pageElements[pageNum];
+            if (!pageData || !pageData.annoCanvas) {
+                showToast('当前页尚未渲染');
+                return;
+            }
+            const annoCanvas = pageData.annoCanvas;
+            const annoCtx = pageData.annoCtx;
             const reader = new FileReader();
             reader.onload = function(ev) {
                 const img = new Image();
                 img.onload = function() {
                     const dpr = window.devicePixelRatio || 1;
-                    // canvas 内部尺寸是 css 尺寸 * dpr；换算出 CSS 坐标系下的尺寸
-                    const canvasCssWidth = currentAnnoCanvas.width / dpr;
-                    const canvasCssHeight = currentAnnoCanvas.height / dpr;
-                    // 目标宽度：页面 CSS 宽度的 40%，高度按原图比例
+                    const canvasCssWidth = annoCanvas.width / dpr;
+                    const canvasCssHeight = annoCanvas.height / dpr;
                     let targetW = canvasCssWidth * 0.4;
                     let targetH = targetW * (img.height / img.width);
-                    // 防止超过页面高度的 40%
                     const maxH = canvasCssHeight * 0.4;
                     if (targetH > maxH) {
                         targetH = maxH;
                         targetW = targetH * (img.width / img.height);
                     }
-                    // 居中
                     const x = (canvasCssWidth - targetW) / 2;
                     const y = (canvasCssHeight - targetH) / 2;
-                    // 进入 undo 栈
-                    saveStrokeState();
-                    // drawImage 会受到 annoCtx 现有 transform 影响（前面 ctx.scale(dpr, dpr) 过），
-                    // 所以用 CSS 坐标绘制即可
-                    const prevComposite = currentAnnoCtx.globalCompositeOperation;
-                    currentAnnoCtx.globalCompositeOperation = 'source-over';
-                    currentAnnoCtx.drawImage(img, x, y, targetW, targetH);
-                    currentAnnoCtx.globalCompositeOperation = prevComposite || 'source-over';
+                    saveStrokeState(pageNum, annoCanvas);
+                    const prevComposite = annoCtx.globalCompositeOperation;
+                    annoCtx.globalCompositeOperation = 'source-over';
+                    annoCtx.drawImage(img, x, y, targetW, targetH);
+                    annoCtx.globalCompositeOperation = prevComposite || 'source-over';
                     redoHistory = [];
                     updateUndoRedoButtons();
-                    saveDrawingToDoc();
+                    saveDrawingForPage(pageNum, annoCanvas);
                 };
                 img.onerror = function() {
                     showToast('图片加载失败');
@@ -6179,22 +6062,14 @@
         function prevPage() {
             if (currentPage > 1) {
                 currentPage--;
-                if (penMode) {
-                    renderPDFPage(currentPage);
-                } else {
-                    scrollToPage(currentPage);
-                }
+                scrollToPage(currentPage);
             }
         }
 
         function nextPage() {
             if (currentPage < totalPages) {
                 currentPage++;
-                if (penMode) {
-                    renderPDFPage(currentPage);
-                } else {
-                    scrollToPage(currentPage);
-                }
+                scrollToPage(currentPage);
             }
         }
 
@@ -6259,11 +6134,7 @@
                 return;
             }
             currentPage = page;
-            if (penMode) {
-                renderPDFPage(currentPage);
-            } else {
-                scrollToPage(currentPage);
-            }
+            scrollToPage(currentPage);
             closePageJumpPopup();
             showToast('已跳转到第 ' + page + ' 页');
         }
@@ -6510,30 +6381,17 @@
 
         function highlightAllResults() {
             clearSearchHighlights();
-            
-            // In continuous scroll mode, highlight visible results
-            if (!penMode) {
-                searchResults.forEach((result, index) => {
-                    const pageData = pageElements[result.page];
-                    if (pageData && pageData.rendered) {
-                        createHighlight(result, index);
-                    }
-                });
-            } else {
-                // In single page mode, only highlight current page results
-                searchResults.forEach((result, index) => {
-                    if (result.page === currentPage) {
-                        createHighlight(result, index);
-                    }
-                });
-            }
+            // 所有模式都使用连续滚动：对已渲染的页面创建高亮
+            searchResults.forEach((result, index) => {
+                const pageData = pageElements[result.page];
+                if (pageData && pageData.rendered) {
+                    createHighlight(result, index);
+                }
+            });
         }
 
         async function createHighlight(result, index) {
-            const pageWrapper = penMode 
-                ? document.querySelector('.pdf-page-wrapper')
-                : pageElements[result.page]?.placeholder;
-                
+            const pageWrapper = pageElements[result.page]?.placeholder;
             if (!pageWrapper) return;
             
             const page = await pdfDoc.getPage(result.page);
@@ -6594,18 +6452,11 @@
             // Navigate to the page
             if (result.page !== currentPage) {
                 currentPage = result.page;
-                if (penMode) {
-                    renderPDFPage(currentPage).then(() => {
-                        highlightAllResults();
-                        scrollToCurrentHighlight();
-                    });
-                } else {
-                    scrollToPage(currentPage);
-                    setTimeout(() => {
-                        highlightAllResults();
-                        scrollToCurrentHighlight();
-                    }, 300);
-                }
+                scrollToPage(currentPage);
+                setTimeout(() => {
+                    highlightAllResults();
+                    scrollToCurrentHighlight();
+                }, 300);
             } else {
                 highlightAllResults();
                 scrollToCurrentHighlight();
@@ -6760,27 +6611,7 @@
             appData.settings.penMode = penMode;
             saveData();
             showToast(penMode ? '画笔已开启' : '画笔已关闭');
-            
-            // 切换模式时重新渲染
-            if (pdfDoc && currentDoc) {
-                if (penMode) {
-                    // 切换到画笔模式：单页渲染
-                    renderPDFPage(currentPage).then(() => {
-                        // 刷新搜索高亮
-                        if (searchResults.length > 0) {
-                            highlightAllResults();
-                        }
-                    });
-                } else {
-                    // 切换到笔记模式：连续滚动渲染
-                    renderAllPDFPages().then(() => {
-                        // 刷新搜索高亮
-                        if (searchResults.length > 0) {
-                            setTimeout(highlightAllResults, 300);
-                        }
-                    });
-                }
-            }
+            // 无需重新渲染：两种模式都使用连续滚动，只是 annotation-canvas 的 pointer-events 切换
         }
         
         function applyPenModeUI() {
@@ -6969,8 +6800,7 @@
                 closeNotePopup();
                 showToast('已保存');
                 if (currentPage === currentNotePosition.page) {
-                    if (penMode) renderPDFPage(currentPage);
-                    else renderAllPDFPages();
+                    refreshPageMarkers(currentNotePosition.page);
                 }
             } catch(err) {
                 showToast('失败: ' + err.message);
@@ -7004,8 +6834,7 @@
             showToast('笔记已保存');
 
             if (pdfDoc && currentPage === currentNotePosition.page) {
-                if (penMode) renderPDFPage(currentPage);
-                else renderAllPDFPages();
+                refreshPageMarkers(currentNotePosition.page);
             }
         }
 
@@ -7185,12 +7014,7 @@
             setTimeout(() => {
                 currentPage = page;
                 if (!pdfDoc) return;
-                if (penMode) {
-                    renderPDFPage(page);
-                } else {
-                    // 连续滚动模式：滚动到目标页，不能调 renderPDFPage（会把所有占位清空）
-                    scrollToPage(page);
-                }
+                scrollToPage(page);
             }, 500);
         }
 
@@ -10093,8 +9917,7 @@ ${book.subject ? '学科：' + book.subject : ''}
             setTimeout(() => {
                 if (pdfDoc && page <= totalPages) {
                     currentPage = page;
-                    if (penMode) renderPDFPage(page);
-                    else scrollToPage(page);
+                    scrollToPage(page);
                     showToast('已跳转到第 ' + page + ' 页');
                 }
             }, 500);
@@ -10161,11 +9984,7 @@ ${book.subject ? '学科：' + book.subject : ''}
             closeBookmarkSidebar();
             if (pdfDoc && page <= totalPages) {
                 currentPage = page;
-                if (penMode) {
-                    renderPDFPage(page);
-                } else {
-                    scrollToPage(page);
-                }
+                scrollToPage(page);
             }
         }
 
@@ -10335,16 +10154,6 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 return Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
             }
 
-            // 双指起始中心点，用于识别双指平移（翻页 / 滚动）
-            let initialCenterX = 0;
-            let initialCenterY = 0;
-            let swipeMode = false;         // 已进入双指水平滑动翻页模式
-            let swipeFired = false;        // 本次双指手势中已触发过翻页，避免连发
-            const swipeTriggerPx = 60;     // 水平滑动触发翻页的阈值
-
-            function centerX(t1, t2) { return (t1.clientX + t2.clientX) / 2; }
-            function centerY(t1, t2) { return (t1.clientY + t2.clientY) / 2; }
-
             document.addEventListener('touchstart', (e) => {
                 const container = document.getElementById('readerContainer');
                 if (!container || !container.closest('.page.active')) return;
@@ -10357,12 +10166,8 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     if (dist >= minPinchDistance) {
                         pinchCandidate = true;
                         pinchStarted = false;
-                        swipeMode = false;
-                        swipeFired = false;
                         initialDistance = dist;
                         baseScale = currentScale;
-                        initialCenterX = centerX(e.touches[0], e.touches[1]);
-                        initialCenterY = centerY(e.touches[0], e.touches[1]);
                     }
                 }
             }, { passive: false });
@@ -10371,41 +10176,15 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 if (e.touches.length !== 2 || !pinchCandidate || initialDistance <= 0 || !wrapper) return;
 
                 const dist = getDistance(e.touches[0], e.touches[1]);
-                const cx = centerX(e.touches[0], e.touches[1]);
-                const cy = centerY(e.touches[0], e.touches[1]);
-                const dDist = dist - initialDistance;
-                const dCenterX = cx - initialCenterX;
-                const dCenterY = cy - initialCenterY;
 
-                // 优先 pinch：如果距离变化超过阈值先激活 pinch
-                if (!pinchStarted && !swipeMode) {
-                    if (Math.abs(dDist) >= pinchActivationThreshold) {
-                        pinchStarted = true;
-                        isPinching = true;
-                        initialDistance = dist;
-                    } else if (penMode && Math.abs(dCenterX) >= swipeTriggerPx && Math.abs(dCenterX) > Math.abs(dCenterY) * 1.4) {
-                        // 仅在画笔模式下启用双指水平滑动翻页（避免和连续滚动冲突）
-                        swipeMode = true;
-                        isPinching = true; // 让画笔绘图 handler 视其为非绘图
-                    }
+                // 未激活：等距离变化超过阈值再激活，阻止握持/轻触被误判为缩放
+                if (!pinchStarted) {
+                    if (Math.abs(dist - initialDistance) < pinchActivationThreshold) return;
+                    pinchStarted = true;
+                    isPinching = true;
+                    // 从激活那一刻的距离重新作为基准，避免激活瞬间产生跳变
+                    initialDistance = dist;
                 }
-
-                if (swipeMode) {
-                    e.preventDefault();
-                    if (!swipeFired) {
-                        // 左滑（dx<0）→ 下一页；右滑（dx>0）→ 上一页
-                        if (dCenterX <= -swipeTriggerPx) {
-                            swipeFired = true;
-                            nextPage();
-                        } else if (dCenterX >= swipeTriggerPx) {
-                            swipeFired = true;
-                            prevPage();
-                        }
-                    }
-                    return;
-                }
-
-                if (!pinchStarted) return;
 
                 e.preventDefault();
                 // 计算缩放比例，使用灵敏度来平滑缩放
@@ -10424,8 +10203,6 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     initialDistance = 0;
                     pinchCandidate = false;
                     pinchStarted = false;
-                    swipeMode = false;
-                    swipeFired = false;
                     setTimeout(() => { isPinching = false; }, 150);
                     if (currentScale < 1.05) {
                         currentScale = 1;
