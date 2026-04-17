@@ -2407,6 +2407,18 @@
             display: flex;
         }
 
+        /* 分屏模式下讲义/摘要只占右半 */
+        body.split-mode .lecture-viewer {
+            left: 50%;
+            bottom: 56px;
+            border-left: 1px solid var(--border-color);
+        }
+        @supports (padding-bottom: env(safe-area-inset-bottom)) {
+            body.split-mode .lecture-viewer {
+                bottom: calc(56px + env(safe-area-inset-bottom));
+            }
+        }
+
         .lecture-header {
             display: flex;
             align-items: center;
@@ -6008,7 +6020,8 @@
             showToast('笔记已删除');
             
             if (pdfDoc && currentPage === currentNotePosition.page) {
-                renderPDFPage(currentPage);
+                if (penMode) renderPDFPage(currentPage);
+                else renderAllPDFPages();
             }
         }
 
@@ -6544,7 +6557,10 @@
                 const x = transform[4] * scale;
                 const y = viewport.height - (transform[5] * scale);
                 const width = result.item.width * scale || 60;
-                const height = result.item.height * scale || 14;
+                // transform[0] 或 |transform[3]| 是字形尺寸，比 item.height（常是行高）更准
+                const fontSize = Math.abs(transform[0]) || Math.abs(transform[3]) || result.item.height || 14;
+                // 限制高度最大 40px，避免个别 PDF 的异常行高把高亮撑大
+                const height = Math.min(fontSize * scale * 1.2, 40);
                 
                 const highlight = document.createElement('div');
                 highlight.className = 'search-highlight' + (index === currentSearchIndex ? ' current' : '');
@@ -6953,7 +6969,8 @@
                 closeNotePopup();
                 showToast('已保存');
                 if (currentPage === currentNotePosition.page) {
-                    renderPDFPage(currentPage);
+                    if (penMode) renderPDFPage(currentPage);
+                    else renderAllPDFPages();
                 }
             } catch(err) {
                 showToast('失败: ' + err.message);
@@ -6987,7 +7004,8 @@
             showToast('笔记已保存');
 
             if (pdfDoc && currentPage === currentNotePosition.page) {
-                renderPDFPage(currentPage);
+                if (penMode) renderPDFPage(currentPage);
+                else renderAllPDFPages();
             }
         }
 
@@ -7166,7 +7184,13 @@
             openDoc(docId);
             setTimeout(() => {
                 currentPage = page;
-                if (pdfDoc) renderPDFPage(page);
+                if (!pdfDoc) return;
+                if (penMode) {
+                    renderPDFPage(page);
+                } else {
+                    // 连续滚动模式：滚动到目标页，不能调 renderPDFPage（会把所有占位清空）
+                    scrollToPage(page);
+                }
             }, 500);
         }
 
@@ -10069,7 +10093,8 @@ ${book.subject ? '学科：' + book.subject : ''}
             setTimeout(() => {
                 if (pdfDoc && page <= totalPages) {
                     currentPage = page;
-                    renderPDFPage(page);
+                    if (penMode) renderPDFPage(page);
+                    else scrollToPage(page);
                     showToast('已跳转到第 ' + page + ' 页');
                 }
             }, 500);
@@ -10310,6 +10335,16 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 return Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
             }
 
+            // 双指起始中心点，用于识别双指平移（翻页 / 滚动）
+            let initialCenterX = 0;
+            let initialCenterY = 0;
+            let swipeMode = false;         // 已进入双指水平滑动翻页模式
+            let swipeFired = false;        // 本次双指手势中已触发过翻页，避免连发
+            const swipeTriggerPx = 60;     // 水平滑动触发翻页的阈值
+
+            function centerX(t1, t2) { return (t1.clientX + t2.clientX) / 2; }
+            function centerY(t1, t2) { return (t1.clientY + t2.clientY) / 2; }
+
             document.addEventListener('touchstart', (e) => {
                 const container = document.getElementById('readerContainer');
                 if (!container || !container.closest('.page.active')) return;
@@ -10322,8 +10357,12 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     if (dist >= minPinchDistance) {
                         pinchCandidate = true;
                         pinchStarted = false;
+                        swipeMode = false;
+                        swipeFired = false;
                         initialDistance = dist;
                         baseScale = currentScale;
+                        initialCenterX = centerX(e.touches[0], e.touches[1]);
+                        initialCenterY = centerY(e.touches[0], e.touches[1]);
                     }
                 }
             }, { passive: false });
@@ -10332,15 +10371,41 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 if (e.touches.length !== 2 || !pinchCandidate || initialDistance <= 0 || !wrapper) return;
 
                 const dist = getDistance(e.touches[0], e.touches[1]);
+                const cx = centerX(e.touches[0], e.touches[1]);
+                const cy = centerY(e.touches[0], e.touches[1]);
+                const dDist = dist - initialDistance;
+                const dCenterX = cx - initialCenterX;
+                const dCenterY = cy - initialCenterY;
 
-                // 未激活：等距离变化超过阈值再激活，阻止握持/轻触被误判为缩放
-                if (!pinchStarted) {
-                    if (Math.abs(dist - initialDistance) < pinchActivationThreshold) return;
-                    pinchStarted = true;
-                    isPinching = true;
-                    // 从激活那一刻的距离重新作为基准，避免激活瞬间产生跳变
-                    initialDistance = dist;
+                // 优先 pinch：如果距离变化超过阈值先激活 pinch
+                if (!pinchStarted && !swipeMode) {
+                    if (Math.abs(dDist) >= pinchActivationThreshold) {
+                        pinchStarted = true;
+                        isPinching = true;
+                        initialDistance = dist;
+                    } else if (penMode && Math.abs(dCenterX) >= swipeTriggerPx && Math.abs(dCenterX) > Math.abs(dCenterY) * 1.4) {
+                        // 仅在画笔模式下启用双指水平滑动翻页（避免和连续滚动冲突）
+                        swipeMode = true;
+                        isPinching = true; // 让画笔绘图 handler 视其为非绘图
+                    }
                 }
+
+                if (swipeMode) {
+                    e.preventDefault();
+                    if (!swipeFired) {
+                        // 左滑（dx<0）→ 下一页；右滑（dx>0）→ 上一页
+                        if (dCenterX <= -swipeTriggerPx) {
+                            swipeFired = true;
+                            nextPage();
+                        } else if (dCenterX >= swipeTriggerPx) {
+                            swipeFired = true;
+                            prevPage();
+                        }
+                    }
+                    return;
+                }
+
+                if (!pinchStarted) return;
 
                 e.preventDefault();
                 // 计算缩放比例，使用灵敏度来平滑缩放
@@ -10359,6 +10424,8 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     initialDistance = 0;
                     pinchCandidate = false;
                     pinchStarted = false;
+                    swipeMode = false;
+                    swipeFired = false;
                     setTimeout(() => { isPinching = false; }, 150);
                     if (currentScale < 1.05) {
                         currentScale = 1;
