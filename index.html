@@ -4337,8 +4337,15 @@
             document.body.classList.remove('split-mode');
             splitModeActive = false;
             document.querySelectorAll('.nav-item').forEach(n => n.removeAttribute('data-split'));
-            // 退出后默认回到阅读页（因为这是分屏的主用途）
-            switchPage(2);
+            // 不能调 switchPage —— 紧接着 __lastSplitToggleAt 会被设置，switchPage 会被时间戳保护挡掉。
+            // 直接激活阅读页，并手动复制 switchPage 中需要的副作用。
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            const page2 = document.getElementById('page2');
+            if (page2) page2.classList.add('active');
+            const navItems = document.querySelectorAll('.nav-item');
+            if (navItems[1]) navItems[1].classList.add('active'); // 第 2 个是"阅读"
+            document.body.classList.add('page2-active'); // 草稿小条显示
             // 重新渲染 PDF 以匹配恢复后的宽度
             setTimeout(() => {
                 if (pdfDoc && currentDoc) {
