@@ -11,7 +11,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="数学阅读">
     <link rel="apple-touch-icon" href="icon-infinity-white.svg">
-    <link rel="icon" href="icon-infinity-white.svg" type="image/svg+xml">
+    <link rel="icon" type="image/svg+xml" href="icon-infinity-white.svg">
     <!-- PDF.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <!-- KaTeX for LaTeX -->
@@ -5716,14 +5716,28 @@
             let drawing = false;
             let lastX, lastY;
 
+            // 把指针事件坐标换算到 canvas 的绘图坐标系（CSS 像素、未受父 transform 影响）
+            // 用 CSS 宽高 / 当前 bounding rect 的比例校正，消除 pinch-zoom 或其他父 transform 引起的偏移
+            function pointerToCanvasXY(e) {
+                const rect = annoCanvas.getBoundingClientRect();
+                const cssW = parseFloat(annoCanvas.style.width) || rect.width;
+                const cssH = parseFloat(annoCanvas.style.height) || rect.height;
+                const rx = rect.width > 0 ? (cssW / rect.width) : 1;
+                const ry = rect.height > 0 ? (cssH / rect.height) : 1;
+                return {
+                    x: (e.clientX - rect.left) * rx,
+                    y: (e.clientY - rect.top) * ry
+                };
+            }
+
             annoCanvas.addEventListener('pointerdown', (e) => {
                 if (isPinching) return;
                 if (penMode) {
                     saveStrokeState();
                     drawing = true;
-                    const rect = annoCanvas.getBoundingClientRect();
-                    lastX = e.clientX - rect.left;
-                    lastY = e.clientY - rect.top;
+                    const p = pointerToCanvasXY(e);
+                    lastX = p.x;
+                    lastY = p.y;
                     if (readerEraserMode) {
                         annoCtx.globalCompositeOperation = 'destination-out';
                         annoCtx.strokeStyle = 'rgba(0,0,0,1)';
@@ -5742,15 +5756,13 @@
             annoCanvas.addEventListener('pointermove', (e) => {
                 if (isPinching) { drawing = false; return; }
                 if (penMode && drawing) {
-                    const rect = annoCanvas.getBoundingClientRect();
-                    const x = e.clientX - rect.left;
-                    const y = e.clientY - rect.top;
+                    const p = pointerToCanvasXY(e);
                     annoCtx.beginPath();
                     annoCtx.moveTo(lastX, lastY);
-                    annoCtx.lineTo(x, y);
+                    annoCtx.lineTo(p.x, p.y);
                     annoCtx.stroke();
-                    lastX = x;
-                    lastY = y;
+                    lastX = p.x;
+                    lastY = p.y;
                     e.preventDefault();
                 }
             });
@@ -6004,7 +6016,15 @@
         // and normal mode both produce correctly-sized pages).
         function getReaderRenderScale(page) {
             const wrapper = document.getElementById('pdfCanvasWrapper');
-            const containerW = (wrapper && wrapper.clientWidth) ? wrapper.clientWidth : (window.innerWidth - 24);
+            let containerW = window.innerWidth - 24;
+            if (wrapper) {
+                const cs = window.getComputedStyle(wrapper);
+                const padL = parseFloat(cs.paddingLeft) || 0;
+                const padR = parseFloat(cs.paddingRight) || 0;
+                // clientWidth 包含 padding，减去得到真正可用的内容宽度
+                const inner = wrapper.clientWidth - padL - padR;
+                if (inner > 0) containerW = inner;
+            }
             const pageCssW = page.getViewport({ scale: 1 }).width;
             return containerW / pageCssW;
         }
