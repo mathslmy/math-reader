@@ -5705,8 +5705,7 @@
         }
 
         function handleContinuousScroll() {
-            if (penMode) return;
-
+            // 画笔模式也使用连续滚动，同样需要更新页码和懒渲染可见页
             // 使用防抖更新当前页码
             if (scrollUpdateTimer) clearTimeout(scrollUpdateTimer);
             scrollUpdateTimer = setTimeout(() => {
@@ -10183,7 +10182,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             let lastCenterY = 0;        // 上一次 touchmove 的两指中心 Y（用于增量滚动）
             let initialCenterX = 0;
             let initialCenterY = 0;
-            const panActivationThreshold = 10; // 中心点位移达到此值才视为 pan 手势
+            const panActivationThreshold = 5; // 中心点位移达到此值才视为 pan 手势（越小越灵敏）
             let readerContainerEl = null;
 
             function getDistance(t1, t2) {
@@ -10239,7 +10238,8 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     } else if (Math.abs(dCenterY) >= panActivationThreshold && Math.abs(dCenterY) > Math.abs(dCenterX)) {
                         panStarted = true;
                         isPinching = true;  // 让画笔 handler 视其为非绘图
-                        lastCenterY = cy;
+                        // 用 initialCenterY 作为起点，确保激活瞬间已积累的位移也被应用到 scrollTop
+                        lastCenterY = initialCenterY;
                     } else {
                         return;
                     }
