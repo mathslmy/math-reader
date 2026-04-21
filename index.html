@@ -10178,11 +10178,12 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             let wrapper = null;
             let pinchCandidate = false; // 已满足起始条件，但尚未超过激活阈值
             let pinchStarted = false;   // 真正进入缩放模式
+            let pinchAllowed = false;   // 双指间距是否足够大，允许 pinch 缩放（pan 不受此限制）
             let panStarted = false;     // 已进入双指上下滚动模式
             let lastCenterY = 0;        // 上一次 touchmove 的两指中心 Y（用于增量滚动）
             let initialCenterX = 0;
             let initialCenterY = 0;
-            const panActivationThreshold = 5; // 中心点位移达到此值才视为 pan 手势（越小越灵敏）
+            const panActivationThreshold = 10; // 中心点位移达到此值才视为 pan 手势
             let readerContainerEl = null;
 
             function getDistance(t1, t2) {
@@ -10200,22 +10201,22 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
 
                 if (e.touches.length === 2) {
                     // 第二根手指一落下就立刻中止任何正在进行的画笔，并回滚已画出的短线。
-                    // 不等 touchmove 判定，否则头几帧的移动还会被画笔响应。
                     isPinching = true;
                     if (typeof rollbackActivePenStroke === 'function') {
                         rollbackActivePenStroke();
                     }
                     const dist = getDistance(e.touches[0], e.touches[1]);
-                    if (dist >= minPinchDistance) {
-                        pinchCandidate = true;
-                        pinchStarted = false;
-                        panStarted = false;
-                        initialDistance = dist;
-                        baseScale = currentScale;
-                        initialCenterX = getCenterX(e.touches[0], e.touches[1]);
-                        initialCenterY = getCenterY(e.touches[0], e.touches[1]);
-                        lastCenterY = initialCenterY;
-                    }
+                    // 双指手势候选总是记录，不管距离大小（pan 对间距没有要求）
+                    pinchCandidate = true;
+                    pinchStarted = false;
+                    panStarted = false;
+                    initialDistance = dist;
+                    baseScale = currentScale;
+                    initialCenterX = getCenterX(e.touches[0], e.touches[1]);
+                    initialCenterY = getCenterY(e.touches[0], e.touches[1]);
+                    lastCenterY = initialCenterY;
+                    // 只有双指间距足够大才允许进入 pinch 缩放模式
+                    pinchAllowed = dist >= minPinchDistance;
                 }
             }, { passive: false });
 
@@ -10229,17 +10230,16 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 const dCenterX = cx - initialCenterX;
                 const dCenterY = cy - initialCenterY;
 
-                // 激活判定：距离变化优先当 pinch；否则若垂直位移达到阈值且垂直分量大于水平分量，当 pan（滚动）
+                // 激活判定：pinch 需双指间距足够；pan 则无间距要求，任何双指上下滑动都可以翻页
                 if (!pinchStarted && !panStarted) {
-                    if (Math.abs(dDist) >= pinchActivationThreshold) {
+                    if (pinchAllowed && Math.abs(dDist) >= pinchActivationThreshold) {
                         pinchStarted = true;
                         isPinching = true;
                         initialDistance = dist;
                     } else if (Math.abs(dCenterY) >= panActivationThreshold && Math.abs(dCenterY) > Math.abs(dCenterX)) {
                         panStarted = true;
                         isPinching = true;  // 让画笔 handler 视其为非绘图
-                        // 用 initialCenterY 作为起点，确保激活瞬间已积累的位移也被应用到 scrollTop
-                        lastCenterY = initialCenterY;
+                        lastCenterY = cy;
                     } else {
                         return;
                     }
@@ -10274,6 +10274,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     pinchCandidate = false;
                     pinchStarted = false;
                     panStarted = false;
+                    pinchAllowed = false;
                     setTimeout(() => { isPinching = false; }, 150);
                     if (currentScale < 1.05) {
                         currentScale = 1;
