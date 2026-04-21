@@ -7269,7 +7269,7 @@
         const defaultAPIUrls = {
             deepseek: 'https://api.deepseek.com/v1/chat/completions',
             openai: 'https://api.openai.com/v1/chat/completions',
-            google: 'https://generativelanguage.googleapis.com/v1beta/models',
+            google: 'https://generativelanguage.googleapis.com/v1beta',
             claude: 'https://api.anthropic.com/v1/messages'
         };
         
@@ -7282,12 +7282,17 @@
             }
         }
         
+        // 判断一个 URL 是否为 Google Gemini 端点（用 host 判断，不依赖下拉框）
+        function isGeminiUrl(url) {
+            return typeof url === 'string' && url.indexOf('generativelanguage.googleapis.com') !== -1;
+        }
+
         async function fetchModels(type) {
             const urlEl = document.getElementById(type === 'primary' ? 'modalAiApiUrl' : 'backupUrl');
             const keyEl = document.getElementById(type === 'primary' ? 'modalAiApiKey' : 'backupKey');
             const selectEl = document.getElementById(type === 'primary' ? 'apiModelSelect' : 'backupModelSelect');
             
-            const baseUrl = urlEl.value.replace('/chat/completions', '').replace('/messages', '');
+            const rawUrl = urlEl.value.trim();
             const key = keyEl.value;
             
             if (!key) {
@@ -7296,28 +7301,49 @@
             }
             
             try {
-                const response = await fetch(baseUrl + '/models', {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${key}`
+                let response, data, models;
+
+                if (isGeminiUrl(rawUrl)) {
+                    // Gemini: GET {base}/models?key=xxx，无 Authorization 头
+                    // 兼容用户填的 url 可能是 .../v1beta、.../v1beta/、.../v1beta/models 等形式
+                    let base = rawUrl.replace(/\/+$/, '');
+                    if (!/\/models$/.test(base)) base = base + '/models';
+                    const url = base + '?key=' + encodeURIComponent(key);
+                    response = await fetch(url, { method: 'GET' });
+                    if (!response.ok) {
+                        const errText = await response.text().catch(() => '');
+                        throw new Error(`获取模型列表失败 ${response.status}: ${errText}`);
                     }
-                });
-                
-                if (!response.ok) {
-                    throw new Error('获取模型列表失败');
+                    data = await response.json();
+                    // Gemini 返回 { models: [ { name: 'models/gemini-1.5-pro', ... }, ... ] }
+                    const rawModels = data.models || [];
+                    models = rawModels
+                        // 仅保留支持 generateContent 的模型
+                        .filter(m => !m.supportedGenerationMethods || m.supportedGenerationMethods.indexOf('generateContent') !== -1)
+                        .map(m => (m.name || '').replace(/^models\//, ''))
+                        .filter(Boolean);
+                } else {
+                    // OpenAI 兼容：GET {base}/models with Bearer
+                    const baseUrl = rawUrl.replace('/chat/completions', '').replace('/messages', '');
+                    response = await fetch(baseUrl + '/models', {
+                        method: 'GET',
+                        headers: { 'Authorization': `Bearer ${key}` }
+                    });
+                    if (!response.ok) {
+                        throw new Error('获取模型列表失败');
+                    }
+                    data = await response.json();
+                    const rawModels = data.data || data.models || [];
+                    models = rawModels.map(m => m.id || m.name || m);
                 }
-                
-                const data = await response.json();
-                const models = data.data || data.models || [];
-                
-                if (models.length === 0) {
+
+                if (!models || models.length === 0) {
                     showToast('未找到可用模型');
                     return;
                 }
                 
                 selectEl.innerHTML = '<option value="">选择模型...</option>';
-                models.forEach(m => {
-                    const modelId = m.id || m.name || m;
+                models.forEach(modelId => {
                     selectEl.innerHTML += `<option value="${modelId}">${modelId}</option>`;
                 });
                 
@@ -8627,6 +8653,11 @@
         }
         
         async function doAIRequest(config, systemPrompt, messages, options = {}) {
+            // Gemini 走 google 原生 generateContent 协议
+            if (isGeminiUrl(config.url)) {
+                return await doGeminiRequest(config, systemPrompt, messages, options);
+            }
+
             const requestBody = {
                 model: config.model,
                 messages: [
@@ -8658,6 +8689,54 @@
             
             const data = await response.json();
             return data.choices?.[0]?.message?.content || null;
+        }
+
+        // Google Gemini 原生协议调用
+        // - URL: {base}/models/{model}:generateContent?key={key}
+        // - 鉴权走 URL 的 key 参数
+        // - messages/system 映射到 contents / systemInstruction
+        // - 温度等参数从 options 取（与自定义渠道一致）；maxOutputTokens 默认 8192
+        async function doGeminiRequest(config, systemPrompt, messages, options = {}) {
+            // 归一化 base：去掉末尾可能的 /models 或斜杠
+            let base = (config.url || '').replace(/\/+$/, '').replace(/\/models$/, '');
+            if (!base) throw new Error('Gemini API URL 为空');
+            const modelName = (config.model || '').replace(/^models\//, '');
+            if (!modelName) throw new Error('请选择 Gemini 模型');
+
+            // Gemini 的角色：user / model（没有 system，用 systemInstruction 字段）
+            const contents = messages.map(m => ({
+                role: m.role === 'assistant' ? 'model' : 'user',
+                parts: [{ text: String(m.content || '') }]
+            }));
+
+            const body = {
+                contents,
+                generationConfig: {
+                    temperature: options.temperature != null ? options.temperature : 0.7,
+                    maxOutputTokens: options.maxTokens || 8192
+                }
+            };
+            if (systemPrompt) {
+                body.systemInstruction = { parts: [{ text: String(systemPrompt) }] };
+            }
+
+            const url = base + '/models/' + encodeURIComponent(modelName) + ':generateContent?key=' + encodeURIComponent(config.key);
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            if (!response.ok) {
+                const errText = await response.text().catch(() => '');
+                throw new Error(`Gemini API错误 ${response.status}: ${errText}`);
+            }
+            const data = await response.json();
+            // 返回首个 candidate 的文本
+            const parts = data.candidates?.[0]?.content?.parts;
+            if (Array.isArray(parts) && parts.length > 0) {
+                return parts.map(p => p.text || '').join('');
+            }
+            return null;
         }
 
         // OpenAI-compatible API call with message history (保留兼容)
