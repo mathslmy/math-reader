@@ -7722,12 +7722,15 @@
             }
             
             // 只上传元数据，不上传文件数据
+            // API 相关设置仅保存本地，不上传
+            const settingsToSync = stripApiSettingsFrom(appData.settings);
+            delete settingsToSync.r2Config;
             const metadata = {
                 books: appData.books.map(b => ({ ...b, data: undefined })),
                 papers: appData.papers.map(p => ({ ...p, data: undefined })),
                 notes: appData.notes,
                 archived: appData.archived,
-                settings: { ...appData.settings, r2Config: undefined },
+                settings: settingsToSync,
                 lectures: appData.lectures,
                 drafts: appData.drafts,
                 syncedAt: new Date().toISOString()
@@ -8189,6 +8192,26 @@
             return keys;
         }
 
+        // API 相关设置只保存在本地，不上传云端；云端恢复时也不覆盖本地 API 配置
+        const API_LOCAL_ONLY_KEYS = [
+            'apiProvider', 'aiApiUrl', 'aiApiKey', 'aiModel',
+            'backupProvider', 'backupUrl', 'backupKey', 'backupModel',
+            'supabaseUrl', 'supabaseKey',
+            'mathpixAppId', 'mathpixAppKey'
+        ];
+        function stripApiSettingsFrom(settings) {
+            const clean = { ...settings };
+            API_LOCAL_ONLY_KEYS.forEach(k => { delete clean[k]; });
+            return clean;
+        }
+        function pickApiSettingsFrom(settings) {
+            const picked = {};
+            API_LOCAL_ONLY_KEYS.forEach(k => {
+                if (settings && settings[k] !== undefined) picked[k] = settings[k];
+            });
+            return picked;
+        }
+
         async function syncToR2() {
             const config = appData.settings.r2Config;
             if (!config || !config.accessKeyId) {
@@ -8202,12 +8225,15 @@
             
             try {
                 // 1. 上传元数据 (不包含PDF数据，但保留annotations)
+                // API 相关设置仅保存本地，不上传
+                const settingsToSync = stripApiSettingsFrom(appData.settings);
+                delete settingsToSync.r2Config;
                 const metadata = {
                     books: appData.books.map(b => ({ ...b, data: undefined })),
                     papers: appData.papers.map(p => ({ ...p, data: undefined })),
                     notes: appData.notes,
                     archived: appData.archived,
-                    settings: { ...appData.settings, r2Config: undefined },
+                    settings: settingsToSync,
                     lectures: appData.lectures,
                     drafts: appData.drafts || {},
                     syncedAt: new Date().toISOString()
@@ -8260,6 +8286,7 @@
                 if (!metadataStr) return;
                 const metadata = JSON.parse(metadataStr);
                 const localR2Config = appData.settings.r2Config;
+                const localApiSettings = pickApiSettingsFrom(appData.settings);
                 appData.books = metadata.books || [];
                 appData.papers = metadata.papers || [];
                 appData.notes = metadata.notes || {};
@@ -8267,7 +8294,8 @@
                 appData.lectures = metadata.lectures || {};
                 appData.drafts = metadata.drafts || {};
                 appData.lectureDrafts = metadata.lectureDrafts || appData.lectureDrafts || {};
-                appData.settings = { ...metadata.settings, r2Config: localR2Config };
+                // API 设置仅保留本地值，不被云端覆盖
+                appData.settings = { ...metadata.settings, ...localApiSettings, r2Config: localR2Config };
                 saveData();
                 refreshAllUIFromAppData();
                 if (config.lastSyncTime || metadata.syncedAt) {
@@ -8307,6 +8335,8 @@
                 
                 // 保留本地R2配置
                 const localR2Config = appData.settings.r2Config;
+                // API 相关设置只保存在本地，云端不会带回来；恢复时保留本地已有值
+                const localApiSettings = pickApiSettingsFrom(appData.settings);
                 
                 // 恢复数据（包含annotations的books和papers）
                 appData.books = metadata.books || [];
@@ -8315,7 +8345,7 @@
                 appData.archived = metadata.archived || [];
                 appData.lectures = metadata.lectures || {};
                 appData.drafts = metadata.drafts || {};
-                appData.settings = { ...metadata.settings, r2Config: localR2Config };
+                appData.settings = { ...metadata.settings, ...localApiSettings, r2Config: localR2Config };
                 
                 saveData();
                 
