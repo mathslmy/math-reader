@@ -14,6 +14,8 @@
     <link rel="icon" type="image/svg+xml" href="icon-infinity-white.svg">
     <!-- PDF.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <!-- pdf-lib for PDF slicing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
     <!-- KaTeX for LaTeX -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
@@ -3786,6 +3788,7 @@
                 <button class="modal-close" onclick="hideModal('aiModal')">&times;</button>
             </div>
             <div class="ai-modal-greeting" id="aiGreeting">Hi, User! 你需要我做什么?</div>
+            <button class="ai-action-btn" onclick="aiAction('outline')">生成大纲</button>
             <button class="ai-action-btn" onclick="aiAction('lecture')">生成讲义</button>
             <button class="ai-action-btn" onclick="aiAction('abstract')">生成摘要</button>
             <button class="ai-action-btn" onclick="aiAction('chat')">不知道，给我建议</button>
@@ -6568,7 +6571,7 @@
                         body: JSON.stringify({
                             model: appData.settings.aiModel || 'deepseek-chat',
                             messages,
-                            max_tokens: 2000
+                            max_tokens: 8192
                         })
                     });
                     
@@ -6817,7 +6820,7 @@
                         'Content-Type': 'application/json',
                         'Authorization': 'Bearer ' + apiKey
                     },
-                    body: JSON.stringify({ model, messages, max_tokens: 500 })
+                    body: JSON.stringify({ model, messages, max_tokens: 8192 })
                 });
 
                 const result = await resp.json();
@@ -8612,14 +8615,16 @@
             const primaryConfig = {
                 url: s.aiApiUrl,
                 key: s.aiApiKey,
-                model: s.aiModel || 'deepseek-chat'
+                model: s.aiModel || 'deepseek-chat',
+                provider: s.apiProvider || ''
             };
             
             // 备用API配置
             const backupConfig = {
                 url: s.backupUrl,
                 key: s.backupKey,
-                model: s.backupModel
+                model: s.backupModel,
+                provider: s.backupProvider || ''
             };
             
             // 先尝试主API
@@ -8653,18 +8658,34 @@
         }
         
         async function doAIRequest(config, systemPrompt, messages, options = {}) {
-            // Gemini 走 google 原生 generateContent 协议
-            if (isGeminiUrl(config.url)) {
+            // Gemini 原生渠道，或用户指定的"自定义"渠道都走 Gemini 协议（按用户要求）
+            const useGemini = isGeminiUrl(config.url) || config.provider === 'custom';
+            if (useGemini) {
                 return await doGeminiRequest(config, systemPrompt, messages, options);
+            }
+
+            // OpenAI / DeepSeek / Claude / 其他 OpenAI 兼容：用 chat/completions 协议
+            // 这些渠道中只有 Claude 支持原生 PDF，其他需要靠文本预提取兜底
+            let finalMessages = messages;
+            if (options.pdfAttachment) {
+                if (config.provider === 'claude' || /anthropic\.com/.test(config.url)) {
+                    // Claude Messages API: document 块
+                    finalMessages = await embedPdfForClaude(messages, options.pdfAttachment);
+                    return await doClaudeRequest(config, systemPrompt, finalMessages, options);
+                } else {
+                    // OpenAI / DeepSeek / 其他：不支持 PDF，回退文本提取
+                    const extractedText = await extractPdfTextAsFallback(options.pdfAttachment);
+                    finalMessages = injectPdfTextIntoLastUser(messages, extractedText);
+                }
             }
 
             const requestBody = {
                 model: config.model,
                 messages: [
                     { role: 'system', content: systemPrompt },
-                    ...messages
+                    ...finalMessages
                 ],
-                max_tokens: options.maxTokens || 2000,
+                max_tokens: options.maxTokens || 8192,
                 temperature: options.temperature || 0.7,
                 stream: options.stream || false
             };
@@ -8691,23 +8712,119 @@
             return data.choices?.[0]?.message?.content || null;
         }
 
+        // 把 PDF 文本提取，作为"附件文本"拼到 messages 最后一条 user 内容前
+        // 用于不支持 PDF 附件的渠道（DeepSeek / 自定义非 Gemini / 纯 OpenAI 普通模型）
+        async function extractPdfTextAsFallback(pdfAttachment) {
+            const bytes = pdfAttachment.bytes;
+            try {
+                const pdf = await pdfjsLib.getDocument({ data: bytes.slice(0) }).promise;
+                const parts = [];
+                const n = pdf.numPages;
+                for (let i = 1; i <= n; i++) {
+                    const page = await pdf.getPage(i);
+                    const tc = await page.getTextContent();
+                    const pageText = tc.items.map(it => it.str).join(' ');
+                    parts.push(`--- Page ${i} ---\n${pageText}`);
+                }
+                return parts.join('\n\n');
+            } catch (e) {
+                console.error('PDF 文本提取失败:', e);
+                return '[PDF 文本提取失败]';
+            }
+        }
+
+        function injectPdfTextIntoLastUser(messages, extractedText) {
+            if (!messages || messages.length === 0) {
+                return [{ role: 'user', content: '【附件 PDF 文本】\n' + extractedText }];
+            }
+            const out = messages.slice();
+            const lastIdx = out.length - 1;
+            const last = out[lastIdx];
+            out[lastIdx] = {
+                role: last.role,
+                content: '【附件 PDF 文本】\n' + extractedText + '\n\n---\n\n' + String(last.content || '')
+            };
+            return out;
+        }
+
+        // Claude Messages API 封装（仅用于带 PDF 附件的情形）
+        async function doClaudeRequest(config, systemPrompt, messages, options = {}) {
+            const body = {
+                model: config.model,
+                max_tokens: options.maxTokens || 8192,
+                temperature: options.temperature != null ? options.temperature : 0.7,
+                messages,
+            };
+            if (systemPrompt) body.system = systemPrompt;
+            const response = await fetch(config.url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': config.key,
+                    'anthropic-version': '2023-06-01',
+                    'anthropic-dangerous-direct-browser-access': 'true'
+                },
+                body: JSON.stringify(body)
+            });
+            if (!response.ok) {
+                const errText = await response.text().catch(() => '');
+                throw new Error(`Claude API错误 ${response.status}: ${errText}`);
+            }
+            const data = await response.json();
+            if (Array.isArray(data.content)) {
+                return data.content.filter(x => x.type === 'text').map(x => x.text).join('');
+            }
+            return null;
+        }
+
+        // 把 PDF 附件嵌入到 Claude messages 最后一条 user 消息里（document 块）
+        async function embedPdfForClaude(messages, pdfAttachment) {
+            const base64 = pdfAttachment.base64 || uint8ToBase64(pdfAttachment.bytes);
+            const out = messages.slice();
+            const lastIdx = out.length - 1;
+            const last = out[lastIdx] || { role: 'user', content: '' };
+            out[lastIdx] = {
+                role: last.role || 'user',
+                content: [
+                    { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } },
+                    { type: 'text', text: String(last.content || '') }
+                ]
+            };
+            return out;
+        }
+
+        function uint8ToBase64(uint8) {
+            let binary = '';
+            const chunk = 0x8000;
+            for (let i = 0; i < uint8.length; i += chunk) {
+                binary += String.fromCharCode.apply(null, uint8.subarray(i, i + chunk));
+            }
+            return btoa(binary);
+        }
+
         // Google Gemini 原生协议调用
         // - URL: {base}/models/{model}:generateContent?key={key}
         // - 鉴权走 URL 的 key 参数
         // - messages/system 映射到 contents / systemInstruction
         // - 温度等参数从 options 取（与自定义渠道一致）；maxOutputTokens 默认 8192
+        // - 支持 PDF 附件：≤ 18MB 用 inline_data；更大走 Files API
         async function doGeminiRequest(config, systemPrompt, messages, options = {}) {
             // 归一化 base：去掉末尾可能的 /models 或斜杠
             let base = (config.url || '').replace(/\/+$/, '').replace(/\/models$/, '');
-            if (!base) throw new Error('Gemini API URL 为空');
+            if (!base) throw new Error('API URL 为空');
             const modelName = (config.model || '').replace(/^models\//, '');
-            if (!modelName) throw new Error('请选择 Gemini 模型');
+            if (!modelName) throw new Error('请选择模型');
 
-            // Gemini 的角色：user / model（没有 system，用 systemInstruction 字段）
-            const contents = messages.map(m => ({
-                role: m.role === 'assistant' ? 'model' : 'user',
-                parts: [{ text: String(m.content || '') }]
-            }));
+            // 若有 PDF 附件，把它嵌入到最后一条 user 消息的 parts
+            let contents;
+            if (options.pdfAttachment) {
+                contents = await buildGeminiContentsWithPdf(base, config.key, messages, options.pdfAttachment);
+            } else {
+                contents = messages.map(m => ({
+                    role: m.role === 'assistant' ? 'model' : 'user',
+                    parts: [{ text: String(m.content || '') }]
+                }));
+            }
 
             const body = {
                 contents,
@@ -8728,15 +8845,102 @@
             });
             if (!response.ok) {
                 const errText = await response.text().catch(() => '');
-                throw new Error(`Gemini API错误 ${response.status}: ${errText}`);
+                throw new Error(`API错误 ${response.status}: ${errText}`);
             }
             const data = await response.json();
-            // 返回首个 candidate 的文本
             const parts = data.candidates?.[0]?.content?.parts;
             if (Array.isArray(parts) && parts.length > 0) {
                 return parts.map(p => p.text || '').join('');
             }
             return null;
+        }
+
+        // 构造 Gemini contents，带 PDF。超过 18MB 走 Files API。
+        async function buildGeminiContentsWithPdf(base, key, messages, pdfAttachment) {
+            const bytes = pdfAttachment.bytes;
+            const inlineThreshold = 18 * 1024 * 1024; // 18 MB
+            let fileRef = null; // { file_uri, mime_type } for Files API
+            let inlineBase64 = null;
+            if (bytes.length <= inlineThreshold) {
+                inlineBase64 = pdfAttachment.base64 || uint8ToBase64(bytes);
+            } else {
+                fileRef = await geminiUploadFile(base, key, bytes, 'application/pdf', pdfAttachment.name || 'book.pdf');
+            }
+
+            const contents = messages.map(m => ({
+                role: m.role === 'assistant' ? 'model' : 'user',
+                parts: [{ text: String(m.content || '') }]
+            }));
+            // 附件放在最后一条 user 消息的 parts 之前
+            let lastUserIdx = -1;
+            for (let i = contents.length - 1; i >= 0; i--) {
+                if (contents[i].role === 'user') { lastUserIdx = i; break; }
+            }
+            if (lastUserIdx < 0) {
+                contents.push({ role: 'user', parts: [] });
+                lastUserIdx = contents.length - 1;
+            }
+            const pdfPart = inlineBase64
+                ? { inline_data: { mime_type: 'application/pdf', data: inlineBase64 } }
+                : { file_data: { mime_type: fileRef.mime_type, file_uri: fileRef.file_uri } };
+            // 附件放在最前（Gemini 推荐的顺序）
+            contents[lastUserIdx].parts = [pdfPart, ...contents[lastUserIdx].parts];
+            return contents;
+        }
+
+        // 走 Gemini Files API：先发 start 拿到 upload URL，再上传字节，最后得到 file_uri
+        async function geminiUploadFile(base, key, bytes, mimeType, displayName) {
+            // base 形如 https://generativelanguage.googleapis.com/v1beta
+            const origin = base.replace(/\/v1beta.*$/, '');
+            const startUrl = origin + '/upload/v1beta/files?key=' + encodeURIComponent(key);
+            const startResp = await fetch(startUrl, {
+                method: 'POST',
+                headers: {
+                    'X-Goog-Upload-Protocol': 'resumable',
+                    'X-Goog-Upload-Command': 'start',
+                    'X-Goog-Upload-Header-Content-Length': String(bytes.length),
+                    'X-Goog-Upload-Header-Content-Type': mimeType,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ file: { display_name: displayName } })
+            });
+            if (!startResp.ok) {
+                const t = await startResp.text().catch(() => '');
+                throw new Error(`Files API start 失败 ${startResp.status}: ${t}`);
+            }
+            const uploadUrl = startResp.headers.get('x-goog-upload-url') || startResp.headers.get('X-Goog-Upload-Url');
+            if (!uploadUrl) throw new Error('Files API 未返回 upload URL');
+            const putResp = await fetch(uploadUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Length': String(bytes.length),
+                    'X-Goog-Upload-Offset': '0',
+                    'X-Goog-Upload-Command': 'upload, finalize'
+                },
+                body: bytes
+            });
+            if (!putResp.ok) {
+                const t = await putResp.text().catch(() => '');
+                throw new Error(`Files API upload 失败 ${putResp.status}: ${t}`);
+            }
+            const info = await putResp.json();
+            // 上传后文件有个 ACTIVE 状态过程，通常 PDF 立即可用，但保险起见轮询一次
+            const fileObj = info.file || info;
+            const name = fileObj.name;
+            const mime = fileObj.mimeType || mimeType;
+            let uri = fileObj.uri;
+            // 轮询直到 state=ACTIVE
+            if (fileObj.state && fileObj.state !== 'ACTIVE') {
+                for (let i = 0; i < 20; i++) {
+                    await new Promise(r => setTimeout(r, 1000));
+                    const poll = await fetch(base + '/' + name + '?key=' + encodeURIComponent(key));
+                    if (!poll.ok) break;
+                    const pd = await poll.json();
+                    if (pd.state === 'ACTIVE') { uri = pd.uri; break; }
+                    if (pd.state === 'FAILED') throw new Error('Files API 处理失败');
+                }
+            }
+            return { file_uri: uri, mime_type: mime };
         }
 
         // OpenAI-compatible API call with message history (保留兼容)
@@ -8787,7 +8991,7 @@
             hideModal('aiModal');
             aiCurrentAction = action;
 
-            if (action === 'lecture') {
+            if (action === 'lecture' || action === 'outline') {
                 showAISelectList('选择书籍', appData.books);
             } else if (action === 'abstract') {
                 showAISelectList('选择论文', appData.papers);
@@ -8825,9 +9029,163 @@
                 generateLecture(id);
             } else if (aiCurrentAction === 'abstract') {
                 generateAbstract(id);
+            } else if (aiCurrentAction === 'outline') {
+                generateAIOutline(id);
             }
         }
 
+        // ==================== PDF 工具 ====================
+        // 加载一本书的 PDF 字节 + 提取 PDF 自带书签
+        async function loadBookPdfBytes(book) {
+            const fileData = book.data || await getFileData(book.id);
+            if (!fileData) throw new Error('书籍文件数据丢失');
+            const base64 = fileData.split(',')[1];
+            const raw = atob(base64);
+            const bytes = new Uint8Array(raw.length);
+            for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+            return bytes;
+        }
+
+        // 用 PDF.js 读取 PDF 自带书签为树形文本（flatten）
+        async function extractBuiltinOutline(bytes) {
+            try {
+                const pdf = await pdfjsLib.getDocument({ data: bytes.slice(0) }).promise;
+                const outline = await pdf.getOutline();
+                if (!outline || outline.length === 0) return '';
+                const lines = [];
+                async function walk(items, depth) {
+                    for (const it of items) {
+                        let pageNum = '';
+                        try {
+                            if (it.dest) {
+                                const dest = typeof it.dest === 'string'
+                                    ? await pdf.getDestination(it.dest)
+                                    : it.dest;
+                                if (dest && dest[0]) {
+                                    const pageIndex = await pdf.getPageIndex(dest[0]);
+                                    pageNum = String(pageIndex + 1);
+                                }
+                            }
+                        } catch (e) { /* 跳过解析失败的项 */ }
+                        const indent = '  '.repeat(depth);
+                        lines.push(`${indent}- ${it.title}${pageNum ? '（第 ' + pageNum + ' 页）' : ''}`);
+                        if (it.items && it.items.length) await walk(it.items, depth + 1);
+                    }
+                }
+                await walk(outline, 0);
+                return lines.join('\n');
+            } catch (e) {
+                console.error('提取书签失败:', e);
+                return '';
+            }
+        }
+
+        // 用 pdf-lib 切出指定页码范围的子 PDF，返回 { bytes, base64 }
+        async function slicePdfPages(sourceBytes, startPage, endPage) {
+            if (!window.PDFLib) throw new Error('pdf-lib 未加载');
+            const src = await PDFLib.PDFDocument.load(sourceBytes);
+            const total = src.getPageCount();
+            const s = Math.max(1, Math.min(total, startPage || 1));
+            const e = Math.max(s, Math.min(total, endPage || total));
+            const out = await PDFLib.PDFDocument.create();
+            const indices = [];
+            for (let i = s; i <= e; i++) indices.push(i - 1);
+            const pages = await out.copyPages(src, indices);
+            pages.forEach(p => out.addPage(p));
+            const bytes = await out.save();
+            return { bytes, base64: uint8ToBase64(bytes) };
+        }
+
+        // ==================== 生成大纲（Step 1） ====================
+        async function generateAIOutline(bookId) {
+            const book = appData.books.find(b => b.id === bookId);
+            if (!book) return;
+            if (book.type !== 'pdf') {
+                showToast('当前仅支持 PDF 书籍生成大纲');
+                return;
+            }
+
+            showToast('正在读取书籍...');
+            let bytes;
+            try {
+                bytes = await loadBookPdfBytes(book);
+            } catch (e) {
+                showToast('读取失败: ' + e.message);
+                return;
+            }
+
+            const existingOutline = await extractBuiltinOutline(bytes);
+
+            showToast('AI 正在生成大纲...');
+
+            const systemPrompt = `你是一个专业的数学教育专家。下面附件是一本完整的书（PDF）。
+请你通读附件，为这本书生成一份结构化大纲（每节大约 1 小时学习量），并给出每一节对应的 PDF 页码范围。
+
+【页码准确性要求——极其重要】
+- startPage 和 endPage 必须是 PDF 文件内的实际页码（从 1 开始计数），对照附件 PDF 真实页面。
+- 不要估算、不要推测，务必与附件内容对应。
+- 相邻节的页码必须连续、无缝衔接（本节 endPage = 下节 startPage - 1 或相等）。
+- 覆盖全书，不得遗漏任何页。
+
+严格以 JSON 返回，不要有任何额外说明：
+{
+  "chapters": [
+    {"title": "第1节: 标题", "topics": ["主题1", "主题2"], "startPage": 1, "endPage": 20},
+    ...
+  ]
+}`;
+
+            const userText = `书名：${book.title}
+${book.author ? '作者：' + book.author : ''}
+${book.subject ? '学科：' + book.subject : ''}
+书籍总页数：${book.totalPages || '未知'}
+
+${existingOutline ? 'PDF 已有书签（供参考，页码以附件实际内容为准）：\n' + existingOutline : 'PDF 无内置书签。'}
+
+请基于附件 PDF 实际内容生成大纲 JSON。`;
+
+            try {
+                const result = await callAI(systemPrompt, [{ role: 'user', content: userText }], {
+                    maxTokens: 8192,
+                    pdfAttachment: { bytes, name: (book.title || 'book') + '.pdf' }
+                });
+
+                let chapters = [];
+                const m = (result || '').match(/\{[\s\S]*\}/);
+                if (m) {
+                    try {
+                        const parsed = JSON.parse(m[0]);
+                        chapters = parsed.chapters || [];
+                    } catch (e) {
+                        showToast('AI 返回格式解析失败');
+                        console.error('Outline JSON 解析失败:', e, result);
+                        return;
+                    }
+                }
+                if (chapters.length === 0) {
+                    showToast('AI 未返回有效大纲');
+                    return;
+                }
+
+                // 不覆盖旧 lectureData.chapters；保存到 book.aiOutline
+                book.aiOutline = {
+                    generatedAt: new Date().toISOString(),
+                    chapters: chapters.map((ch, idx) => ({
+                        title: ch.title || ('第' + (idx + 1) + '节'),
+                        topics: ch.topics || [],
+                        startPage: ch.startPage || 1,
+                        endPage: ch.endPage || (book.totalPages || 1)
+                    }))
+                };
+                saveData();
+                showToast(`大纲已生成（${chapters.length} 节）`);
+            } catch (e) {
+                console.error('生成大纲失败:', e);
+                showToast('生成失败: ' + e.message);
+            }
+        }
+
+        // ==================== 生成讲义（Step 2） ====================
         async function generateLecture(bookId) {
             const book = appData.books.find(b => b.id === bookId);
             if (!book) return;
@@ -8841,107 +9199,74 @@
                     currentChapter: 0
                 };
             }
-            
             const lectureData = appData.lectures[bookId];
-            lectureData.status = 'generating';
-            saveData();
-            
-            showToast('正在分析书籍结构...');
 
-            try {
-                // 第一步：让AI分析书籍并规划章节
-                const planPrompt = `你是一个专业的数学教育专家。请根据书籍信息，将其内容划分为适合学习的章节。
-每个章节应该是1小时左右能学完的内容量。根据书籍实际内容长度决定章节数量。
-
-请以JSON格式返回章节规划，格式如下：
-{
-  "chapters": [
-    {"title": "第1节: 章节标题", "topics": ["主题1", "主题2"], "startPage": 1, "endPage": 20},
-    {"title": "第2节: 章节标题", "topics": ["主题1", "主题2"], "startPage": 21, "endPage": 45}
-  ]
-}
-
-startPage和endPage是该章节在书籍中的大致页码范围（估算即可）。
-只返回JSON，不要其他内容。`;
-
-                const planMessage = `书名：${book.title}
-${book.author ? '作者：' + book.author : ''}
-${book.subject ? '学科：' + book.subject : ''}
-书籍总页数：${book.totalPages || '未知'}
-
-请根据书籍内容量合理规划章节数量，并估算每章节的页码范围。`;
-
-                const planResult = await callAI(planPrompt, [{ role: 'user', content: planMessage }], { maxTokens: 2000 });
-                
-                let chapters = [];
-                try {
-                    const jsonMatch = planResult.match(/\{[\s\S]*\}/);
-                    if (jsonMatch) {
-                        const parsed = JSON.parse(jsonMatch[0]);
-                        chapters = parsed.chapters || [];
-                    }
-                } catch (e) {
-                    // 如果解析失败，创建默认章节
-                    chapters = [
-                        { title: '第1节: 基础概念', topics: ['核心定义', '基本记号'] },
-                        { title: '第2节: 主要定理', topics: ['重要定理', '证明方法'] },
-                        { title: '第3节: 应用与习题', topics: ['应用实例', '练习题'] }
-                    ];
-                }
-                
-                // 初始化章节数据，并为书籍添加书签
-                lectureData.chapters = chapters.map((ch, idx) => ({
-                    id: 'ch_' + Date.now() + '_' + idx,
-                    title: ch.title,
-                    topics: ch.topics,
-                    startPage: ch.startPage || (idx * 10 + 1),
-                    endPage: ch.endPage || ((idx + 1) * 10),
-                    content: null,
-                    progress: 0,
-                    status: 'pending'
+            // 来源优先级：AI 生成的 outline > lectureData.chapters 已有的 > 让 AI 即时规划（回退）
+            let sourceChapters = null;
+            if (book.aiOutline && Array.isArray(book.aiOutline.chapters) && book.aiOutline.chapters.length > 0) {
+                sourceChapters = book.aiOutline.chapters;
+            } else if (lectureData.chapters && lectureData.chapters.length > 0) {
+                sourceChapters = lectureData.chapters.map(c => ({
+                    title: c.title, topics: c.topics || [], startPage: c.startPage, endPage: c.endPage
                 }));
-                
-                // 为书籍创建书签
-                if (!book.bookmarks) book.bookmarks = [];
-                book.bookmarks = lectureData.chapters.map((ch, idx) => ({
-                    id: ch.id,
-                    title: ch.title,
-                    page: ch.startPage,
-                    lectureIndex: idx
-                }));
-                
-                lectureData.status = 'ready';
-                saveData();
-                
-                showToast(`已规划 ${chapters.length} 节讲义`);
-                renderNotesPage();
-                
-                // 开始生成第一节讲义
-                generateChapterContent(bookId, 0);
-                
-            } catch (err) {
-                console.error('规划讲义失败:', err);
-                lectureData.status = 'error';
-                saveData();
-                showToast('规划失败: ' + err.message);
             }
+
+            if (!sourceChapters) {
+                showToast('请先点击"生成大纲"');
+                return;
+            }
+
+            lectureData.status = 'generating';
+            // 把 outline 落到 lectureData.chapters（保留已生成的 content）
+            const existingByTitle = {};
+            (lectureData.chapters || []).forEach(c => { if (c.title) existingByTitle[c.title] = c; });
+            lectureData.chapters = sourceChapters.map((ch, idx) => {
+                const prev = existingByTitle[ch.title];
+                return {
+                    id: (prev && prev.id) || ('ch_' + Date.now() + '_' + idx),
+                    title: ch.title,
+                    topics: ch.topics || [],
+                    startPage: ch.startPage,
+                    endPage: ch.endPage,
+                    content: prev ? prev.content : null,
+                    progress: prev ? prev.progress : 0,
+                    status: prev && prev.content ? 'ready' : 'pending'
+                };
+            });
+
+            // 为书籍创建书签
+            if (!book.bookmarks) book.bookmarks = [];
+            book.bookmarks = lectureData.chapters.map((ch, idx) => ({
+                id: ch.id,
+                title: ch.title,
+                page: ch.startPage,
+                lectureIndex: idx
+            }));
+
+            lectureData.status = 'ready';
+            saveData();
+            showToast(`已加载 ${lectureData.chapters.length} 节大纲`);
+            renderNotesPage();
+
+            // 生成第一节
+            generateChapterContent(bookId, 0);
         }
 
         async function generateChapterContent(bookId, chapterIndex) {
             const book = appData.books.find(b => b.id === bookId);
             const lectureData = appData.lectures?.[bookId];
             if (!book || !lectureData || !lectureData.chapters[chapterIndex]) return;
-            
+
             const chapter = lectureData.chapters[chapterIndex];
             if (chapter.content) return; // 已生成
-            
+
             chapter.status = 'generating';
             saveData();
-            
-            try {
-                const systemPrompt = `你是一个专业的数学讲师。请为数学基础一般（仅学过基础数学分析和线性代数）的学生准备讲义。
 
-请生成一份严谨的讲义，必须包含以下三个部分：
+            try {
+                const systemPrompt = `你是一个专业的数学讲师。附件是这一节对应的 PDF 页，请基于附件实际内容，为数学基础一般（仅学过基础数学分析和线性代数）的学生准备讲义。讲义应当与附件 PDF 内容一致，不要凭空发挥。
+
+请严格按以下三个部分组织，每节按 1 小时学习效率把握总量：
 
 ## 一、预习
 
@@ -8976,24 +9301,38 @@ ${book.subject ? '学科：' + book.subject : ''}
 
                 const userMessage = `书籍：${book.title}
 章节：${chapter.title}
-涉及主题：${chapter.topics.join('、')}
+对应页码：第 ${chapter.startPage} - ${chapter.endPage} 页
+涉及主题：${(chapter.topics || []).join('、')}
 
-请生成这一节的完整讲义。`;
+请根据附件 PDF 内容生成这一节完整讲义。`;
 
-                const result = await callAI(systemPrompt, [{ role: 'user', content: userMessage }], { maxTokens: 4000 });
-                
+                // 切出这一节的子 PDF 作为附件
+                let pdfAttachment = null;
+                try {
+                    const fullBytes = await loadBookPdfBytes(book);
+                    const slice = await slicePdfPages(fullBytes, chapter.startPage, chapter.endPage);
+                    pdfAttachment = { bytes: slice.bytes, base64: slice.base64, name: `${book.title}_${chapter.title}.pdf` };
+                } catch (e) {
+                    console.error('切出章节 PDF 失败，改为不带附件生成:', e);
+                }
+
+                const result = await callAI(systemPrompt, [{ role: 'user', content: userMessage }], {
+                    maxTokens: 8192,
+                    pdfAttachment
+                });
+
                 chapter.content = result || '内容生成失败';
                 chapter.status = 'ready';
                 chapter.generatedAt = new Date().toISOString();
                 saveData();
-                
+
                 // 如果正在查看这个讲义，刷新显示
                 if (currentLecture && currentLecture.bookId === bookId && currentLecture.chapterIndex === chapterIndex) {
                     displayLectureContent();
                 }
-                
+
                 renderNotesPage();
-                
+
             } catch (err) {
                 console.error('生成章节内容失败:', err);
                 chapter.status = 'error';
@@ -9965,7 +10304,7 @@ ${book.subject ? '学科：' + book.subject : ''}
                     body: JSON.stringify({
                         model: model || 'deepseek-chat',
                         messages: [{ role: 'user', content: prompt }],
-                        max_tokens: 500
+                        max_tokens: 8192
                     })
                 });
                 
@@ -10116,7 +10455,7 @@ ${book.subject ? '学科：' + book.subject : ''}
 ${paper.authors ? '作者：' + paper.authors : ''}
 ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
 
-                const result = await callAI(systemPrompt, [{ role: 'user', content: userMessage }], { maxTokens: 1500 });
+                const result = await callAI(systemPrompt, [{ role: 'user', content: userMessage }], { maxTokens: 8192 });
                 
                 paper.aiAbstract = result || '摘要生成失败';
                 saveData();
@@ -10221,7 +10560,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 // 只保留最近10条消息作为上下文
                 const recentMessages = chatMessages.slice(-10);
                 
-                const result = await callAI(systemPrompt, recentMessages, { maxTokens: 1500 });
+                const result = await callAI(systemPrompt, recentMessages, { maxTokens: 8192 });
                 
                 removeTypingIndicator();
                 addChatMessage(container, false, result || '抱歉，我暂时无法回答这个问题。');
