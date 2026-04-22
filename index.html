@@ -5426,8 +5426,9 @@
             const container = document.getElementById('readerContainer');
             const containerRect = container.getBoundingClientRect();
             const scrollTop = container.scrollTop;
-            const viewportTop = scrollTop - containerRect.height;
-            const viewportBottom = scrollTop + containerRect.height * 2;
+            // 缓冲：上下各 2 屏。旧实现只有下方 1 屏缓冲，滚动稍快第 2-3 页就白屏。
+            const viewportTop = scrollTop - containerRect.height * 2;
+            const viewportBottom = scrollTop + containerRect.height * 3;
 
             for (let i = 1; i <= totalPages; i++) {
                 const pageData = pageElements[i];
@@ -5437,7 +5438,7 @@
                 const pageTop = placeholder.offsetTop;
                 const pageBottom = pageTop + placeholder.offsetHeight;
 
-                // 渲染可见范围内的页面（包括上下各一屏的缓冲区）
+                // 渲染可见范围内的页面（包括上下各两屏的缓冲区）
                 if (pageBottom >= viewportTop && pageTop <= viewportBottom) {
                     await renderSinglePage(i);
                 }
@@ -5748,6 +5749,7 @@
 
         let scrollListenerAttached = false;
         let scrollUpdateTimer = null;
+        let scrollThrottleTimer = null;
 
         function setupScrollListener() {
             if (scrollListenerAttached) return;
@@ -5758,13 +5760,20 @@
         }
 
         function handleContinuousScroll() {
-            // 画笔模式也使用连续滚动，同样需要更新页码和懒渲染可见页
-            // 使用防抖更新当前页码
+            // 节流：滚动过程中每 80ms 就触发一次可见页渲染，避免用户滑到哪就白屏到哪
+            // （旧实现用防抖，滚动没停就永远不渲染，第 2 页以后要等停下来才出图）
+            if (!scrollThrottleTimer) {
+                scrollThrottleTimer = setTimeout(() => {
+                    scrollThrottleTimer = null;
+                    renderVisiblePages();
+                }, 80);
+            }
+            // 防抖：滚动停下后再做一次最终渲染 + 页码更新 + 进度保存
             if (scrollUpdateTimer) clearTimeout(scrollUpdateTimer);
             scrollUpdateTimer = setTimeout(() => {
                 updateCurrentPageFromScroll();
                 renderVisiblePages();
-            }, 100);
+            }, 150);
         }
 
         function updateCurrentPageFromScroll() {
