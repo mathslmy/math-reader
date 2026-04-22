@@ -5363,6 +5363,32 @@
             pageElements = {};
             renderedPages.clear();
             _cachedContainerInnerWidth = 0;
+            if (typeof pageObserver !== 'undefined' && pageObserver) {
+                try { pageObserver.disconnect(); } catch (e) {}
+                pageObserver = null;
+            }
+        }
+
+        // IntersectionObserver 实例：浏览器原生异步判定哪些页面进入/接近可视区。
+        // 替代旧的"每次滚动跑一遍 totalPages 次 offsetTop 查询"的 O(N) 强制布局。
+        let pageObserver = null;
+
+        // 当前正在渲染的页数（并发上限），避免滑得很快时同时跑 10+ 个 page.render
+        let _renderingCount = 0;
+        const RENDER_CONCURRENCY = 2;
+        const _renderWaitQueue = []; // 等待槽位的 resolve 函数
+
+        function _acquireRenderSlot() {
+            if (_renderingCount < RENDER_CONCURRENCY) {
+                _renderingCount++;
+                return Promise.resolve();
+            }
+            return new Promise(r => _renderWaitQueue.push(r));
+        }
+        function _releaseRenderSlot() {
+            const next = _renderWaitQueue.shift();
+            if (next) next(); // 直接放下一个进来，计数不变
+            else _renderingCount--;
         }
 
         async function renderAllPDFPages() {
@@ -5373,18 +5399,22 @@
             wrapper.innerHTML = '';
             renderedPages.clear();
             pageElements = {};
-            _cachedContainerInnerWidth = 0; // 本次加载重新测一次
+            _cachedContainerInnerWidth = 0;
 
-            // 只拉第1页拿尺寸作为占位符预估尺寸（绝大多数 PDF 全书页尺寸一致）。
-            // 旧实现是串行 await pdfDoc.getPage(i) 遍历 totalPages 次，500 页的书
-            // 在显示第一页前要等数秒。
+            // 断掉旧的 observer
+            if (pageObserver) {
+                try { pageObserver.disconnect(); } catch (e) {}
+                pageObserver = null;
+            }
+
+            // 拿第 1 页尺寸作为占位符估算尺寸（绝大多数 PDF 全书页尺寸一致）
             const firstPage = await pdfDoc.getPage(1);
             const scale = getReaderRenderScale(firstPage);
             const estViewport = firstPage.getViewport({ scale: Math.min(scale, 2) });
             const estW = estViewport.width;
             const estH = estViewport.height;
 
-            // 一次性构建所有占位符，尺寸用第1页估算值；真实尺寸在 renderSinglePage 里校正
+            // 批量建占位符
             const frag = document.createDocumentFragment();
             for (let i = 1; i <= totalPages; i++) {
                 const placeholder = document.createElement('div');
@@ -5396,135 +5426,161 @@
                 placeholder.style.boxShadow = 'var(--shadow)';
                 placeholder.style.position = 'relative';
 
-                // 第1页已经拿到真实 viewport，可以直接存；其他页先存 null，渲染时再算
                 pageElements[i] = {
                     placeholder,
                     viewport: (i === 1) ? estViewport : null,
-                    rendered: false
+                    rendered: false,
+                    page: (i === 1) ? firstPage : null
                 };
                 frag.appendChild(placeholder);
             }
             wrapper.appendChild(frag);
 
-            // 渲染可见页面和附近页面
-            await renderVisiblePages();
+            // 立即启动第 1 页渲染（不 await，让后面先跑起来，用户尽快看到首页）
+            renderSinglePage(1);
 
-            // 滚动到当前页
+            // 设置 IntersectionObserver：上下各 1.5 屏作为 rootMargin（预加载），
+            // 浏览器会在每次滚动时异步触发 callback，完全不阻塞主线程。
+            const container = document.getElementById('readerContainer');
+            const rootMargin = `${Math.round(container.clientHeight * 1.5)}px 0px`;
+            pageObserver = new IntersectionObserver((entries) => {
+                for (const entry of entries) {
+                    if (!entry.isIntersecting) continue;
+                    const pageNum = parseInt(entry.target.dataset.page, 10);
+                    if (!pageNum) continue;
+                    const pd = pageElements[pageNum];
+                    if (pd && !pd.rendered) {
+                        renderSinglePage(pageNum); // fire-and-forget，内部有并发控制
+                    }
+                }
+            }, {
+                root: container,
+                rootMargin,
+                threshold: 0
+            });
+
+            // 把所有占位符交给 observer 管
+            for (let i = 1; i <= totalPages; i++) {
+                pageObserver.observe(pageElements[i].placeholder);
+            }
+
+            // 如果要跳到历史进度页，在这里滚过去；observer 会自动渲染目标页及其附近
             if (currentPage > 1 && pageElements[currentPage]) {
                 const targetEl = pageElements[currentPage].placeholder;
-                const container = document.getElementById('readerContainer');
                 container.scrollTop = targetEl.offsetTop - 12;
             }
 
             isRenderingAllPages = false;
-            
-            // 设置滚动监听
+
+            // 滚动监听仅负责当前页号更新和进度保存；渲染交给 observer
             setupScrollListener();
         }
 
+        // 兼容保留（搜索高亮等地方可能会调用一次性渲染某页）
         async function renderVisiblePages() {
-            const container = document.getElementById('readerContainer');
-            const containerRect = container.getBoundingClientRect();
-            const scrollTop = container.scrollTop;
-            // 缓冲：上下各 2 屏。旧实现只有下方 1 屏缓冲，滚动稍快第 2-3 页就白屏。
-            const viewportTop = scrollTop - containerRect.height * 2;
-            const viewportBottom = scrollTop + containerRect.height * 3;
-
-            for (let i = 1; i <= totalPages; i++) {
-                const pageData = pageElements[i];
-                if (!pageData || pageData.rendered) continue;
-
-                const placeholder = pageData.placeholder;
-                const pageTop = placeholder.offsetTop;
-                const pageBottom = pageTop + placeholder.offsetHeight;
-
-                // 渲染可见范围内的页面（包括上下各两屏的缓冲区）
-                if (pageBottom >= viewportTop && pageTop <= viewportBottom) {
-                    await renderSinglePage(i);
-                }
+            // observer 机制下大多不再需要；但搜索跳转时手动触发一下当前页渲染
+            const pd = pageElements[currentPage];
+            if (pd && !pd.rendered) {
+                await renderSinglePage(currentPage);
             }
         }
 
         async function renderSinglePage(pageNum) {
             const pageData = pageElements[pageNum];
-            if (!pageData || pageData.rendered) return;
+            if (!pageData || pageData.rendered || pageData._rendering) return;
+            pageData._rendering = true; // 重入保护：observer 可能连续触发
 
-            const page = await pdfDoc.getPage(pageNum);
-            // 占位符阶段只对第1页算了真实 viewport，其他页现在按本页真实尺寸算
-            let viewport = pageData.viewport;
-            if (!viewport) {
-                const scale = getReaderRenderScale(page);
-                viewport = page.getViewport({ scale: Math.min(scale, 2) });
-                pageData.viewport = viewport;
+            await _acquireRenderSlot();
+            try {
+                // 页对象复用：renderAllPDFPages 里已对第 1 页 getPage 过
+                const page = pageData.page || await pdfDoc.getPage(pageNum);
+                pageData.page = page;
+
+                // 占位符阶段只对第1页算了真实 viewport，其他页按本页真实尺寸算
+                let viewport = pageData.viewport;
+                if (!viewport) {
+                    const scale = getReaderRenderScale(page);
+                    viewport = page.getViewport({ scale: Math.min(scale, 2) });
+                    pageData.viewport = viewport;
+                }
+                const placeholder = pageData.placeholder;
+
+                // 如果本页真实尺寸与预估占位符尺寸不同，校正一下占位符，避免跳动
+                const estW = parseFloat(placeholder.style.width) || 0;
+                const estH = parseFloat(placeholder.style.height) || 0;
+                if (Math.abs(estW - viewport.width) > 0.5 || Math.abs(estH - viewport.height) > 0.5) {
+                    placeholder.style.width = viewport.width + 'px';
+                    placeholder.style.height = viewport.height + 'px';
+                }
+
+                const canvas = document.createElement('canvas');
+                canvas.width = viewport.width * window.devicePixelRatio;
+                canvas.height = viewport.height * window.devicePixelRatio;
+                canvas.style.width = viewport.width + 'px';
+                canvas.style.height = viewport.height + 'px';
+                canvas.style.display = 'block';
+
+                const ctx = canvas.getContext('2d');
+                ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+
+                await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+
+                // 清空占位符并添加canvas
+                placeholder.innerHTML = '';
+                placeholder.appendChild(canvas);
+                placeholder.classList.add('pdf-page-wrapper');
+                placeholder.classList.remove('pdf-page-placeholder');
+
+                // 添加批注层（画笔模式下可交互）
+                const annoCanvas = document.createElement('canvas');
+                annoCanvas.className = 'annotation-canvas';
+                annoCanvas.dataset.pageNum = pageNum;
+                annoCanvas.width = viewport.width * window.devicePixelRatio;
+                annoCanvas.height = viewport.height * window.devicePixelRatio;
+                annoCanvas.style.width = viewport.width + 'px';
+                annoCanvas.style.height = viewport.height + 'px';
+                annoCanvas.style.pointerEvents = penMode ? 'auto' : 'none';
+
+                const annoCtx = annoCanvas.getContext('2d');
+                annoCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
+
+                // 保存引用到 pageData 供其他模块使用
+                pageData.annoCanvas = annoCanvas;
+                pageData.annoCtx = annoCtx;
+
+                // 恢复该页的绘图数据
+                const pageDrawing = getDocAnnotation(currentDoc.id, pageNum, 'drawing');
+                if (pageDrawing) {
+                    const img = new Image();
+                    img.onload = () => {
+                        annoCtx.drawImage(img, 0, 0, viewport.width, viewport.height);
+                    };
+                    img.src = pageDrawing;
+                }
+
+                // 画笔交互逻辑 —— 每页自带
+                attachPenInteraction(annoCanvas, annoCtx, pageNum, viewport);
+
+                placeholder.appendChild(annoCanvas);
+
+                // 添加长按添加笔记功能
+                setupPageLongPress(placeholder, pageNum);
+
+                // 渲染笔记标记
+                renderPageNoteMarkers(placeholder, pageNum);
+
+                pageData.rendered = true;
+                renderedPages.add(pageNum);
+
+                // 渲染完毕，交还给 observer（其实 observer 本来就只会回调一次 isIntersecting=true，
+                // 但为防多次触发浪费，已渲染的页面也可以 unobserve）
+                if (pageObserver) {
+                    try { pageObserver.unobserve(placeholder); } catch(e) {}
+                }
+            } finally {
+                pageData._rendering = false;
+                _releaseRenderSlot();
             }
-            const placeholder = pageData.placeholder;
-
-            // 如果本页真实尺寸与预估占位符尺寸不同，校正一下占位符，避免跳动
-            const estW = parseFloat(placeholder.style.width) || 0;
-            const estH = parseFloat(placeholder.style.height) || 0;
-            if (Math.abs(estW - viewport.width) > 0.5 || Math.abs(estH - viewport.height) > 0.5) {
-                placeholder.style.width = viewport.width + 'px';
-                placeholder.style.height = viewport.height + 'px';
-            }
-
-            const canvas = document.createElement('canvas');
-            canvas.width = viewport.width * window.devicePixelRatio;
-            canvas.height = viewport.height * window.devicePixelRatio;
-            canvas.style.width = viewport.width + 'px';
-            canvas.style.height = viewport.height + 'px';
-            canvas.style.display = 'block';
-
-            const ctx = canvas.getContext('2d');
-            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-
-            await page.render({ canvasContext: ctx, viewport: viewport }).promise;
-
-            // 清空占位符并添加canvas
-            placeholder.innerHTML = '';
-            placeholder.appendChild(canvas);
-            placeholder.classList.add('pdf-page-wrapper');
-            placeholder.classList.remove('pdf-page-placeholder');
-
-            // 添加批注层（画笔模式下可交互）
-            const annoCanvas = document.createElement('canvas');
-            annoCanvas.className = 'annotation-canvas';
-            annoCanvas.dataset.pageNum = pageNum;
-            annoCanvas.width = viewport.width * window.devicePixelRatio;
-            annoCanvas.height = viewport.height * window.devicePixelRatio;
-            annoCanvas.style.width = viewport.width + 'px';
-            annoCanvas.style.height = viewport.height + 'px';
-            annoCanvas.style.pointerEvents = penMode ? 'auto' : 'none';
-
-            const annoCtx = annoCanvas.getContext('2d');
-            annoCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
-
-            // 保存引用到 pageData 供其他模块使用
-            pageData.annoCanvas = annoCanvas;
-            pageData.annoCtx = annoCtx;
-
-            // 恢复该页的绘图数据
-            const pageDrawing = getDocAnnotation(currentDoc.id, pageNum, 'drawing');
-            if (pageDrawing) {
-                const img = new Image();
-                img.onload = () => {
-                    annoCtx.drawImage(img, 0, 0, viewport.width, viewport.height);
-                };
-                img.src = pageDrawing;
-            }
-
-            // 画笔交互逻辑 —— 每页自带
-            attachPenInteraction(annoCanvas, annoCtx, pageNum, viewport);
-
-            placeholder.appendChild(annoCanvas);
-
-            // 添加长按添加笔记功能
-            setupPageLongPress(placeholder, pageNum);
-
-            // 渲染笔记标记
-            renderPageNoteMarkers(placeholder, pageNum);
-
-            pageData.rendered = true;
-            renderedPages.add(pageNum);
         }
 
         // 把画笔交互绑定到单个页面的批注 canvas 上
@@ -5749,7 +5805,6 @@
 
         let scrollListenerAttached = false;
         let scrollUpdateTimer = null;
-        let scrollThrottleTimer = null;
 
         function setupScrollListener() {
             if (scrollListenerAttached) return;
@@ -5760,19 +5815,11 @@
         }
 
         function handleContinuousScroll() {
-            // 节流：滚动过程中每 80ms 就触发一次可见页渲染，避免用户滑到哪就白屏到哪
-            // （旧实现用防抖，滚动没停就永远不渲染，第 2 页以后要等停下来才出图）
-            if (!scrollThrottleTimer) {
-                scrollThrottleTimer = setTimeout(() => {
-                    scrollThrottleTimer = null;
-                    renderVisiblePages();
-                }, 80);
-            }
-            // 防抖：滚动停下后再做一次最终渲染 + 页码更新 + 进度保存
+            // 渲染由 IntersectionObserver 异步驱动，不再放在滚动回调里；
+            // 这里只做页码更新和进度保存，防抖即可。
             if (scrollUpdateTimer) clearTimeout(scrollUpdateTimer);
             scrollUpdateTimer = setTimeout(() => {
                 updateCurrentPageFromScroll();
-                renderVisiblePages();
             }, 150);
         }
 
