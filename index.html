@@ -4197,6 +4197,22 @@
 
         // ==================== Init ====================
         async function init() {
+            // 打点：监听主线程超过 50ms 的长任务，定位谁在卡
+            try {
+                if (typeof PerformanceObserver !== 'undefined') {
+                    const po = new PerformanceObserver((list) => {
+                        for (const entry of list.getEntries()) {
+                            console.log('[perf] LONGTASK',
+                                'duration=' + entry.duration.toFixed(0) + 'ms',
+                                'start=' + entry.startTime.toFixed(0),
+                                'name=' + entry.name,
+                                entry.attribution && entry.attribution[0] ? entry.attribution[0].name : '');
+                        }
+                    });
+                    po.observe({ type: 'longtask', buffered: true });
+                }
+            } catch (e) { console.warn('longtask observer not supported', e); }
+
             await initFileDB();
             loadData();
             applySettings();
@@ -5671,13 +5687,33 @@
                     'render=' + (_tAfterRender - _tBeforeRender).toFixed(0),
                     'post=' + (_tEnd - _tAfterRender).toFixed(0),
                     'total=' + (_tEnd - _tEnter).toFixed(0), 'ms');
-                // 捕获"浏览器真正把 canvas 画到屏幕"的时刻（合成完成后的下一帧）
-                requestAnimationFrame(() => {
-                    requestAnimationFrame(() => {
-                        console.log('[perf] renderSinglePage p=' + pageNum + ' PAINTED',
-                            (performance.now() - _tEnter).toFixed(0), 'ms after render start');
-                    });
-                });
+                // 连续 20 帧打点：如果某两帧间隔 > 16ms，就是那段时间主线程被占住
+                // 能精确看出 1800ms 空档是卡在哪一段
+                (function trackFrames(pn, tEnd) {
+                    let frame = 0;
+                    const tStart = performance.now();
+                    let lastTs = tStart;
+                    function step() {
+                        const now = performance.now();
+                        const delta = now - lastTs;
+                        const sinceEnd = now - tEnd;
+                        if (delta > 30 || frame === 0 || frame === 5 || frame === 20) {
+                            console.log('[perf] p=' + pn + ' frame=' + frame,
+                                'sinceEnd=' + sinceEnd.toFixed(0) + 'ms',
+                                'delta=' + delta.toFixed(0) + 'ms');
+                        }
+                        lastTs = now;
+                        frame++;
+                        if (frame <= 30 && sinceEnd < 3000) {
+                            requestAnimationFrame(step);
+                        } else {
+                            console.log('[perf] p=' + pn + ' trackFrames END',
+                                'totalFrames=' + frame,
+                                'totalMs=' + (now - tStart).toFixed(0));
+                        }
+                    }
+                    requestAnimationFrame(step);
+                })(pageNum, _tEnd);
             } finally {
                 pageData._rendering = false;
                 _releaseRenderSlot();
