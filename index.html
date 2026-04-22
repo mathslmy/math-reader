@@ -4225,6 +4225,7 @@
             if (page !== currentDoc.currentPage) {
                 currentDoc.currentPage = page;
                 currentDoc.progress = Math.round((page / totalPages) * 100);
+                currentDoc.progressUpdatedAt = Date.now();
                 saveData();
             }
         }
@@ -5843,6 +5844,7 @@
                 if (!suppressScrollWriteback && !isRenderingAllPages && layoutReady && currentDoc) {
                     currentDoc.currentPage = currentPage;
                     currentDoc.progress = Math.round((currentPage / totalPages) * 100);
+                    currentDoc.progressUpdatedAt = Date.now();
                     saveData();
                 }
             }
@@ -5872,6 +5874,7 @@
                 if (currentDoc.currentPage !== pageNum) {
                     currentDoc.currentPage = pageNum;
                     currentDoc.progress = Math.round((pageNum / totalPages) * 100);
+                    currentDoc.progressUpdatedAt = Date.now();
                     saveData();
                 }
             }
@@ -8379,6 +8382,30 @@
         // latest metadata once in the background so the user sees the newest data.
         // Silent: no toast on success, logs on failure. Does not pull PDF files
         // (those are pulled on demand by the existing flow when a doc is opened).
+        // 把云端 docs 合并进本地 docs：对每一本相同 id 的文档，
+        // 阅读进度字段 (currentPage / progress) 按 progressUpdatedAt 时间戳取较新的那份。
+        // 其余字段（标题、annotations 等）仍以云端为准。
+        function mergeDocsPreferringLocalProgress(cloudDocs, localDocs) {
+            const localMap = {};
+            (localDocs || []).forEach(d => { if (d && d.id) localMap[d.id] = d; });
+            return (cloudDocs || []).map(cloudDoc => {
+                if (!cloudDoc || !cloudDoc.id) return cloudDoc;
+                const local = localMap[cloudDoc.id];
+                if (!local) return cloudDoc;
+                const localTs = Number(local.progressUpdatedAt) || 0;
+                const cloudTs = Number(cloudDoc.progressUpdatedAt) || 0;
+                if (localTs > cloudTs) {
+                    return {
+                        ...cloudDoc,
+                        currentPage: local.currentPage,
+                        progress: (typeof local.progress === 'number') ? local.progress : cloudDoc.progress,
+                        progressUpdatedAt: local.progressUpdatedAt
+                    };
+                }
+                return cloudDoc;
+            });
+        }
+
         async function autoSyncFromR2OnStartup() {
             const config = appData.settings && appData.settings.r2Config;
             if (!config || !config.accessKeyId || !config.autoSyncEnabled) return;
@@ -8390,8 +8417,11 @@
                 const metadata = JSON.parse(metadataStr);
                 const localR2Config = appData.settings.r2Config;
                 const localApiSettings = pickApiSettingsFrom(appData.settings);
-                appData.books = metadata.books || [];
-                appData.papers = metadata.papers || [];
+                // 阅读进度保留本地较新的值，避免云端旧进度把本地刚写的进度冲掉
+                const localBooks = appData.books || [];
+                const localPapers = appData.papers || [];
+                appData.books = mergeDocsPreferringLocalProgress(metadata.books || [], localBooks);
+                appData.papers = mergeDocsPreferringLocalProgress(metadata.papers || [], localPapers);
                 appData.notes = metadata.notes || {};
                 appData.archived = metadata.archived || [];
                 appData.lectures = metadata.lectures || {};
