@@ -3283,8 +3283,6 @@
             </div>
         </div>
 
-        <div id="perfDebugBar" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:rgba(0,0,0,0.85);color:#0f0;font:11px/1.4 monospace;padding:6px 8px;max-height:40vh;overflow:auto;white-space:pre-wrap;display:none;"></div>
-
         <div class="reader-container" id="readerContainer" style="position:relative;">
             <div class="pdf-canvas-wrapper" id="pdfCanvasWrapper">
                 <!-- PDF pages rendered here -->
@@ -3576,29 +3574,6 @@
                 </div>
                 <div class="setting-item-right">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-                </div>
-            </div>
-        </div>
-
-        <!-- 阅读设置 -->
-        <div class="settings-section">
-            <div class="settings-section-title">阅读设置</div>
-            <div style="padding:0 20px 4px;">
-                <div class="setting-item-label" style="padding:4px 0;">渲染清晰度</div>
-                <div class="setting-item-desc" style="margin-bottom:8px;">清晰度越高越清楚，但打开和滑动越慢。小屏幕上中档通常看不出差别。</div>
-            </div>
-            <div class="theme-options">
-                <div class="theme-option" data-quality="low" onclick="setRenderQuality('low')">
-                    <div class="theme-preview" style="background:var(--bg-tertiary);display:flex;align-items:center;justify-content:center;font-weight:600;color:var(--text-secondary);">1x</div>
-                    <span>流畅</span>
-                </div>
-                <div class="theme-option" data-quality="medium" onclick="setRenderQuality('medium')">
-                    <div class="theme-preview" style="background:var(--bg-tertiary);display:flex;align-items:center;justify-content:center;font-weight:600;color:var(--text-secondary);">1.5x</div>
-                    <span>标准</span>
-                </div>
-                <div class="theme-option" data-quality="high" onclick="setRenderQuality('high')">
-                    <div class="theme-preview" style="background:var(--bg-tertiary);display:flex;align-items:center;justify-content:center;font-weight:600;color:var(--text-secondary);">高清</div>
-                    <span>高清</span>
                 </div>
             </div>
         </div>
@@ -4197,22 +4172,6 @@
 
         // ==================== Init ====================
         async function init() {
-            // 打点：监听主线程超过 50ms 的长任务，定位谁在卡
-            try {
-                if (typeof PerformanceObserver !== 'undefined') {
-                    const po = new PerformanceObserver((list) => {
-                        for (const entry of list.getEntries()) {
-                            console.log('[perf] LONGTASK',
-                                'duration=' + entry.duration.toFixed(0) + 'ms',
-                                'start=' + entry.startTime.toFixed(0),
-                                'name=' + entry.name,
-                                entry.attribution && entry.attribution[0] ? entry.attribution[0].name : '');
-                        }
-                    });
-                    po.observe({ type: 'longtask', buffered: true });
-                }
-            } catch (e) { console.warn('longtask observer not supported', e); }
-
             await initFileDB();
             loadData();
             applySettings();
@@ -4297,8 +4256,6 @@
 
         // ==================== Navigation ====================
         function switchPage(num) {
-            const _tSw = performance.now();
-            console.log('[perf] switchPage start', num, _tSw.toFixed(0));
             // 分屏切换触发后 600ms 内忽略随之而来的 click，防止两指压下/抬起时触发误点
             if (window.__lastSplitToggleAt && (Date.now() - window.__lastSplitToggleAt) < 600) {
                 return;
@@ -4334,15 +4291,10 @@
             }
 
             if (num === 3) {
-                const _tRN = performance.now();
                 renderNotesPage();
-                console.log('[perf] switchPage renderNotesPage', (performance.now() - _tRN).toFixed(0), 'ms');
                 // 自动打开上次的讲义
-                const _tRL = performance.now();
                 restoreLastLecture();
-                console.log('[perf] switchPage restoreLastLecture', (performance.now() - _tRL).toFixed(0), 'ms');
             }
-            console.log('[perf] switchPage TOTAL', num, (performance.now() - _tSw).toFixed(0), 'ms');
         }
 
         function restoreLastLecture() {
@@ -5129,7 +5081,6 @@
 
                 card.addEventListener('click', (e) => {
                     if (!isLongPress) {
-                        console.log('[perf] card click -> openDoc', id, performance.now().toFixed(0));
                         openDoc(id);
                     }
                     isLongPress = false;
@@ -5313,8 +5264,6 @@
 
         // ==================== PDF Reader ====================
         function openDoc(id, fromSwitchPage = false) {
-            const _t0 = performance.now();
-            console.log('[perf] openDoc start', id);
             let doc = appData.books.find(b => b.id === id) || appData.papers.find(p => p.id === id);
             if (!doc) return;
 
@@ -5328,15 +5277,12 @@
             
             // 保存上次打开的文档ID
             appData.settings.lastDocId = id;
-            const _tBeforeSave = performance.now();
             saveData();
-            console.log('[perf] openDoc saveData took', (performance.now() - _tBeforeSave).toFixed(0), 'ms');
 
             // 避免循环调用
             if (!fromSwitchPage) {
                 switchPage(2);
             }
-            console.log('[perf] openDoc pre-loadPDF total', (performance.now() - _t0).toFixed(0), 'ms');
 
             if (doc.type === 'pdf') {
                 loadPDF(doc);
@@ -5351,79 +5297,36 @@
             }
         }
 
-        // ==================== 性能诊断（临时） ====================
-        // 把 [perf] 开头的 console.log 同步显示到屏幕顶部调试条
-        // 用完再删
-        (function() {
-            const origLog = console.log.bind(console);
-            const bar = () => document.getElementById('perfDebugBar');
-            let lines = [];
-            console.log = function(...args) {
-                origLog(...args);
-                try {
-                    const msg = args.map(a => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ');
-                    if (msg.startsWith('[perf]')) {
-                        const b = bar();
-                        if (b) {
-                            b.style.display = 'block';
-                            lines.push(msg);
-                            if (lines.length > 30) lines.shift();
-                            b.textContent = lines.join('\n');
-                        }
-                    }
-                } catch (e) {}
-            };
-            // 双击调试条关闭
-            document.addEventListener('DOMContentLoaded', () => {
-                const b = bar();
-                if (b) b.addEventListener('dblclick', () => { b.style.display = 'none'; lines = []; });
-            });
-        })();
-
         async function loadPDF(doc) {
-            const _tLoadStart = performance.now();
             try {
                 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-                // 先释放上一本书占用的资源（避免内存堆积）
-                const _t1 = performance.now();
-                await destroyCurrentPdf();
-                console.log('[perf] loadPDF destroyCurrentPdf', (performance.now() - _t1).toFixed(0), 'ms');
-
                 // 从IndexedDB获取文件数据
-                const _t2 = performance.now();
                 let fileData = doc.data;
                 if (!fileData) {
                     fileData = await getFileData(doc.id);
                 }
-                console.log('[perf] loadPDF getFileData', (performance.now() - _t2).toFixed(0), 'ms, size', fileData ? fileData.length : 0);
                 if (!fileData) {
                     showToast('文件数据丢失');
                     return;
                 }
+                
+                const data = fileData.split(',')[1];
+                const raw = atob(data);
+                const uint8 = new Uint8Array(raw.length);
+                for (let i = 0; i < raw.length; i++) uint8[i] = raw.charCodeAt(i);
 
-                // 用 fetch(DataURL) 在浏览器内部异步完成 base64 解码，避免主线程
-                // atob + for 循环一个几十MB的字符串（旧实现在大PDF上会阻塞UI几秒）。
-                // 等价于 ArrayBuffer，但解码在底层更快。
-                const _t3 = performance.now();
-                const resp = await fetch(fileData);
-                const arrayBuffer = await resp.arrayBuffer();
-                console.log('[perf] loadPDF fetch+arrayBuffer', (performance.now() - _t3).toFixed(0), 'ms, bytes', arrayBuffer.byteLength);
-
-                const _t4 = performance.now();
-                pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-                console.log('[perf] loadPDF pdfjs.getDocument', (performance.now() - _t4).toFixed(0), 'ms');
+                pdfDoc = await pdfjsLib.getDocument({ data: uint8 }).promise;
                 totalPages = pdfDoc.numPages;
                 doc.totalPages = totalPages;
                 currentPage = doc.currentPage || 1;
 
                 document.getElementById('readerPageNav').style.display = 'flex';
                 
-                // 所有模式都使用连续滚动渲染；历史进度页的瞬时跳转在内部处理。
-                const _t5 = performance.now();
+                // 所有模式都使用连续滚动渲染
                 await renderAllPDFPages();
-                console.log('[perf] loadPDF renderAllPDFPages', (performance.now() - _t5).toFixed(0), 'ms');
-                console.log('[perf] loadPDF TOTAL', (performance.now() - _tLoadStart).toFixed(0), 'ms, totalPages', totalPages);
+                // 如果需要跳到之前的进度页
+                if (currentPage > 1) scrollToPage(currentPage);
             } catch(err) {
                 console.error('PDF load error:', err);
                 document.getElementById('pdfCanvasWrapper').innerHTML = `
@@ -5434,290 +5337,143 @@
             }
         }
 
-        // 释放函数定义放在后面（变量声明之后），见 destroyCurrentPdf
-
         // ==================== Continuous Scroll Mode (Note Mode) ====================
         let renderedPages = new Set();
         let pageElements = {};
         let isRenderingAllPages = false;
-        // 容器可用宽度缓存，避免在几百页循环里反复触发 getComputedStyle 强制布局
-        let _cachedContainerInnerWidth = 0;
-
-        // 释放当前 pdfDoc 以及所有页面 DOM 引用，供切换文档时调用
-        async function destroyCurrentPdf() {
-            try {
-                if (pdfDoc && typeof pdfDoc.destroy === 'function') {
-                    await pdfDoc.destroy();
-                }
-            } catch (e) {
-                console.warn('pdfDoc.destroy failed', e);
-            }
-            pdfDoc = null;
-            pageElements = {};
-            renderedPages.clear();
-            _cachedContainerInnerWidth = 0;
-            if (typeof pageObserver !== 'undefined' && pageObserver) {
-                try { pageObserver.disconnect(); } catch (e) {}
-                pageObserver = null;
-            }
-        }
-
-        // IntersectionObserver 实例：浏览器原生异步判定哪些页面进入/接近可视区。
-        // 替代旧的"每次滚动跑一遍 totalPages 次 offsetTop 查询"的 O(N) 强制布局。
-        let pageObserver = null;
-
-        // 当前正在渲染的页数（并发上限），避免滑得很快时同时跑 10+ 个 page.render
-        let _renderingCount = 0;
-        const RENDER_CONCURRENCY = 2;
-        const _renderWaitQueue = []; // 等待槽位的 resolve 函数
-
-        function _acquireRenderSlot() {
-            if (_renderingCount < RENDER_CONCURRENCY) {
-                _renderingCount++;
-                return Promise.resolve();
-            }
-            return new Promise(r => _renderWaitQueue.push(r));
-        }
-        function _releaseRenderSlot() {
-            const next = _renderWaitQueue.shift();
-            if (next) next(); // 直接放下一个进来，计数不变
-            else _renderingCount--;
-        }
 
         async function renderAllPDFPages() {
             if (!pdfDoc || isRenderingAllPages) return;
             isRenderingAllPages = true;
-            const _tStart = performance.now();
 
             const wrapper = document.getElementById('pdfCanvasWrapper');
             wrapper.innerHTML = '';
             renderedPages.clear();
             pageElements = {};
-            _cachedContainerInnerWidth = 0;
 
-            // 断掉旧的 observer
-            if (pageObserver) {
-                try { pageObserver.disconnect(); } catch (e) {}
-                pageObserver = null;
-            }
-
-            // 拿第 1 页尺寸作为占位符估算尺寸（绝大多数 PDF 全书页尺寸一致）
-            const _tGetFirst = performance.now();
-            const firstPage = await pdfDoc.getPage(1);
-            console.log('[perf] renderAllPDFPages getPage(1)', (performance.now() - _tGetFirst).toFixed(0), 'ms');
-            const scale = getReaderRenderScale(firstPage);
-            const estViewport = firstPage.getViewport({ scale: Math.min(scale, 2) });
-            const estW = estViewport.width;
-            const estH = estViewport.height;
-
-            // 批量建占位符
-            const _tFrag = performance.now();
-            const frag = document.createDocumentFragment();
+            // 创建所有页面的占位符
             for (let i = 1; i <= totalPages; i++) {
+                const page = await pdfDoc.getPage(i);
+                const scale = getReaderRenderScale(page);
+                const viewport = page.getViewport({ scale: Math.min(scale, 2) });
+
                 const placeholder = document.createElement('div');
                 placeholder.className = 'pdf-page-placeholder';
                 placeholder.dataset.page = i;
-                placeholder.style.width = estW + 'px';
-                placeholder.style.height = estH + 'px';
+                placeholder.style.width = viewport.width + 'px';
+                placeholder.style.height = viewport.height + 'px';
                 placeholder.style.background = '#fff';
                 placeholder.style.boxShadow = 'var(--shadow)';
                 placeholder.style.position = 'relative';
-
-                pageElements[i] = {
-                    placeholder,
-                    viewport: (i === 1) ? estViewport : null,
-                    rendered: false,
-                    page: (i === 1) ? firstPage : null
-                };
-                frag.appendChild(placeholder);
+                
+                pageElements[i] = { placeholder, viewport, rendered: false };
+                wrapper.appendChild(placeholder);
             }
-            wrapper.appendChild(frag);
-            console.log('[perf] renderAllPDFPages build placeholders', (performance.now() - _tFrag).toFixed(0), 'ms, pages', totalPages);
 
-            const container = document.getElementById('readerContainer');
+            // 渲染可见页面和附近页面
+            await renderVisiblePages();
 
-            // 关键：先把滚动位置设到历史进度页（瞬时跳），让 observer 注册时
-            // 直接看到目标页在可视区，而不是先从第 1 页开始。
+            // 滚动到当前页
             if (currentPage > 1 && pageElements[currentPage]) {
-                container.scrollTop = pageElements[currentPage].placeholder.offsetTop - 12;
+                const targetEl = pageElements[currentPage].placeholder;
+                const container = document.getElementById('readerContainer');
+                container.scrollTop = targetEl.offsetTop - 12;
             }
-
-            // 立即启动当前页渲染（不 await，让它尽快出图）
-            renderSinglePage(currentPage);
-
-            // 设置 IntersectionObserver：rootMargin 给 0.5 屏即可，
-            // 过大会在快速滑动时把一大片页都塞进渲染队列。
-            const rootMargin = `${Math.round(container.clientHeight * 0.5)}px 0px`;
-            pageObserver = new IntersectionObserver((entries) => {
-                // 收集所有进入的页，按距离当前可视区中心排序，只处理最近的几个。
-                const viewCenter = container.scrollTop + container.clientHeight / 2;
-                const candidates = [];
-                for (const entry of entries) {
-                    if (!entry.isIntersecting) continue;
-                    const pageNum = parseInt(entry.target.dataset.page, 10);
-                    if (!pageNum) continue;
-                    const pd = pageElements[pageNum];
-                    if (!pd || pd.rendered || pd._rendering) continue;
-                    const pageCenter = pd.placeholder.offsetTop + pd.placeholder.offsetHeight / 2;
-                    candidates.push({ pageNum, dist: Math.abs(pageCenter - viewCenter) });
-                }
-                candidates.sort((a, b) => a.dist - b.dist);
-                for (const c of candidates) {
-                    renderSinglePage(c.pageNum);
-                }
-            }, {
-                root: container,
-                rootMargin,
-                threshold: 0
-            });
-
-            // 把所有占位符交给 observer 管
-            const _tObs = performance.now();
-            for (let i = 1; i <= totalPages; i++) {
-                pageObserver.observe(pageElements[i].placeholder);
-            }
-            console.log('[perf] renderAllPDFPages observer.observe*N', (performance.now() - _tObs).toFixed(0), 'ms');
 
             isRenderingAllPages = false;
-
-            // 滚动监听仅负责当前页号更新和进度保存；渲染交给 observer
+            
+            // 设置滚动监听
             setupScrollListener();
-            console.log('[perf] renderAllPDFPages TOTAL', (performance.now() - _tStart).toFixed(0), 'ms');
         }
 
-        // 兼容保留（搜索高亮等地方可能会调用一次性渲染某页）
         async function renderVisiblePages() {
-            // observer 机制下大多不再需要；但搜索跳转时手动触发一下当前页渲染
-            const pd = pageElements[currentPage];
-            if (pd && !pd.rendered) {
-                await renderSinglePage(currentPage);
+            const container = document.getElementById('readerContainer');
+            const containerRect = container.getBoundingClientRect();
+            const scrollTop = container.scrollTop;
+            const viewportTop = scrollTop - containerRect.height;
+            const viewportBottom = scrollTop + containerRect.height * 2;
+
+            for (let i = 1; i <= totalPages; i++) {
+                const pageData = pageElements[i];
+                if (!pageData || pageData.rendered) continue;
+
+                const placeholder = pageData.placeholder;
+                const pageTop = placeholder.offsetTop;
+                const pageBottom = pageTop + placeholder.offsetHeight;
+
+                // 渲染可见范围内的页面（包括上下各一屏的缓冲区）
+                if (pageBottom >= viewportTop && pageTop <= viewportBottom) {
+                    await renderSinglePage(i);
+                }
             }
         }
 
         async function renderSinglePage(pageNum) {
             const pageData = pageElements[pageNum];
-            if (!pageData || pageData.rendered || pageData._rendering) return;
-            pageData._rendering = true;
+            if (!pageData || pageData.rendered) return;
 
-            const _tEnter = performance.now();
-            await _acquireRenderSlot();
-            const _tGotSlot = performance.now();
-            try {
-                const page = pageData.page || await pdfDoc.getPage(pageNum);
-                pageData.page = page;
-                const _tGotPage = performance.now();
+            const page = await pdfDoc.getPage(pageNum);
+            const viewport = pageData.viewport;
+            const placeholder = pageData.placeholder;
 
-                let viewport = pageData.viewport;
-                if (!viewport) {
-                    const scale = getReaderRenderScale(page);
-                    viewport = page.getViewport({ scale: Math.min(scale, 2) });
-                    pageData.viewport = viewport;
-                }
-                const placeholder = pageData.placeholder;
+            const canvas = document.createElement('canvas');
+            canvas.width = viewport.width * window.devicePixelRatio;
+            canvas.height = viewport.height * window.devicePixelRatio;
+            canvas.style.width = viewport.width + 'px';
+            canvas.style.height = viewport.height + 'px';
+            canvas.style.display = 'block';
 
-                const estW = parseFloat(placeholder.style.width) || 0;
-                const estH = parseFloat(placeholder.style.height) || 0;
-                if (Math.abs(estW - viewport.width) > 0.5 || Math.abs(estH - viewport.height) > 0.5) {
-                    placeholder.style.width = viewport.width + 'px';
-                    placeholder.style.height = viewport.height + 'px';
-                }
+            const ctx = canvas.getContext('2d');
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
 
-                const canvas = document.createElement('canvas');
-                // 主 canvas 的内部像素倍率按用户设置（默认 medium=1.5），
-                // 倍率越高越清晰但合成越慢。annoCanvas（画笔）仍用原始 devicePixelRatio 保持笔迹清晰。
-                const _pdfPR = getRenderPixelRatio();
-                canvas.width = viewport.width * _pdfPR;
-                canvas.height = viewport.height * _pdfPR;
-                canvas.style.width = viewport.width + 'px';
-                canvas.style.height = viewport.height + 'px';
-                canvas.style.display = 'block';
+            await page.render({ canvasContext: ctx, viewport: viewport }).promise;
 
-                const ctx = canvas.getContext('2d');
-                ctx.scale(_pdfPR, _pdfPR);
+            // 清空占位符并添加canvas
+            placeholder.innerHTML = '';
+            placeholder.appendChild(canvas);
+            placeholder.classList.add('pdf-page-wrapper');
+            placeholder.classList.remove('pdf-page-placeholder');
 
-                const _tBeforeRender = performance.now();
-                await page.render({ canvasContext: ctx, viewport: viewport }).promise;
-                const _tAfterRender = performance.now();
+            // 添加批注层（画笔模式下可交互）
+            const annoCanvas = document.createElement('canvas');
+            annoCanvas.className = 'annotation-canvas';
+            annoCanvas.dataset.pageNum = pageNum;
+            annoCanvas.width = viewport.width * window.devicePixelRatio;
+            annoCanvas.height = viewport.height * window.devicePixelRatio;
+            annoCanvas.style.width = viewport.width + 'px';
+            annoCanvas.style.height = viewport.height + 'px';
+            annoCanvas.style.pointerEvents = penMode ? 'auto' : 'none';
 
-                placeholder.innerHTML = '';
-                placeholder.appendChild(canvas);
-                placeholder.classList.add('pdf-page-wrapper');
-                placeholder.classList.remove('pdf-page-placeholder');
+            const annoCtx = annoCanvas.getContext('2d');
+            annoCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
 
-                const annoCanvas = document.createElement('canvas');
-                annoCanvas.className = 'annotation-canvas';
-                annoCanvas.dataset.pageNum = pageNum;
-                annoCanvas.width = viewport.width * window.devicePixelRatio;
-                annoCanvas.height = viewport.height * window.devicePixelRatio;
-                annoCanvas.style.width = viewport.width + 'px';
-                annoCanvas.style.height = viewport.height + 'px';
-                annoCanvas.style.pointerEvents = penMode ? 'auto' : 'none';
+            // 保存引用到 pageData 供其他模块使用
+            pageData.annoCanvas = annoCanvas;
+            pageData.annoCtx = annoCtx;
 
-                const annoCtx = annoCanvas.getContext('2d');
-                annoCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
-
-                pageData.annoCanvas = annoCanvas;
-                pageData.annoCtx = annoCtx;
-
-                const pageDrawing = getDocAnnotation(currentDoc.id, pageNum, 'drawing');
-                if (pageDrawing) {
-                    const img = new Image();
-                    img.onload = () => {
-                        annoCtx.drawImage(img, 0, 0, viewport.width, viewport.height);
-                    };
-                    img.src = pageDrawing;
-                }
-
-                attachPenInteraction(annoCanvas, annoCtx, pageNum, viewport);
-                placeholder.appendChild(annoCanvas);
-
-                setupPageLongPress(placeholder, pageNum);
-                renderPageNoteMarkers(placeholder, pageNum);
-
-                pageData.rendered = true;
-                renderedPages.add(pageNum);
-
-                if (pageObserver) {
-                    try { pageObserver.unobserve(placeholder); } catch(e) {}
-                }
-                const _tEnd = performance.now();
-                console.log('[perf] renderSinglePage p=' + pageNum,
-                    'wait=' + (_tGotSlot - _tEnter).toFixed(0),
-                    'getPage=' + (_tGotPage - _tGotSlot).toFixed(0),
-                    'render=' + (_tAfterRender - _tBeforeRender).toFixed(0),
-                    'post=' + (_tEnd - _tAfterRender).toFixed(0),
-                    'total=' + (_tEnd - _tEnter).toFixed(0), 'ms');
-                // 连续 20 帧打点：如果某两帧间隔 > 16ms，就是那段时间主线程被占住
-                // 能精确看出 1800ms 空档是卡在哪一段
-                (function trackFrames(pn, tEnd) {
-                    let frame = 0;
-                    const tStart = performance.now();
-                    let lastTs = tStart;
-                    function step() {
-                        const now = performance.now();
-                        const delta = now - lastTs;
-                        const sinceEnd = now - tEnd;
-                        if (delta > 30 || frame === 0 || frame === 5 || frame === 20) {
-                            console.log('[perf] p=' + pn + ' frame=' + frame,
-                                'sinceEnd=' + sinceEnd.toFixed(0) + 'ms',
-                                'delta=' + delta.toFixed(0) + 'ms');
-                        }
-                        lastTs = now;
-                        frame++;
-                        if (frame <= 30 && sinceEnd < 3000) {
-                            requestAnimationFrame(step);
-                        } else {
-                            console.log('[perf] p=' + pn + ' trackFrames END',
-                                'totalFrames=' + frame,
-                                'totalMs=' + (now - tStart).toFixed(0));
-                        }
-                    }
-                    requestAnimationFrame(step);
-                })(pageNum, _tEnd);
-            } finally {
-                pageData._rendering = false;
-                _releaseRenderSlot();
+            // 恢复该页的绘图数据
+            const pageDrawing = getDocAnnotation(currentDoc.id, pageNum, 'drawing');
+            if (pageDrawing) {
+                const img = new Image();
+                img.onload = () => {
+                    annoCtx.drawImage(img, 0, 0, viewport.width, viewport.height);
+                };
+                img.src = pageDrawing;
             }
+
+            // 画笔交互逻辑 —— 每页自带
+            attachPenInteraction(annoCanvas, annoCtx, pageNum, viewport);
+
+            placeholder.appendChild(annoCanvas);
+
+            // 添加长按添加笔记功能
+            setupPageLongPress(placeholder, pageNum);
+
+            // 渲染笔记标记
+            renderPageNoteMarkers(placeholder, pageNum);
+
+            pageData.rendered = true;
+            renderedPages.add(pageNum);
         }
 
         // 把画笔交互绑定到单个页面的批注 canvas 上
@@ -5952,12 +5708,13 @@
         }
 
         function handleContinuousScroll() {
-            // 渲染由 IntersectionObserver 异步驱动，不再放在滚动回调里；
-            // 这里只做页码更新和进度保存，防抖即可。
+            // 画笔模式也使用连续滚动，同样需要更新页码和懒渲染可见页
+            // 使用防抖更新当前页码
             if (scrollUpdateTimer) clearTimeout(scrollUpdateTimer);
             scrollUpdateTimer = setTimeout(() => {
                 updateCurrentPageFromScroll();
-            }, 150);
+                renderVisiblePages();
+            }, 100);
         }
 
         function updateCurrentPageFromScroll() {
@@ -6008,16 +5765,9 @@
             
             const container = document.getElementById('readerContainer');
             const targetEl = pageData.placeholder;
-            // 跨度大时用瞬时跳：smooth scroll 会让 IntersectionObserver 在穿越路径上
-            // 对途中每一页都触发一次渲染请求，几百个请求同时排队堵死目标页。
-            // 3 屏以上距离都按瞬时处理。
-            const currentTop = container.scrollTop;
-            const targetTop = targetEl.offsetTop - 12;
-            const distance = Math.abs(targetTop - currentTop);
-            const bigJump = distance > container.clientHeight * 3;
             container.scrollTo({
-                top: targetTop,
-                behavior: bigJump ? 'auto' : 'smooth'
+                top: targetEl.offsetTop - 12,
+                behavior: 'smooth'
             });
             
             currentPage = pageNum;
@@ -6147,71 +5897,19 @@
 
         // Compute PDF render scale based on actual container width (so split mode
         // and normal mode both produce correctly-sized pages).
-        // 容器宽度在单次 load 内不变，缓存避免每页重复调用 getComputedStyle 触发强制布局。
         function getReaderRenderScale(page) {
-            let containerW = _cachedContainerInnerWidth;
-            if (!containerW) {
-                const wrapper = document.getElementById('pdfCanvasWrapper');
-                containerW = window.innerWidth - 24;
-                if (wrapper) {
-                    const cs = window.getComputedStyle(wrapper);
-                    const padL = parseFloat(cs.paddingLeft) || 0;
-                    const padR = parseFloat(cs.paddingRight) || 0;
-                    // clientWidth 包含 padding，减去得到真正可用的内容宽度
-                    const inner = wrapper.clientWidth - padL - padR;
-                    if (inner > 0) containerW = inner;
-                }
-                _cachedContainerInnerWidth = containerW;
+            const wrapper = document.getElementById('pdfCanvasWrapper');
+            let containerW = window.innerWidth - 24;
+            if (wrapper) {
+                const cs = window.getComputedStyle(wrapper);
+                const padL = parseFloat(cs.paddingLeft) || 0;
+                const padR = parseFloat(cs.paddingRight) || 0;
+                // clientWidth 包含 padding，减去得到真正可用的内容宽度
+                const inner = wrapper.clientWidth - padL - padR;
+                if (inner > 0) containerW = inner;
             }
             const pageCssW = page.getViewport({ scale: 1 }).width;
             return containerW / pageCssW;
-        }
-
-        // 计算主 PDF canvas 的内部像素倍率（与屏幕 devicePixelRatio 相乘再开 canvas）。
-        // 用户设置在 appData.settings.renderQuality: 'low' | 'medium' | 'high'
-        // - low    固定 1x，最快，有轻微模糊
-        // - medium 固定 1.5x，默认，屏幕 DPR 较高时几乎看不出差别
-        // - high   使用 devicePixelRatio（通常 2x 或 3x），最清晰但最慢
-        function getRenderPixelRatio() {
-            const q = (appData && appData.settings && appData.settings.renderQuality) || 'medium';
-            const dpr = window.devicePixelRatio || 1;
-            if (q === 'low') return 1;
-            if (q === 'high') return dpr;
-            return 1.5; // medium
-        }
-
-        // 用户切换清晰度档位
-        function setRenderQuality(q) {
-            if (q !== 'low' && q !== 'medium' && q !== 'high') return;
-            appData.settings.renderQuality = q;
-            saveData();
-            // 更新 UI active 态
-            document.querySelectorAll('.theme-option[data-quality]').forEach(opt => {
-                opt.classList.toggle('active', opt.dataset.quality === q);
-            });
-            // 如果当前在阅读，把已渲染的主 canvas 全部清掉，重新渲染当前可见页
-            // 批注 canvas（画笔）不动，避免丢失正在画的内容
-            if (pdfDoc && pageElements) {
-                for (const pageNum in pageElements) {
-                    const pd = pageElements[pageNum];
-                    if (!pd || !pd.rendered) continue;
-                    // 只替换主 canvas（placeholder 内第一个 canvas 就是 PDF 渲染 canvas）
-                    const mainCanvas = pd.placeholder.querySelector('canvas:not(.annotation-canvas)');
-                    if (mainCanvas) mainCanvas.remove();
-                    pd.rendered = false;
-                    pd._rendering = false;
-                    renderedPages.delete(parseInt(pageNum, 10));
-                    // 重新加入 observer 队列
-                    pd.placeholder.classList.add('pdf-page-placeholder');
-                    pd.placeholder.classList.remove('pdf-page-wrapper');
-                    if (pageObserver) {
-                        try { pageObserver.observe(pd.placeholder); } catch(e) {}
-                    }
-                }
-                // 立即渲染当前页
-                renderSinglePage(currentPage);
-            }
-            showToast('清晰度已设为：' + (q === 'low' ? '流畅' : q === 'high' ? '高清' : '标准'));
         }
 
         // 把某页当前 canvas 的内容保存到文档（持久化）
@@ -7387,12 +7085,6 @@
             applyColorTheme();
             document.querySelectorAll('.theme-option').forEach(t => {
                 t.classList.toggle('active', t.dataset.color === currentColorTheme);
-            });
-
-            // Apply render quality
-            const rq = s.renderQuality || 'medium';
-            document.querySelectorAll('.theme-option[data-quality]').forEach(opt => {
-                opt.classList.toggle('active', opt.dataset.quality === rq);
             });
 
             // Apply background image
