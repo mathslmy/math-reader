@@ -5327,10 +5327,11 @@
 
                 document.getElementById('readerPageNav').style.display = 'flex';
                 
-                // 所有模式都使用连续滚动渲染
+                // 所有模式都使用连续滚动渲染；历史进度页的瞬时跳转在内部处理，
+                // 不再调 scrollToPage（smooth scroll 会从第 1 页平滑穿过几百个占位符，
+                // 每个占位符依次触发 IntersectionObserver，把几百页全部塞进渲染队列，
+                // 导致目标页排在最后，屏幕白屏半天）。
                 await renderAllPDFPages();
-                // 如果需要跳到之前的进度页
-                if (currentPage > 1) scrollToPage(currentPage);
             } catch(err) {
                 console.error('PDF load error:', err);
                 document.getElementById('pdfCanvasWrapper').innerHTML = `
@@ -5436,22 +5437,40 @@
             }
             wrapper.appendChild(frag);
 
-            // 立即启动第 1 页渲染（不 await，让后面先跑起来，用户尽快看到首页）
-            renderSinglePage(1);
-
-            // 设置 IntersectionObserver：上下各 1.5 屏作为 rootMargin（预加载），
-            // 浏览器会在每次滚动时异步触发 callback，完全不阻塞主线程。
             const container = document.getElementById('readerContainer');
-            const rootMargin = `${Math.round(container.clientHeight * 1.5)}px 0px`;
+
+            // 关键：先把滚动位置设到历史进度页（瞬时跳），让 observer 注册时
+            // 直接看到目标页在可视区，而不是先从第 1 页开始。
+            // 旧流程会先启动 renderSinglePage(1)，占满并发槽位，用户真正想看的
+            // 第 N 页要等第 1 页渲染完才能开始，导致"首页白屏半天"。
+            if (currentPage > 1 && pageElements[currentPage]) {
+                container.scrollTop = pageElements[currentPage].placeholder.offsetTop - 12;
+            }
+
+            // 立即启动当前页渲染（不 await，让它尽快出图）
+            renderSinglePage(currentPage);
+
+            // 设置 IntersectionObserver：rootMargin 给 0.5 屏即可，
+            // 过大会在快速滑动时把一大片页都塞进渲染队列。
+            const rootMargin = `${Math.round(container.clientHeight * 0.5)}px 0px`;
             pageObserver = new IntersectionObserver((entries) => {
+                // 收集所有进入的页，按距离当前可视区中心排序，只处理最近的几个。
+                // 快速滑动时一次回调可能带几十个 entry，若无差别 fire-and-forget，
+                // 并发队列会被远处的页占满，真正停下来时看到的页反而要等很久。
+                const viewCenter = container.scrollTop + container.clientHeight / 2;
+                const candidates = [];
                 for (const entry of entries) {
                     if (!entry.isIntersecting) continue;
                     const pageNum = parseInt(entry.target.dataset.page, 10);
                     if (!pageNum) continue;
                     const pd = pageElements[pageNum];
-                    if (pd && !pd.rendered) {
-                        renderSinglePage(pageNum); // fire-and-forget，内部有并发控制
-                    }
+                    if (!pd || pd.rendered || pd._rendering) continue;
+                    const pageCenter = pd.placeholder.offsetTop + pd.placeholder.offsetHeight / 2;
+                    candidates.push({ pageNum, dist: Math.abs(pageCenter - viewCenter) });
+                }
+                candidates.sort((a, b) => a.dist - b.dist);
+                for (const c of candidates) {
+                    renderSinglePage(c.pageNum); // fire-and-forget，内部有并发控制
                 }
             }, {
                 root: container,
@@ -5462,12 +5481,6 @@
             // 把所有占位符交给 observer 管
             for (let i = 1; i <= totalPages; i++) {
                 pageObserver.observe(pageElements[i].placeholder);
-            }
-
-            // 如果要跳到历史进度页，在这里滚过去；observer 会自动渲染目标页及其附近
-            if (currentPage > 1 && pageElements[currentPage]) {
-                const targetEl = pageElements[currentPage].placeholder;
-                container.scrollTop = targetEl.offsetTop - 12;
             }
 
             isRenderingAllPages = false;
@@ -5871,9 +5884,16 @@
             
             const container = document.getElementById('readerContainer');
             const targetEl = pageData.placeholder;
+            // 跨度大时用瞬时跳：smooth scroll 会让 IntersectionObserver 在穿越路径上
+            // 对途中每一页都触发一次渲染请求，几百个请求同时排队堵死目标页。
+            // 3 屏以上距离都按瞬时处理。
+            const currentTop = container.scrollTop;
+            const targetTop = targetEl.offsetTop - 12;
+            const distance = Math.abs(targetTop - currentTop);
+            const bigJump = distance > container.clientHeight * 3;
             container.scrollTo({
-                top: targetEl.offsetTop - 12,
-                behavior: 'smooth'
+                top: targetTop,
+                behavior: bigJump ? 'auto' : 'smooth'
             });
             
             currentPage = pageNum;
