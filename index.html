@@ -3580,6 +3580,29 @@
             </div>
         </div>
 
+        <!-- 阅读设置 -->
+        <div class="settings-section">
+            <div class="settings-section-title">阅读设置</div>
+            <div style="padding:0 20px 4px;">
+                <div class="setting-item-label" style="padding:4px 0;">渲染清晰度</div>
+                <div class="setting-item-desc" style="margin-bottom:8px;">清晰度越高越清楚，但打开和滑动越慢。小屏幕上中档通常看不出差别。</div>
+            </div>
+            <div class="theme-options">
+                <div class="theme-option" data-quality="low" onclick="setRenderQuality('low')">
+                    <div class="theme-preview" style="background:var(--bg-tertiary);display:flex;align-items:center;justify-content:center;font-weight:600;color:var(--text-secondary);">1x</div>
+                    <span>流畅</span>
+                </div>
+                <div class="theme-option" data-quality="medium" onclick="setRenderQuality('medium')">
+                    <div class="theme-preview" style="background:var(--bg-tertiary);display:flex;align-items:center;justify-content:center;font-weight:600;color:var(--text-secondary);">1.5x</div>
+                    <span>标准</span>
+                </div>
+                <div class="theme-option" data-quality="high" onclick="setRenderQuality('high')">
+                    <div class="theme-preview" style="background:var(--bg-tertiary);display:flex;align-items:center;justify-content:center;font-weight:600;color:var(--text-secondary);">高清</div>
+                    <span>高清</span>
+                </div>
+            </div>
+        </div>
+
         <!-- User Avatar Modal -->
         <div class="modal-overlay" id="avatarModal" onclick="hideModal('avatarModal')">
             <div class="modal-content" onclick="event.stopPropagation()">
@@ -5584,14 +5607,17 @@
                 }
 
                 const canvas = document.createElement('canvas');
-                canvas.width = viewport.width * window.devicePixelRatio;
-                canvas.height = viewport.height * window.devicePixelRatio;
+                // 主 canvas 的内部像素倍率按用户设置（默认 medium=1.5），
+                // 倍率越高越清晰但合成越慢。annoCanvas（画笔）仍用原始 devicePixelRatio 保持笔迹清晰。
+                const _pdfPR = getRenderPixelRatio();
+                canvas.width = viewport.width * _pdfPR;
+                canvas.height = viewport.height * _pdfPR;
                 canvas.style.width = viewport.width + 'px';
                 canvas.style.height = viewport.height + 'px';
                 canvas.style.display = 'block';
 
                 const ctx = canvas.getContext('2d');
-                ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+                ctx.scale(_pdfPR, _pdfPR);
 
                 const _tBeforeRender = performance.now();
                 await page.render({ canvasContext: ctx, viewport: viewport }).promise;
@@ -6103,6 +6129,53 @@
             }
             const pageCssW = page.getViewport({ scale: 1 }).width;
             return containerW / pageCssW;
+        }
+
+        // 计算主 PDF canvas 的内部像素倍率（与屏幕 devicePixelRatio 相乘再开 canvas）。
+        // 用户设置在 appData.settings.renderQuality: 'low' | 'medium' | 'high'
+        // - low    固定 1x，最快，有轻微模糊
+        // - medium 固定 1.5x，默认，屏幕 DPR 较高时几乎看不出差别
+        // - high   使用 devicePixelRatio（通常 2x 或 3x），最清晰但最慢
+        function getRenderPixelRatio() {
+            const q = (appData && appData.settings && appData.settings.renderQuality) || 'medium';
+            const dpr = window.devicePixelRatio || 1;
+            if (q === 'low') return 1;
+            if (q === 'high') return dpr;
+            return 1.5; // medium
+        }
+
+        // 用户切换清晰度档位
+        function setRenderQuality(q) {
+            if (q !== 'low' && q !== 'medium' && q !== 'high') return;
+            appData.settings.renderQuality = q;
+            saveData();
+            // 更新 UI active 态
+            document.querySelectorAll('.theme-option[data-quality]').forEach(opt => {
+                opt.classList.toggle('active', opt.dataset.quality === q);
+            });
+            // 如果当前在阅读，把已渲染的主 canvas 全部清掉，重新渲染当前可见页
+            // 批注 canvas（画笔）不动，避免丢失正在画的内容
+            if (pdfDoc && pageElements) {
+                for (const pageNum in pageElements) {
+                    const pd = pageElements[pageNum];
+                    if (!pd || !pd.rendered) continue;
+                    // 只替换主 canvas（placeholder 内第一个 canvas 就是 PDF 渲染 canvas）
+                    const mainCanvas = pd.placeholder.querySelector('canvas:not(.annotation-canvas)');
+                    if (mainCanvas) mainCanvas.remove();
+                    pd.rendered = false;
+                    pd._rendering = false;
+                    renderedPages.delete(parseInt(pageNum, 10));
+                    // 重新加入 observer 队列
+                    pd.placeholder.classList.add('pdf-page-placeholder');
+                    pd.placeholder.classList.remove('pdf-page-wrapper');
+                    if (pageObserver) {
+                        try { pageObserver.observe(pd.placeholder); } catch(e) {}
+                    }
+                }
+                // 立即渲染当前页
+                renderSinglePage(currentPage);
+            }
+            showToast('清晰度已设为：' + (q === 'low' ? '流畅' : q === 'high' ? '高清' : '标准'));
         }
 
         // 把某页当前 canvas 的内容保存到文档（持久化）
@@ -7278,6 +7351,12 @@
             applyColorTheme();
             document.querySelectorAll('.theme-option').forEach(t => {
                 t.classList.toggle('active', t.dataset.color === currentColorTheme);
+            });
+
+            // Apply render quality
+            const rq = s.renderQuality || 'medium';
+            document.querySelectorAll('.theme-option[data-quality]').forEach(opt => {
+                opt.classList.toggle('active', opt.dataset.quality === rq);
             });
 
             // Apply background image
