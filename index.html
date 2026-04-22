@@ -5320,13 +5320,38 @@
                 totalPages = pdfDoc.numPages;
                 doc.totalPages = totalPages;
                 currentPage = doc.currentPage || 1;
+                const savedPage = currentPage;
 
                 document.getElementById('readerPageNav').style.display = 'flex';
+                document.getElementById('pageInfo').textContent = `${currentPage} / ${totalPages}`;
                 
+                // 恢复进度期间抑制 scroll 事件覆盖写 doc.currentPage
+                suppressScrollWriteback = true;
                 // 所有模式都使用连续滚动渲染
                 await renderAllPDFPages();
-                // 如果需要跳到之前的进度页
-                if (currentPage > 1) scrollToPage(currentPage);
+
+                // iOS Safari 的 layout 是懒的，第一次设置 scrollTop 可能因容器未完成布局而无效。
+                // 用 rAF + 短延迟重试几次，确保滚动位置真的落在目标页上。
+                if (savedPage > 1) {
+                    const container = document.getElementById('readerContainer');
+                    for (let attempt = 0; attempt < 5; attempt++) {
+                        await new Promise(r => requestAnimationFrame(() => r()));
+                        const pageData = pageElements[savedPage];
+                        if (pageData && pageData.placeholder) {
+                            const target = pageData.placeholder.offsetTop - 12;
+                            if (target > 0) {
+                                container.scrollTop = target;
+                                // 确认是否生效
+                                if (Math.abs(container.scrollTop - target) < 4) break;
+                            }
+                        }
+                        await new Promise(r => setTimeout(r, 50));
+                    }
+                    currentPage = savedPage;
+                    document.getElementById('pageInfo').textContent = `${currentPage} / ${totalPages}`;
+                }
+                // 放开 scroll 回写（延迟一点点避免最后一次 scroll 事件抢先写回）
+                setTimeout(() => { suppressScrollWriteback = false; }, 400);
             } catch(err) {
                 console.error('PDF load error:', err);
                 document.getElementById('pdfCanvasWrapper').innerHTML = `
@@ -5341,6 +5366,8 @@
         let renderedPages = new Set();
         let pageElements = {};
         let isRenderingAllPages = false;
+
+        let suppressScrollWriteback = false;
 
         async function renderAllPDFPages() {
             if (!pdfDoc || isRenderingAllPages) return;
@@ -5747,8 +5774,9 @@
                 currentPage = newCurrentPage;
                 document.getElementById('pageInfo').textContent = `${currentPage} / ${totalPages}`;
                 
-                // 更新进度
-                if (currentDoc) {
+                // 恢复阅读进度期间不要把当前滚动位置覆盖写回 doc.currentPage，
+                // 否则初次 restore 还没完成时 scroll 回调会把进度重置为 1
+                if (!suppressScrollWriteback && currentDoc) {
                     currentDoc.currentPage = currentPage;
                     currentDoc.progress = Math.round((currentPage / totalPages) * 100);
                     saveData();
