@@ -5301,6 +5301,9 @@
             try {
                 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
+                // 先释放上一本书占用的资源（避免内存堆积）
+                await destroyCurrentPdf();
+
                 // 从IndexedDB获取文件数据
                 let fileData = doc.data;
                 if (!fileData) {
@@ -5310,13 +5313,14 @@
                     showToast('文件数据丢失');
                     return;
                 }
-                
-                const data = fileData.split(',')[1];
-                const raw = atob(data);
-                const uint8 = new Uint8Array(raw.length);
-                for (let i = 0; i < raw.length; i++) uint8[i] = raw.charCodeAt(i);
 
-                pdfDoc = await pdfjsLib.getDocument({ data: uint8 }).promise;
+                // 用 fetch(DataURL) 在浏览器内部异步完成 base64 解码，避免主线程
+                // atob + for 循环一个几十MB的字符串（旧实现在大PDF上会阻塞UI几秒）。
+                // 等价于 ArrayBuffer，但解码在底层更快。
+                const resp = await fetch(fileData);
+                const arrayBuffer = await resp.arrayBuffer();
+
+                pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
                 totalPages = pdfDoc.numPages;
                 doc.totalPages = totalPages;
                 currentPage = doc.currentPage || 1;
@@ -5337,10 +5341,29 @@
             }
         }
 
+        // 释放函数定义放在后面（变量声明之后），见 destroyCurrentPdf
+
         // ==================== Continuous Scroll Mode (Note Mode) ====================
         let renderedPages = new Set();
         let pageElements = {};
         let isRenderingAllPages = false;
+        // 容器可用宽度缓存，避免在几百页循环里反复触发 getComputedStyle 强制布局
+        let _cachedContainerInnerWidth = 0;
+
+        // 释放当前 pdfDoc 以及所有页面 DOM 引用，供切换文档时调用
+        async function destroyCurrentPdf() {
+            try {
+                if (pdfDoc && typeof pdfDoc.destroy === 'function') {
+                    await pdfDoc.destroy();
+                }
+            } catch (e) {
+                console.warn('pdfDoc.destroy failed', e);
+            }
+            pdfDoc = null;
+            pageElements = {};
+            renderedPages.clear();
+            _cachedContainerInnerWidth = 0;
+        }
 
         async function renderAllPDFPages() {
             if (!pdfDoc || isRenderingAllPages) return;
@@ -5350,25 +5373,38 @@
             wrapper.innerHTML = '';
             renderedPages.clear();
             pageElements = {};
+            _cachedContainerInnerWidth = 0; // 本次加载重新测一次
 
-            // 创建所有页面的占位符
+            // 只拉第1页拿尺寸作为占位符预估尺寸（绝大多数 PDF 全书页尺寸一致）。
+            // 旧实现是串行 await pdfDoc.getPage(i) 遍历 totalPages 次，500 页的书
+            // 在显示第一页前要等数秒。
+            const firstPage = await pdfDoc.getPage(1);
+            const scale = getReaderRenderScale(firstPage);
+            const estViewport = firstPage.getViewport({ scale: Math.min(scale, 2) });
+            const estW = estViewport.width;
+            const estH = estViewport.height;
+
+            // 一次性构建所有占位符，尺寸用第1页估算值；真实尺寸在 renderSinglePage 里校正
+            const frag = document.createDocumentFragment();
             for (let i = 1; i <= totalPages; i++) {
-                const page = await pdfDoc.getPage(i);
-                const scale = getReaderRenderScale(page);
-                const viewport = page.getViewport({ scale: Math.min(scale, 2) });
-
                 const placeholder = document.createElement('div');
                 placeholder.className = 'pdf-page-placeholder';
                 placeholder.dataset.page = i;
-                placeholder.style.width = viewport.width + 'px';
-                placeholder.style.height = viewport.height + 'px';
+                placeholder.style.width = estW + 'px';
+                placeholder.style.height = estH + 'px';
                 placeholder.style.background = '#fff';
                 placeholder.style.boxShadow = 'var(--shadow)';
                 placeholder.style.position = 'relative';
-                
-                pageElements[i] = { placeholder, viewport, rendered: false };
-                wrapper.appendChild(placeholder);
+
+                // 第1页已经拿到真实 viewport，可以直接存；其他页先存 null，渲染时再算
+                pageElements[i] = {
+                    placeholder,
+                    viewport: (i === 1) ? estViewport : null,
+                    rendered: false
+                };
+                frag.appendChild(placeholder);
             }
+            wrapper.appendChild(frag);
 
             // 渲染可见页面和附近页面
             await renderVisiblePages();
@@ -5413,8 +5449,22 @@
             if (!pageData || pageData.rendered) return;
 
             const page = await pdfDoc.getPage(pageNum);
-            const viewport = pageData.viewport;
+            // 占位符阶段只对第1页算了真实 viewport，其他页现在按本页真实尺寸算
+            let viewport = pageData.viewport;
+            if (!viewport) {
+                const scale = getReaderRenderScale(page);
+                viewport = page.getViewport({ scale: Math.min(scale, 2) });
+                pageData.viewport = viewport;
+            }
             const placeholder = pageData.placeholder;
+
+            // 如果本页真实尺寸与预估占位符尺寸不同，校正一下占位符，避免跳动
+            const estW = parseFloat(placeholder.style.width) || 0;
+            const estH = parseFloat(placeholder.style.height) || 0;
+            if (Math.abs(estW - viewport.width) > 0.5 || Math.abs(estH - viewport.height) > 0.5) {
+                placeholder.style.width = viewport.width + 'px';
+                placeholder.style.height = viewport.height + 'px';
+            }
 
             const canvas = document.createElement('canvas');
             canvas.width = viewport.width * window.devicePixelRatio;
@@ -5897,16 +5947,21 @@
 
         // Compute PDF render scale based on actual container width (so split mode
         // and normal mode both produce correctly-sized pages).
+        // 容器宽度在单次 load 内不变，缓存避免每页重复调用 getComputedStyle 触发强制布局。
         function getReaderRenderScale(page) {
-            const wrapper = document.getElementById('pdfCanvasWrapper');
-            let containerW = window.innerWidth - 24;
-            if (wrapper) {
-                const cs = window.getComputedStyle(wrapper);
-                const padL = parseFloat(cs.paddingLeft) || 0;
-                const padR = parseFloat(cs.paddingRight) || 0;
-                // clientWidth 包含 padding，减去得到真正可用的内容宽度
-                const inner = wrapper.clientWidth - padL - padR;
-                if (inner > 0) containerW = inner;
+            let containerW = _cachedContainerInnerWidth;
+            if (!containerW) {
+                const wrapper = document.getElementById('pdfCanvasWrapper');
+                containerW = window.innerWidth - 24;
+                if (wrapper) {
+                    const cs = window.getComputedStyle(wrapper);
+                    const padL = parseFloat(cs.paddingLeft) || 0;
+                    const padR = parseFloat(cs.paddingRight) || 0;
+                    // clientWidth 包含 padding，减去得到真正可用的内容宽度
+                    const inner = wrapper.clientWidth - padL - padR;
+                    if (inner > 0) containerW = inner;
+                }
+                _cachedContainerInnerWidth = containerW;
             }
             const pageCssW = page.getViewport({ scale: 1 }).width;
             return containerW / pageCssW;
