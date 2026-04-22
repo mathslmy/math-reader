@@ -3287,6 +3287,8 @@
             <div class="pdf-canvas-wrapper" id="pdfCanvasWrapper">
                 <!-- PDF pages rendered here -->
             </div>
+            <!-- 恢复进度期间用来遮住空白，避免闪一下 -->
+            <div id="readerRestoreOverlay" style="display:none;position:absolute;inset:0;z-index:40;background:var(--bg-secondary);"></div>
             <div id="welcomeReader" style="text-align:center;padding:60px 20px;color:var(--text-muted);">
                 <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
                 <p style="margin-top:12px;">从书架选择文档开始阅读</p>
@@ -4183,6 +4185,48 @@
 
             // 自动同步启用时，启动后静默从云端拉取一次最新数据
             autoSyncFromR2OnStartup();
+
+            // 页面隐藏或关闭前：立刻把当前阅读进度写回（绕开 100ms 防抖），
+            // 防止用户快速翻到新页后立刻退出 app 导致进度丢失。
+            const flushOnHide = () => { try { flushCurrentPageNow(); } catch (e) {} };
+            window.addEventListener('pagehide', flushOnHide);
+            window.addEventListener('beforeunload', flushOnHide);
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'hidden') flushOnHide();
+            });
+        }
+
+        // 根据当前滚动位置同步写回 doc.currentPage 并 saveData（不走防抖）。
+        // 用于 app 关闭 / 切后台前保存进度。
+        function flushCurrentPageNow() {
+            if (!currentDoc || !pdfDoc || suppressScrollWriteback) return;
+            // 必须确认 PDF 的 placeholder 已经都被渲染进 DOM，且 wrapper 的 scrollHeight 正常，
+            // 否则在 loadPDF 过程中此函数被触发（例如启动瞬间的 visibilitychange）
+            // 可能用 scrollTop=0 错误算成第 1 页，把进度覆盖掉。
+            if (isRenderingAllPages) return;
+            if (!pageElements || Object.keys(pageElements).length === 0) return;
+            const container = document.getElementById('readerContainer');
+            if (!container) return;
+            // 容器内容还没布局出来（scrollHeight 小于视口高度）也不写
+            if (container.scrollHeight <= container.clientHeight + 10) return;
+            const scrollTop = container.scrollTop;
+            const containerHeight = container.clientHeight;
+            const scrollCenter = scrollTop + containerHeight / 2;
+            let page = 1;
+            for (let i = 1; i <= totalPages; i++) {
+                const pd = pageElements[i];
+                if (!pd) continue;
+                const top = pd.placeholder.offsetTop;
+                const bot = top + pd.placeholder.offsetHeight;
+                if (scrollCenter >= top && scrollCenter < bot) { page = i; break; }
+                if (scrollCenter < top) { page = Math.max(1, i - 1); break; }
+                page = i;
+            }
+            if (page !== currentDoc.currentPage) {
+                currentDoc.currentPage = page;
+                currentDoc.progress = Math.round((page / totalPages) * 100);
+                saveData();
+            }
         }
 
         // ==================== IndexedDB for large files ====================
@@ -5327,10 +5371,12 @@
                 
                 // 恢复进度期间抑制 scroll 事件覆盖写 doc.currentPage
                 suppressScrollWriteback = true;
-                // 要恢复到非首页时，先隐藏 wrapper 防止闪一下第 1 页
-                const wrapperEl = document.getElementById('pdfCanvasWrapper');
-                if (savedPage > 1 && wrapperEl) {
-                    wrapperEl.style.visibility = 'hidden';
+                // 要恢复到非首页时，先盖一层背景色遮罩，防止闪一下
+                const overlay = document.getElementById('readerRestoreOverlay');
+                if (savedPage > 1 && overlay) {
+                    overlay.style.display = 'block';
+                    overlay.style.opacity = '1';
+                    overlay.style.transition = '';
                 }
                 // 所有模式都使用连续滚动渲染
                 await renderAllPDFPages();
@@ -5354,15 +5400,20 @@
                     }
                     currentPage = savedPage;
                     document.getElementById('pageInfo').textContent = `${currentPage} / ${totalPages}`;
-                    // 滚到位后再显示
-                    if (wrapperEl) wrapperEl.style.visibility = '';
+                    // 再等一帧让 iOS 真正把目标页绘制到屏幕，再淡出遮罩
+                    await new Promise(r => requestAnimationFrame(() => r()));
+                    if (overlay) {
+                        overlay.style.transition = 'opacity 180ms ease-out';
+                        overlay.style.opacity = '0';
+                        setTimeout(() => { overlay.style.display = 'none'; }, 220);
+                    }
                 }
                 // 放开 scroll 回写（延迟一点点避免最后一次 scroll 事件抢先写回）
                 setTimeout(() => { suppressScrollWriteback = false; }, 400);
             } catch(err) {
-                // 出错时一定要把 wrapper 显示回来，不然用户会看到空白
-                const wrapperEl = document.getElementById('pdfCanvasWrapper');
-                if (wrapperEl) wrapperEl.style.visibility = '';
+                // 出错时一定要把遮罩收掉，不然用户看不到错误提示
+                const overlay = document.getElementById('readerRestoreOverlay');
+                if (overlay) overlay.style.display = 'none';
                 suppressScrollWriteback = false;
                 console.error('PDF load error:', err);
                 document.getElementById('pdfCanvasWrapper').innerHTML = `
@@ -5785,9 +5836,11 @@
                 currentPage = newCurrentPage;
                 document.getElementById('pageInfo').textContent = `${currentPage} / ${totalPages}`;
                 
-                // 恢复阅读进度期间不要把当前滚动位置覆盖写回 doc.currentPage，
-                // 否则初次 restore 还没完成时 scroll 回调会把进度重置为 1
-                if (!suppressScrollWriteback && currentDoc) {
+                // 恢复阅读进度期间不要把当前滚动位置覆盖写回 doc.currentPage
+                // 同时：若正在渲染或容器尚未完成布局（scrollHeight 不够），也不写
+                const container2 = document.getElementById('readerContainer');
+                const layoutReady = container2 && container2.scrollHeight > container2.clientHeight + 10;
+                if (!suppressScrollWriteback && !isRenderingAllPages && layoutReady && currentDoc) {
                     currentDoc.currentPage = currentPage;
                     currentDoc.progress = Math.round((currentPage / totalPages) * 100);
                     saveData();
