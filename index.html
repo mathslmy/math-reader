@@ -5327,6 +5327,11 @@
                 
                 // 恢复进度期间抑制 scroll 事件覆盖写 doc.currentPage
                 suppressScrollWriteback = true;
+                // 要恢复到非首页时，先隐藏 wrapper 防止闪一下第 1 页
+                const wrapperEl = document.getElementById('pdfCanvasWrapper');
+                if (savedPage > 1 && wrapperEl) {
+                    wrapperEl.style.visibility = 'hidden';
+                }
                 // 所有模式都使用连续滚动渲染
                 await renderAllPDFPages();
 
@@ -5349,10 +5354,16 @@
                     }
                     currentPage = savedPage;
                     document.getElementById('pageInfo').textContent = `${currentPage} / ${totalPages}`;
+                    // 滚到位后再显示
+                    if (wrapperEl) wrapperEl.style.visibility = '';
                 }
                 // 放开 scroll 回写（延迟一点点避免最后一次 scroll 事件抢先写回）
                 setTimeout(() => { suppressScrollWriteback = false; }, 400);
             } catch(err) {
+                // 出错时一定要把 wrapper 显示回来，不然用户会看到空白
+                const wrapperEl = document.getElementById('pdfCanvasWrapper');
+                if (wrapperEl) wrapperEl.style.visibility = '';
+                suppressScrollWriteback = false;
                 console.error('PDF load error:', err);
                 document.getElementById('pdfCanvasWrapper').innerHTML = `
                     <div style="padding:40px;text-align:center;color:#ef4444;">
