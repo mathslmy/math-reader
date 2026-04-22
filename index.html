@@ -5864,6 +5864,17 @@
             
             currentPage = pageNum;
             document.getElementById('pageInfo').textContent = `${currentPage} / ${totalPages}`;
+
+            // 程序化翻页（按钮/跳页/书签/搜索等）必须立刻把进度写回 doc，
+            // 否则 scroll 事件的防抖写回会因为 newCurrentPage === currentPage 而跳过，
+            // 导致退出重进后回到第 1 页。
+            if (!suppressScrollWriteback && !isRenderingAllPages && currentDoc && totalPages > 0) {
+                if (currentDoc.currentPage !== pageNum) {
+                    currentDoc.currentPage = pageNum;
+                    currentDoc.progress = Math.round((pageNum / totalPages) * 100);
+                    saveData();
+                }
+            }
         }
 
         // Drawing state
