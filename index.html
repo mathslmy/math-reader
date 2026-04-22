@@ -4258,6 +4258,8 @@
 
         // ==================== Navigation ====================
         function switchPage(num) {
+            const _tSw = performance.now();
+            console.log('[perf] switchPage start', num, _tSw.toFixed(0));
             // 分屏切换触发后 600ms 内忽略随之而来的 click，防止两指压下/抬起时触发误点
             if (window.__lastSplitToggleAt && (Date.now() - window.__lastSplitToggleAt) < 600) {
                 return;
@@ -4293,10 +4295,15 @@
             }
 
             if (num === 3) {
+                const _tRN = performance.now();
                 renderNotesPage();
+                console.log('[perf] switchPage renderNotesPage', (performance.now() - _tRN).toFixed(0), 'ms');
                 // 自动打开上次的讲义
+                const _tRL = performance.now();
                 restoreLastLecture();
+                console.log('[perf] switchPage restoreLastLecture', (performance.now() - _tRL).toFixed(0), 'ms');
             }
+            console.log('[perf] switchPage TOTAL', num, (performance.now() - _tSw).toFixed(0), 'ms');
         }
 
         function restoreLastLecture() {
@@ -5083,6 +5090,7 @@
 
                 card.addEventListener('click', (e) => {
                     if (!isLongPress) {
+                        console.log('[perf] card click -> openDoc', id, performance.now().toFixed(0));
                         openDoc(id);
                     }
                     isLongPress = false;
@@ -5637,6 +5645,13 @@
                     'render=' + (_tAfterRender - _tBeforeRender).toFixed(0),
                     'post=' + (_tEnd - _tAfterRender).toFixed(0),
                     'total=' + (_tEnd - _tEnter).toFixed(0), 'ms');
+                // 捕获"浏览器真正把 canvas 画到屏幕"的时刻（合成完成后的下一帧）
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        console.log('[perf] renderSinglePage p=' + pageNum + ' PAINTED',
+                            (performance.now() - _tEnter).toFixed(0), 'ms after render start');
+                    });
+                });
             } finally {
                 pageData._rendering = false;
                 _releaseRenderSlot();
