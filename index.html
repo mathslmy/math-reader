@@ -8417,11 +8417,22 @@
                 const metadata = JSON.parse(metadataStr);
                 const localR2Config = appData.settings.r2Config;
                 const localApiSettings = pickApiSettingsFrom(appData.settings);
-                // 阅读进度保留本地较新的值，避免云端旧进度把本地刚写的进度冲掉
+                // 阅读进度保留本地较新的值，避免云端旧进度把本地刚写的进度冲掉。
+                // 书籍列表以云端为基础：云端删除的条目本地也会消失，
+                // 同时把 IndexedDB 里对应的 PDF 文件一起清掉。
                 const localBooks = appData.books || [];
                 const localPapers = appData.papers || [];
-                appData.books = mergeDocsPreferringLocalProgress(metadata.books || [], localBooks);
-                appData.papers = mergeDocsPreferringLocalProgress(metadata.papers || [], localPapers);
+                const cloudBooks = metadata.books || [];
+                const cloudPapers = metadata.papers || [];
+                const cloudIds = new Set([...cloudBooks, ...cloudPapers].map(d => d && d.id).filter(Boolean));
+                const removedIds = [...localBooks, ...localPapers]
+                    .map(d => d && d.id)
+                    .filter(id => id && !cloudIds.has(id));
+                for (const id of removedIds) {
+                    try { await deleteFileData(id); } catch (e) { console.warn('deleteFileData failed for', id, e); }
+                }
+                appData.books = mergeDocsPreferringLocalProgress(cloudBooks, localBooks);
+                appData.papers = mergeDocsPreferringLocalProgress(cloudPapers, localPapers);
                 appData.notes = metadata.notes || {};
                 appData.archived = metadata.archived || [];
                 appData.lectures = metadata.lectures || {};
@@ -8472,6 +8483,17 @@
                 const localApiSettings = pickApiSettingsFrom(appData.settings);
                 
                 // 恢复数据（包含annotations的books和papers）
+                // 本地有、云端没有的条目：列表以云端为基础会自然消失，
+                // 这里同时清掉 IndexedDB 里对应的 PDF 文件，避免僵尸数据。
+                const prevLocalIds = [...(appData.books || []), ...(appData.papers || [])]
+                    .map(d => d && d.id).filter(Boolean);
+                const cloudIds = new Set([...(metadata.books || []), ...(metadata.papers || [])]
+                    .map(d => d && d.id).filter(Boolean));
+                for (const id of prevLocalIds) {
+                    if (!cloudIds.has(id)) {
+                        try { await deleteFileData(id); } catch (e) { console.warn('deleteFileData failed for', id, e); }
+                    }
+                }
                 appData.books = metadata.books || [];
                 appData.papers = metadata.papers || [];
                 appData.notes = metadata.notes || {};
