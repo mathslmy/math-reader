@@ -4797,6 +4797,7 @@
             if (e.touches.length === 2) {
                 // Two-finger pan
                 e.preventDefault();
+                e.stopPropagation();
                 draftDrawing = false;
                 draftPanActive = true;
                 const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
@@ -4817,6 +4818,7 @@
         function handleDraftTouchMove(e) {
             if (e.touches.length === 2 && draftPanActive) {
                 e.preventDefault();
+                e.stopPropagation();
                 const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
                 const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
                 const dx = cx - draftPanLastX;
