@@ -2393,6 +2393,8 @@
             display: none;
             z-index: 10;
             background: var(--bg-primary);
+            overflow: auto;
+            -webkit-overflow-scrolling: touch;
         }
 
         .draft-canvas-wrapper.active {
@@ -2401,8 +2403,6 @@
 
         .draft-canvas {
             display: block;
-            width: 100%;
-            height: 100%;
             touch-action: none;
             background: transparent;
         }
@@ -3379,6 +3379,9 @@
             <button class="draft-tool-btn" id="draftRedo" onclick="draftRedo()" title="重做">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 019-9 9 9 0 016 2.3l3 2.7"/></svg>
             </button>
+            <button class="draft-tool-btn" id="draftClear" onclick="clearDraftCanvas()" title="清空画布">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M5 6v14a2 2 0 002 2h10a2 2 0 002-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+            </button>
             <div class="draft-divider"></div>
             <!-- 可展开的画笔工具 -->
             <div class="draft-pen-tools" id="draftPenTools">
@@ -3387,6 +3390,7 @@
                 <div class="pen-color" data-color="#3b82f6" style="background:#3b82f6" onclick="setDraftPenColor(this)"></div>
                 <div class="pen-color" data-color="#22c55e" style="background:#22c55e" onclick="setDraftPenColor(this)"></div>
                 <div class="draft-divider"></div>
+                <div class="pen-size" data-size="1" onclick="setDraftPenSize(this)"><div class="pen-size-dot" style="width:2px;height:2px;"></div></div>
                 <div class="pen-size active" data-size="2" onclick="setDraftPenSize(this)"><div class="pen-size-dot" style="width:4px;height:4px;"></div></div>
                 <div class="pen-size" data-size="4" onclick="setDraftPenSize(this)"><div class="pen-size-dot" style="width:8px;height:8px;"></div></div>
                 <div class="pen-size" data-size="8" onclick="setDraftPenSize(this)"><div class="pen-size-dot" style="width:12px;height:12px;"></div></div>
@@ -4096,6 +4100,9 @@
             <button class="draft-tool-btn" id="lectureDraftRedo" onclick="lectureDraftRedo()" title="重做">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 019-9 9 9 0 016 2.3l3 2.7"/></svg>
             </button>
+            <button class="draft-tool-btn" id="lectureDraftClear" onclick="clearLectureDraftCanvas()" title="清空画布">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M5 6v14a2 2 0 002 2h10a2 2 0 002-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+            </button>
             <div class="draft-divider"></div>
             <!-- 可展开的画笔工具 -->
             <div class="draft-pen-tools" id="lectureDraftPenTools">
@@ -4104,6 +4111,7 @@
                 <div class="pen-color" data-color="#3b82f6" style="background:#3b82f6" onclick="setLectureDraftPenColor(this)"></div>
                 <div class="pen-color" data-color="#22c55e" style="background:#22c55e" onclick="setLectureDraftPenColor(this)"></div>
                 <div class="draft-divider"></div>
+                <div class="pen-size" data-size="1" onclick="setLectureDraftPenSize(this)"><div class="pen-size-dot" style="width:2px;height:2px;"></div></div>
                 <div class="pen-size active" data-size="2" onclick="setLectureDraftPenSize(this)"><div class="pen-size-dot" style="width:4px;height:4px;"></div></div>
                 <div class="pen-size" data-size="4" onclick="setLectureDraftPenSize(this)"><div class="pen-size-dot" style="width:8px;height:8px;"></div></div>
                 <div class="pen-size" data-size="8" onclick="setLectureDraftPenSize(this)"><div class="pen-size-dot" style="width:12px;height:12px;"></div></div>
@@ -4738,10 +4746,11 @@
         
         function resizeDraftCanvas() {
             if (!draftCanvas) return;
-            const content = document.querySelector('.draft-content');
-            if (!content) return;
-            const rect = content.getBoundingClientRect();
-            if (rect.width === 0 || rect.height === 0) return;
+            const wrapper = document.getElementById('draftCanvasWrapper');
+            if (!wrapper) return;
+            const CANVAS_SIZE = 3000;
+            // 只在首次或尺寸为0时设置大画布
+            if (draftCanvas.width === CANVAS_SIZE && draftCanvas.height === CANVAS_SIZE) return;
             
             // 保存当前内容
             let imageData = null;
@@ -4751,8 +4760,8 @@
                 } catch(e) {}
             }
             
-            draftCanvas.width = rect.width;
-            draftCanvas.height = rect.height;
+            draftCanvas.width = CANVAS_SIZE;
+            draftCanvas.height = CANVAS_SIZE;
             
             // 恢复内容
             if (imageData) {
@@ -4760,6 +4769,11 @@
                     draftCtx.putImageData(imageData, 0, 0);
                 } catch(e) {}
             }
+            
+            // 滚动到画布中心
+            const rect = wrapper.getBoundingClientRect();
+            wrapper.scrollLeft = (CANVAS_SIZE - rect.width) / 2;
+            wrapper.scrollTop = (CANVAS_SIZE - rect.height) / 2;
         }
         
         function loadDraftCanvasData() {
@@ -4768,14 +4782,30 @@
             if (draftData && draftData.canvas) {
                 const img = new Image();
                 img.onload = () => {
-                    draftCtx.drawImage(img, 0, 0, draftCanvas.width, draftCanvas.height);
+                    draftCtx.drawImage(img, 0, 0);
                 };
                 img.src = draftData.canvas;
             }
         }
         
+        let draftPanActive = false;
+        let draftPanLastX = 0;
+        let draftPanLastY = 0;
+
         function handleDraftTouchStart(e) {
             if (!draftPenEnabled && !draftEraserEnabled) return;
+            if (e.touches.length === 2) {
+                // Two-finger pan
+                e.preventDefault();
+                draftDrawing = false;
+                draftPanActive = true;
+                const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+                const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+                draftPanLastX = cx;
+                draftPanLastY = cy;
+                return;
+            }
+            if (e.touches.length !== 1) return;
             e.preventDefault();
             const touch = e.touches[0];
             const rect = draftCanvas.getBoundingClientRect();
@@ -4785,7 +4815,23 @@
         }
         
         function handleDraftTouchMove(e) {
+            if (e.touches.length === 2 && draftPanActive) {
+                e.preventDefault();
+                const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+                const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+                const dx = cx - draftPanLastX;
+                const dy = cy - draftPanLastY;
+                const wrapper = document.getElementById('draftCanvasWrapper');
+                if (wrapper) {
+                    wrapper.scrollLeft -= dx;
+                    wrapper.scrollTop -= dy;
+                }
+                draftPanLastX = cx;
+                draftPanLastY = cy;
+                return;
+            }
             if (!draftDrawing || (!draftPenEnabled && !draftEraserEnabled)) return;
+            if (e.touches.length !== 1) return;
             e.preventDefault();
             const touch = e.touches[0];
             const rect = draftCanvas.getBoundingClientRect();
@@ -4814,6 +4860,9 @@
         }
         
         function handleDraftTouchEnd(e) {
+            if (e.touches.length < 2) {
+                draftPanActive = false;
+            }
             if (draftDrawing) {
                 draftDrawing = false;
                 draftCtx.globalCompositeOperation = 'source-over';
@@ -4866,6 +4915,14 @@
                 saveDraftCanvasState();
                 saveDraft();
             }
+        }
+
+        function clearDraftCanvas() {
+            if (!draftCanvas || !draftCtx) return;
+            if (!confirm('确定清空画布？')) return;
+            draftCtx.clearRect(0, 0, draftCanvas.width, draftCanvas.height);
+            saveDraftCanvasState();
+            saveDraft();
         }
 
         // ==================== Rich-text draft helpers ====================
@@ -10325,13 +10382,16 @@ ${existingOutline ? 'PDF 已有书签（供参考，页码以附件实际内容�
             if (!lectureDraftCanvas) return;
             const wrapper = document.getElementById('lectureDraftCanvasWrapper');
             if (!wrapper) return;
+            const CANVAS_SIZE = 3000;
+            if (lectureDraftCanvas.width === CANVAS_SIZE && lectureDraftCanvas.height === CANVAS_SIZE) return;
+            const oldData = lectureDraftCanvas.width > 0 ? lectureDraftCanvas.toDataURL() : null;
+            lectureDraftCanvas.width = CANVAS_SIZE;
+            lectureDraftCanvas.height = CANVAS_SIZE;
+            if (oldData) loadLectureDraftCanvasData(oldData);
+            // 滚动到画布中心
             const rect = wrapper.getBoundingClientRect();
-            if (rect.width > 0 && rect.height > 0) {
-                const oldData = lectureDraftCanvas.toDataURL();
-                lectureDraftCanvas.width = rect.width;
-                lectureDraftCanvas.height = rect.height;
-                if (oldData) loadLectureDraftCanvasData(oldData);
-            }
+            wrapper.scrollLeft = (CANVAS_SIZE - rect.width) / 2;
+            wrapper.scrollTop = (CANVAS_SIZE - rect.height) / 2;
         }
 
         function loadLectureDraftCanvasData(dataUrl) {
@@ -10454,8 +10514,23 @@ ${existingOutline ? 'PDF 已有书签（供参考，页码以附件实际内容�
             saveLectureDraft();
         }
 
+        let lectureDraftPanActive = false;
+        let lectureDraftPanLastX = 0;
+        let lectureDraftPanLastY = 0;
+
         function handleLectureDraftTouchStart(e) {
             if (!lectureDraftPenEnabled && !lectureDraftEraserEnabled) return;
+            if (e.touches.length === 2) {
+                e.preventDefault();
+                lectureDraftDrawing = false;
+                lectureDraftPanActive = true;
+                const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+                const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+                lectureDraftPanLastX = cx;
+                lectureDraftPanLastY = cy;
+                return;
+            }
+            if (e.touches.length !== 1) return;
             e.preventDefault();
             lectureDraftDrawing = true;
             const touch = e.touches[0];
@@ -10465,7 +10540,23 @@ ${existingOutline ? 'PDF 已有书签（供参考，页码以附件实际内容�
         }
 
         function handleLectureDraftTouchMove(e) {
+            if (e.touches.length === 2 && lectureDraftPanActive) {
+                e.preventDefault();
+                const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+                const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+                const dx = cx - lectureDraftPanLastX;
+                const dy = cy - lectureDraftPanLastY;
+                const wrapper = document.getElementById('lectureDraftCanvasWrapper');
+                if (wrapper) {
+                    wrapper.scrollLeft -= dx;
+                    wrapper.scrollTop -= dy;
+                }
+                lectureDraftPanLastX = cx;
+                lectureDraftPanLastY = cy;
+                return;
+            }
             if (!lectureDraftDrawing || (!lectureDraftPenEnabled && !lectureDraftEraserEnabled)) return;
+            if (e.touches.length !== 1) return;
             e.preventDefault();
             const touch = e.touches[0];
             const rect = lectureDraftCanvas.getBoundingClientRect();
@@ -10493,7 +10584,10 @@ ${existingOutline ? 'PDF 已有书签（供参考，页码以附件实际内容�
             lectureDraftLastY = y;
         }
 
-        function handleLectureDraftTouchEnd() {
+        function handleLectureDraftTouchEnd(e) {
+            if (e.touches.length < 2) {
+                lectureDraftPanActive = false;
+            }
             if (lectureDraftDrawing) {
                 lectureDraftDrawing = false;
                 lectureDraftCtx.globalCompositeOperation = 'source-over';
@@ -10544,6 +10638,14 @@ ${existingOutline ? 'PDF 已有书签（供参考，页码以附件实际内容�
                 saveLectureDraftCanvasState();
                 saveLectureDraft();
             }
+        }
+
+        function clearLectureDraftCanvas() {
+            if (!lectureDraftCanvas || !lectureDraftCtx) return;
+            if (!confirm('确定清空画布？')) return;
+            lectureDraftCtx.clearRect(0, 0, lectureDraftCanvas.width, lectureDraftCanvas.height);
+            saveLectureDraftCanvasState();
+            saveLectureDraft();
         }
 
         function closeLectureViewer() {
