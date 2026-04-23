@@ -7708,6 +7708,7 @@
         let r2AutoSyncTimer = null;
         let r2LastSyncTime = null;
         let r2SyncInProgress = false;
+        let r2PendingSyncTask = null; // 排队等待的文件变更同步任务
 
         function loadR2Config() {
             const config = appData.settings.r2Config || {};
@@ -7871,6 +7872,12 @@
                 console.error('R2 自动同步失败:', err);
             } finally {
                 r2SyncInProgress = false;
+                // 检查是否有排队的文件变更同步任务
+                if (r2PendingSyncTask) {
+                    const pending = r2PendingSyncTask;
+                    r2PendingSyncTask = null;
+                    triggerSyncOnFileChange(pending.fileId, pending.action);
+                }
             }
         }
 
@@ -7905,6 +7912,8 @@
             }
             
             if (r2SyncInProgress) {
+                // 有同步正在进行，排队等待，完成后自动执行
+                r2PendingSyncTask = { fileId, action };
                 return;
             }
             
@@ -7943,6 +7952,12 @@
                 console.error('文件变更同步失败:', err);
             } finally {
                 r2SyncInProgress = false;
+                // 检查是否有排队的同步任务
+                if (r2PendingSyncTask) {
+                    const pending = r2PendingSyncTask;
+                    r2PendingSyncTask = null;
+                    triggerSyncOnFileChange(pending.fileId, pending.action);
+                }
             }
         }
 
@@ -8525,6 +8540,12 @@
                 console.warn('Startup auto-sync failed:', err);
             } finally {
                 r2SyncInProgress = false;
+                // 检查是否有排队的文件变更同步任务
+                if (r2PendingSyncTask) {
+                    const pending = r2PendingSyncTask;
+                    r2PendingSyncTask = null;
+                    triggerSyncOnFileChange(pending.fileId, pending.action);
+                }
             }
         }
 
