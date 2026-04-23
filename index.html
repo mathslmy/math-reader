@@ -5195,6 +5195,8 @@
             const idx = appData.archived.findIndex(a => a.id === id);
             if (idx === -1) return;
             const item = appData.archived.splice(idx, 1)[0];
+            // 恢复视为一次"新增"，刷新 addedAt，避免合并时被当作云端已删的旧条目清掉
+            item.addedAt = new Date().toISOString();
             if (item.category === 'book') appData.books.push(item);
             else appData.papers.push(item);
             saveData();
@@ -7805,8 +7807,59 @@
             r2SyncInProgress = true;
             
             try {
-                // 静默同步，不显示 toast
+                // 先拉取云端元数据，把"云端已经没有但本地还有"的书从本地删掉，
+                // 同时清掉 IndexedDB 里对应的 PDF 文件；
+                // 但本地 addedAt 晚于云端 syncedAt 的条目视为本地新加还没上传，保留，
+                // 并在合并后把这些新加书的 PDF 文件一起上传到云端。
+                // 阅读进度按时间戳合并保留较新的值。合并完再把结果写回云端。
+                let newlyAddedIds = [];
+                try {
+                    const metadataStr = await r2GetObject('metadata.json');
+                    if (metadataStr) {
+                        const metadata = JSON.parse(metadataStr);
+                        const localBooks = appData.books || [];
+                        const localPapers = appData.papers || [];
+                        const cloudBooks = metadata.books || [];
+                        const cloudPapers = metadata.papers || [];
+                        const cloudSyncedAtMs = metadata.syncedAt ? Date.parse(metadata.syncedAt) : 0;
+                        const cloudIds = new Set([...cloudBooks, ...cloudPapers].map(d => d && d.id).filter(Boolean));
+                        const removedIds = [];
+                        [...localBooks, ...localPapers].forEach(d => {
+                            if (!d || !d.id || cloudIds.has(d.id)) return;
+                            const addedAtMs = d.addedAt ? Date.parse(d.addedAt) : NaN;
+                            if (!isNaN(addedAtMs) && addedAtMs > cloudSyncedAtMs) {
+                                newlyAddedIds.push(d.id);
+                            } else {
+                                removedIds.push(d.id);
+                            }
+                        });
+                        for (const id of removedIds) {
+                            try { await deleteFileData(id); } catch (e) { console.warn('deleteFileData failed for', id, e); }
+                        }
+                        appData.books = mergeDocsPreferringLocalProgress(cloudBooks, localBooks, cloudSyncedAtMs);
+                        appData.papers = mergeDocsPreferringLocalProgress(cloudPapers, localPapers, cloudSyncedAtMs);
+                        saveData();
+                        refreshAllUIFromAppData();
+                    }
+                } catch (e) {
+                    console.warn('定时同步：拉取合并失败，跳过本次推送', e);
+                    return;
+                }
+
+                // 再把合并后的结果推回云端
                 await r2SyncMetadataOnly();
+
+                // 把本地新加、云端还没有的 PDF 文件一起上传
+                for (const id of newlyAddedIds) {
+                    try {
+                        const fileData = await getFileData(id);
+                        if (fileData) {
+                            await r2PutObject('files/' + id + '.pdf', fileData, 'application/pdf');
+                        }
+                    } catch (e) {
+                        console.warn('上传新文件失败:', id, e);
+                    }
+                }
                 
                 // 更新上次同步时间
                 config.lastSyncTime = new Date().toISOString();
@@ -8385,10 +8438,13 @@
         // 把云端 docs 合并进本地 docs：对每一本相同 id 的文档，
         // 阅读进度字段 (currentPage / progress) 按 progressUpdatedAt 时间戳取较新的那份。
         // 其余字段（标题、annotations 等）仍以云端为准。
-        function mergeDocsPreferringLocalProgress(cloudDocs, localDocs) {
+        // 本地有、云端没有的条目：如果 addedAt 晚于云端 syncedAt，视为本地新加，保留；
+        // 否则视为云端已删除，丢弃。cloudSyncedAtMs 为云端 metadata.syncedAt 的时间戳（毫秒）。
+        function mergeDocsPreferringLocalProgress(cloudDocs, localDocs, cloudSyncedAtMs) {
             const localMap = {};
             (localDocs || []).forEach(d => { if (d && d.id) localMap[d.id] = d; });
-            return (cloudDocs || []).map(cloudDoc => {
+            const cloudIds = new Set((cloudDocs || []).map(d => d && d.id).filter(Boolean));
+            const merged = (cloudDocs || []).map(cloudDoc => {
                 if (!cloudDoc || !cloudDoc.id) return cloudDoc;
                 const local = localMap[cloudDoc.id];
                 if (!local) return cloudDoc;
@@ -8404,6 +8460,17 @@
                 }
                 return cloudDoc;
             });
+            const baseline = Number(cloudSyncedAtMs) || 0;
+            (localDocs || []).forEach(local => {
+                if (!local || !local.id) return;
+                if (cloudIds.has(local.id)) return;
+                const addedAtMs = local.addedAt ? Date.parse(local.addedAt) : NaN;
+                // 只有 addedAt 能解析且晚于云端 syncedAt 才算本地新加，保留
+                if (!isNaN(addedAtMs) && addedAtMs > baseline) {
+                    merged.push(local);
+                }
+            });
+            return merged;
         }
 
         async function autoSyncFromR2OnStartup() {
@@ -8420,19 +8487,28 @@
                 // 阅读进度保留本地较新的值，避免云端旧进度把本地刚写的进度冲掉。
                 // 书籍列表以云端为基础：云端删除的条目本地也会消失，
                 // 同时把 IndexedDB 里对应的 PDF 文件一起清掉。
+                // 但本地 addedAt 晚于云端 syncedAt 的条目视为本地新加还没上传，保留。
                 const localBooks = appData.books || [];
                 const localPapers = appData.papers || [];
                 const cloudBooks = metadata.books || [];
                 const cloudPapers = metadata.papers || [];
+                const cloudSyncedAtMs = metadata.syncedAt ? Date.parse(metadata.syncedAt) : 0;
                 const cloudIds = new Set([...cloudBooks, ...cloudPapers].map(d => d && d.id).filter(Boolean));
                 const removedIds = [...localBooks, ...localPapers]
-                    .map(d => d && d.id)
-                    .filter(id => id && !cloudIds.has(id));
+                    .filter(d => {
+                        if (!d || !d.id) return false;
+                        if (cloudIds.has(d.id)) return false;
+                        const addedAtMs = d.addedAt ? Date.parse(d.addedAt) : NaN;
+                        // 本地新加、晚于云端 syncedAt 的保留，不删文件
+                        if (!isNaN(addedAtMs) && addedAtMs > cloudSyncedAtMs) return false;
+                        return true;
+                    })
+                    .map(d => d.id);
                 for (const id of removedIds) {
                     try { await deleteFileData(id); } catch (e) { console.warn('deleteFileData failed for', id, e); }
                 }
-                appData.books = mergeDocsPreferringLocalProgress(cloudBooks, localBooks);
-                appData.papers = mergeDocsPreferringLocalProgress(cloudPapers, localPapers);
+                appData.books = mergeDocsPreferringLocalProgress(cloudBooks, localBooks, cloudSyncedAtMs);
+                appData.papers = mergeDocsPreferringLocalProgress(cloudPapers, localPapers, cloudSyncedAtMs);
                 appData.notes = metadata.notes || {};
                 appData.archived = metadata.archived || [];
                 appData.lectures = metadata.lectures || {};
