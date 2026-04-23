@@ -1747,6 +1747,22 @@
             border-bottom-left-radius: 4px;
         }
 
+        /* Chat bubble LaTeX/Markdown rendering */
+        .chat-bubble p { margin: 0 0 6px 0; }
+        .chat-bubble p:last-child { margin-bottom: 0; }
+        .chat-bubble p:empty { display: none; }
+        .chat-bubble h1, .chat-bubble h2, .chat-bubble h3 { margin: 8px 0 4px 0; font-size: 15px; font-weight: 600; }
+        .chat-bubble h1 { font-size: 16px; }
+        .chat-bubble strong { font-weight: 600; }
+        .chat-bubble em { font-style: italic; }
+        .chat-bubble li { margin-left: 16px; list-style: disc; }
+        .chat-bubble code { background: rgba(0,0,0,0.06); padding: 1px 4px; border-radius: 3px; font-size: 13px; }
+        .chat-bubble .latex-display { margin: 8px 0; overflow-x: auto; }
+        .chat-bubble .katex { font-size: 0.95em; }
+        .chat-bubble .katex-display { margin: 8px 0; }
+        .chat-bubble .katex-display > .katex { text-align: left; }
+        body.dark .chat-bubble code { background: rgba(255,255,255,0.1); }
+
         body.dark .chat-message.user .chat-bubble {
             background: #fff;
             color: #000;
@@ -8871,7 +8887,13 @@
                 if (msg.screenshot) {
                     contentHtml += `<img src="${msg.screenshot}" style="max-width:100%;border-radius:8px;margin-bottom:6px;cursor:pointer;" onclick="window.open(this.src)">`;
                 }
-                contentHtml += escapeHtml(msg.content);
+
+                if (isUser) {
+                    contentHtml += escapeHtml(msg.content);
+                } else {
+                    // AI消息: 渲染Markdown + LaTeX，与讲义阅读界面一致
+                    contentHtml += renderChatMarkdownLatex(msg.content);
+                }
 
                 messageDiv.innerHTML = `
                     ${avatarHtml}
@@ -8883,6 +8905,66 @@
                 setupReaderChatLongPress(messageDiv, index);
             });
             container.scrollTop = container.scrollHeight;
+
+            // 对整个聊天容器执行KaTeX渲染
+            renderLectureMath(container);
+        }
+
+        // 聊天气泡的Markdown+LaTeX渲染（与讲义渲染管线一致）
+        function renderChatMarkdownLatex(text) {
+            if (!text) return '';
+            let content = text;
+
+            // 保护LaTeX公式，避免被Markdown处理破坏
+            const latexBlocks = [];
+            const latexInlines = [];
+
+            content = content.replace(/\$\$([\s\S]*?)\$\$/g, (match, p1) => {
+                latexBlocks.push(p1.trim());
+                return `%%LATEXBLOCK${latexBlocks.length - 1}%%`;
+            });
+
+            content = content.replace(/\\\[([\s\S]*?)\\\]/g, (match, p1) => {
+                latexBlocks.push(p1.trim());
+                return `%%LATEXBLOCK${latexBlocks.length - 1}%%`;
+            });
+
+            content = content.replace(/\$([^\$\n]+?)\$/g, (match, p1) => {
+                latexInlines.push(p1.trim());
+                return `%%LATEXINLINE${latexInlines.length - 1}%%`;
+            });
+
+            content = content.replace(/\\\(([^\n]+?)\\\)/g, (match, p1) => {
+                latexInlines.push(p1.trim());
+                return `%%LATEXINLINE${latexInlines.length - 1}%%`;
+            });
+
+            // 处理Markdown
+            let html = escapeHtml(content);
+            html = html
+                .replace(/^### (.*$)/gm, '<h3>$1</h3>')
+                .replace(/^## (.*$)/gm, '<h2>$1</h2>')
+                .replace(/^# (.*$)/gm, '<h1>$1</h1>')
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/^- (.*$)/gm, '<li>$1</li>')
+                .replace(/^(\d+)\. (.*$)/gm, '<li>$2</li>')
+                .replace(/`([^`]+)`/g, '<code>$1</code>')
+                .replace(/\n\n/g, '</p><p>')
+                .replace(/\n/g, '<br>');
+
+            // 恢复LaTeX公式
+            html = html.replace(/%%LATEXBLOCK(\d+)%%/g, (match, idx) => {
+                const latex = latexBlocks[parseInt(idx)];
+                return `</p><div class="latex-display">$$${latex}$$</div><p>`;
+            });
+
+            html = html.replace(/%%LATEXINLINE(\d+)%%/g, (match, idx) => {
+                const latex = latexInlines[parseInt(idx)];
+                return `$${latex}$`;
+            });
+
+            return '<p>' + html + '</p>';
         }
 
         let readerChatLongPressTimer = null;
@@ -8990,7 +9072,6 @@
             const apiMessages = history.map((h, idx) => {
                 // 只对最新一条用户消息附带截图
                 if (idx === history.length - 1 && h.role === 'user' && screenshot) {
-                    // 构造多模态内容: 截图 + 文本
                     return {
                         role: 'user',
                         content: [
@@ -9268,14 +9349,12 @@
             } else {
                 contents = messages.map(m => {
                     const role = m.role === 'assistant' ? 'model' : 'user';
-                    // 处理多模态内容(content为数组时，包含image_url和text)
                     if (Array.isArray(m.content)) {
                         const parts = [];
                         for (const item of m.content) {
                             if (item.type === 'text') {
                                 parts.push({ text: item.text || '' });
                             } else if (item.type === 'image_url' && item.image_url?.url) {
-                                // data:image/jpeg;base64,xxx -> 提取base64和mime
                                 const dataUrl = item.image_url.url;
                                 const match = dataUrl.match(/^data:(image\/[^;]+);base64,(.+)$/);
                                 if (match) {
