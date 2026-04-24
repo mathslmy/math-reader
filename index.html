@@ -1747,6 +1747,21 @@
             border-bottom-left-radius: 4px;
         }
 
+        .chat-bubble p { margin: 0 0 6px 0; }
+        .chat-bubble p:last-child { margin-bottom: 0; }
+        .chat-bubble p:empty { display: none; }
+        .chat-bubble h1, .chat-bubble h2, .chat-bubble h3 { margin: 8px 0 4px 0; font-size: 15px; font-weight: 600; }
+        .chat-bubble h1 { font-size: 16px; }
+        .chat-bubble strong { font-weight: 600; }
+        .chat-bubble em { font-style: italic; }
+        .chat-bubble li { margin-left: 16px; list-style: disc; }
+        .chat-bubble code { background: rgba(0,0,0,0.06); padding: 1px 4px; border-radius: 3px; font-size: 13px; }
+        .chat-bubble .latex-display { margin: 8px 0; overflow-x: auto; }
+        .chat-bubble .katex { font-size: 0.95em; }
+        .chat-bubble .katex-display { margin: 8px 0; }
+        .chat-bubble .katex-display > .katex { text-align: left; }
+        body.dark .chat-bubble code { background: rgba(255,255,255,0.1); }
+
         body.dark .chat-message.user .chat-bubble {
             background: #fff;
             color: #000;
@@ -8833,12 +8848,15 @@
                 messageDiv.className = `chat-message ${isUser ? 'user' : 'ai'}`;
                 messageDiv.dataset.msgIndex = index;
 
-                // If message has screenshot, show it
                 let contentHtml = '';
                 if (msg.screenshot) {
                     contentHtml += `<img src="${msg.screenshot}" style="max-width:100%;border-radius:8px;margin-bottom:6px;cursor:pointer;" onclick="window.open(this.src)">`;
                 }
-                contentHtml += escapeHtml(msg.content);
+                if (isUser) {
+                    contentHtml += escapeHtml(msg.content);
+                } else {
+                    contentHtml += renderChatMarkdownLatex(msg.content);
+                }
 
                 messageDiv.innerHTML = `
                     ${avatarHtml}
@@ -8846,10 +8864,36 @@
                 `;
                 container.appendChild(messageDiv);
 
-                // Long press to delete (faithful to original)
                 setupReaderChatLongPress(messageDiv, index);
             });
             container.scrollTop = container.scrollHeight;
+            renderLectureMath(container);
+        }
+
+        function renderChatMarkdownLatex(text) {
+            if (!text) return '';
+            let content = text;
+            const latexBlocks = [];
+            const latexInlines = [];
+            content = content.replace(/\$\$([\s\S]*?)\$\$/g, (m, p1) => { latexBlocks.push(p1.trim()); return `%%LATEXBLOCK${latexBlocks.length - 1}%%`; });
+            content = content.replace(/\\\[([\s\S]*?)\\\]/g, (m, p1) => { latexBlocks.push(p1.trim()); return `%%LATEXBLOCK${latexBlocks.length - 1}%%`; });
+            content = content.replace(/\$([^\$\n]+?)\$/g, (m, p1) => { latexInlines.push(p1.trim()); return `%%LATEXINLINE${latexInlines.length - 1}%%`; });
+            content = content.replace(/\\\(([^\n]+?)\\\)/g, (m, p1) => { latexInlines.push(p1.trim()); return `%%LATEXINLINE${latexInlines.length - 1}%%`; });
+            let html = escapeHtml(content);
+            html = html
+                .replace(/^### (.*$)/gm, '<h3>$1</h3>')
+                .replace(/^## (.*$)/gm, '<h2>$1</h2>')
+                .replace(/^# (.*$)/gm, '<h1>$1</h1>')
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/^- (.*$)/gm, '<li>$1</li>')
+                .replace(/^(\d+)\. (.*$)/gm, '<li>$2</li>')
+                .replace(/`([^`]+)`/g, '<code>$1</code>')
+                .replace(/\n\n/g, '</p><p>')
+                .replace(/\n/g, '<br>');
+            html = html.replace(/%%LATEXBLOCK(\d+)%%/g, (m, idx) => { return `</p><div class="latex-display">$$${latexBlocks[parseInt(idx)]}$$</div><p>`; });
+            html = html.replace(/%%LATEXINLINE(\d+)%%/g, (m, idx) => { return `$${latexInlines[parseInt(idx)]}$`; });
+            return '<p>' + html + '</p>';
         }
 
         let readerChatLongPressTimer = null;
