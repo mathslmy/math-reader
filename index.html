@@ -7759,8 +7759,8 @@
                 const payload = {
                     id: 'main',
                     data: JSON.stringify({
-                        books: appData.books.map(b => ({ ...b, data: undefined })), // Don't sync file data
-                        papers: appData.papers.map(p => ({ ...p, data: undefined })),
+                        books: appData.books.map(b => cleanDocForSync(b)),
+                        papers: appData.papers.map(p => cleanDocForSync(p)),
                         notes: appData.notes,
                         archived: appData.archived
                     }),
@@ -7995,8 +7995,8 @@
             const settingsToSync = stripApiSettingsFrom(appData.settings);
             delete settingsToSync.r2Config;
             const metadata = {
-                books: appData.books.map(b => ({ ...b, data: undefined })),
-                papers: appData.papers.map(p => ({ ...p, data: undefined })),
+                books: appData.books.map(b => cleanDocForSync(b)),
+                papers: appData.papers.map(p => cleanDocForSync(p)),
                 notes: appData.notes,
                 archived: appData.archived,
                 settings: settingsToSync,
@@ -8006,6 +8006,20 @@
             };
             
             await r2PutObject('metadata.json', JSON.stringify(metadata), 'application/json');
+        }
+
+        // 清理doc对象用于同步：去掉data、chatHistory中去掉screenshot并限制30条
+        function cleanDocForSync(doc) {
+            const cleaned = { ...doc, data: undefined };
+            if (cleaned.chatHistory && cleaned.chatHistory.length > 0) {
+                let hist = cleaned.chatHistory;
+                if (hist.length > 30) hist = hist.slice(-30);
+                cleaned.chatHistory = hist.map(h => {
+                    if (h.screenshot) { const c = Object.assign({}, h); delete c.screenshot; return c; }
+                    return h;
+                });
+            }
+            return cleaned;
         }
 
         async function triggerSyncOnFileChange(fileId, action) {
@@ -8508,8 +8522,8 @@
                 const settingsToSync = stripApiSettingsFrom(appData.settings);
                 delete settingsToSync.r2Config;
                 const metadata = {
-                    books: appData.books.map(b => ({ ...b, data: undefined })),
-                    papers: appData.papers.map(p => ({ ...p, data: undefined })),
+                    books: appData.books.map(b => cleanDocForSync(b)),
+                    papers: appData.papers.map(p => cleanDocForSync(p)),
                     notes: appData.notes,
                     archived: appData.archived,
                     settings: settingsToSync,
@@ -8739,8 +8753,8 @@
         // ==================== Data Management ====================
         function exportData() {
             const exportObj = {
-                books: appData.books.map(b => ({ ...b, data: undefined })),
-                papers: appData.papers.map(p => ({ ...p, data: undefined })),
+                books: appData.books.map(b => cleanDocForSync(b)),
+                papers: appData.papers.map(p => cleanDocForSync(p)),
                 notes: appData.notes,
                 archived: appData.archived,
                 settings: appData.settings,
@@ -8807,7 +8821,6 @@
             }
             const doc = appData.books.find(b => b.id === docId) || appData.papers.find(p => p.id === docId);
             if (doc) {
-                // 内存中保留screenshot供显示
                 doc.chatHistory = history;
                 // 存localStorage时去掉screenshot防止撑爆
                 const orig = doc.chatHistory;
@@ -8817,7 +8830,21 @@
                 });
                 try { saveData(); } catch (e) { console.error('saveData failed:', e); }
                 doc.chatHistory = orig;
+                // 立即同步到云端防止数据丢失
+                debouncedChatSync();
             }
+        }
+
+        // 防抖：聊天连续变更时只在最后一次500ms后同步一次
+        let _chatSyncTimer = null;
+        function debouncedChatSync() {
+            clearTimeout(_chatSyncTimer);
+            _chatSyncTimer = setTimeout(() => {
+                const config = appData.settings && appData.settings.r2Config;
+                if (config && config.accessKeyId && !r2SyncInProgress) {
+                    r2SyncMetadataOnly().catch(e => console.error('聊天同步失败:', e));
+                }
+            }, 500);
         }
 
         function renderReaderChatHistory() {
