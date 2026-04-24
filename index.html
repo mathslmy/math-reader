@@ -779,6 +779,9 @@
             z-index: 2000;
             transform: translateY(100%);
             transition: transform 0.3s ease;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
         }
 
         .note-popup.show { transform: translateY(0); }
@@ -6983,6 +6986,8 @@
                 ly = e.clientY - rect.top;
                 e.preventDefault();
             };
+            canvas.ontouchstart = (e) => { e.preventDefault(); };
+            canvas.oncontextmenu = (e) => { e.preventDefault(); };
             canvas.onpointermove = (e) => {
                 if (!drawing) return;
                 const rect = canvas.getBoundingClientRect();
