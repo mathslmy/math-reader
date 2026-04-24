@@ -8997,21 +8997,23 @@
 
             input.value = '';
 
-            // Capture current page screenshot with annotations
-            let screenshot = null;
-            try {
-                screenshot = captureCurrentPageScreenshot();
-            } catch (e) {
-                console.error('截图失败:', e);
-            }
-
             // Add user message
             let history = loadReaderChatHistory(currentDoc.id);
-            const userMsg = { role: 'user', content: message };
-            if (screenshot) userMsg.screenshot = screenshot;
-            history.push(userMsg);
+            history.push({ role: 'user', content: message });
             saveReaderChatHistory(currentDoc.id, history);
             renderReaderChatHistory();
+
+            // 切出当前页PDF作为附件发给AI
+            let pdfAttachment = null;
+            if (currentDoc.type === 'pdf') {
+                try {
+                    const fullBytes = await loadBookPdfBytes(currentDoc);
+                    const slice = await slicePdfPages(fullBytes, currentPage, currentPage);
+                    pdfAttachment = { bytes: slice.bytes, base64: slice.base64, name: `${currentDoc.title}_p${currentPage}.pdf` };
+                } catch (e) {
+                    console.error('切出当前页PDF失败:', e);
+                }
+            }
 
             // Build system prompt with context
             const notes = getDocAnnotations(currentDoc.id, currentPage, 'note');
@@ -9021,9 +9023,8 @@
 当前页码: ${currentPage}/${totalPages}
 阅读进度: ${currentDoc.progress}%
 该页笔记: ${notesSummary || '无'}
-请根据用户的问题和当前阅读上下文给出帮助。简洁、准确、数学专业。`;
+附件是当前页的PDF，请根据附件内容和用户问题给出帮助。简洁、准确、数学专业。`;
 
-            // Build messages for API (exclude screenshots to save tokens)
             const apiMessages = history.map(h => ({ role: h.role, content: h.content }));
 
             // Show typing indicator
@@ -9046,7 +9047,7 @@
             container.scrollTop = container.scrollHeight;
 
             try {
-                const result = await callReaderAI(systemPrompt, apiMessages);
+                const result = await callReaderAI(systemPrompt, apiMessages, { pdfAttachment });
                 document.getElementById('readerChatLoading')?.remove();
 
                 if (result) {
@@ -9054,7 +9055,6 @@
                     saveReaderChatHistory(currentDoc.id, history);
                     renderReaderChatHistory();
                 } else {
-                    // No API configured - placeholder
                     document.getElementById('readerChatLoading')?.remove();
                     const replies = [
                         '这个问题很好。建议你先回顾这一页的定义和关键定理。',
@@ -9071,7 +9071,7 @@
             } catch (e) {
                 console.error('Reader chat error:', e);
                 document.getElementById('readerChatLoading')?.remove();
-                history.push({ role: 'assistant', content: '请求失败，请稍后重试。' });
+                history.push({ role: 'assistant', content: '请求失败: ' + (e.message || '未知错误') });
                 saveReaderChatHistory(currentDoc.id, history);
                 renderReaderChatHistory();
             }
@@ -9431,8 +9431,8 @@
         }
 
         // OpenAI-compatible API call with message history (保留兼容)
-        async function callReaderAI(systemPrompt, messages) {
-            return await callAI(systemPrompt, messages);
+        async function callReaderAI(systemPrompt, messages, options = {}) {
+            return await callAI(systemPrompt, messages, options);
         }
 
         function exportReaderChatHistory() {
