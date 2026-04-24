@@ -5831,7 +5831,7 @@
             let lpStartPos = { x: 0, y: 0 };
 
             pageWrapper.addEventListener('touchstart', (e) => {
-                if (penMode) return;
+                if (penMode) { e.preventDefault(); return; }
                 lpMoved = false;
                 lpStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
                 lpTimer = setTimeout(() => {
@@ -5846,7 +5846,7 @@
                         openNotePopup();
                     }
                 }, 600);
-            }, { passive: true });
+            }, { passive: false });
 
             pageWrapper.addEventListener('touchmove', (e) => {
                 const dx = e.touches[0].clientX - lpStartPos.x;
@@ -5862,7 +5862,7 @@
             }, { passive: true });
 
             pageWrapper.addEventListener('contextmenu', (e) => {
-                if (penMode) return;
+                if (penMode) { e.preventDefault(); return; }
                 e.preventDefault();
                 const rect = pageWrapper.getBoundingClientRect();
                 currentNotePosition = {
