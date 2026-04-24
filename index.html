@@ -8875,12 +8875,18 @@
             let content = text;
             const latexBlocks = [];
             const latexInlines = [];
-            content = content.replace(/\$\$([\s\S]*?)\$\$/g, (m, p1) => { latexBlocks.push(p1.trim()); return `%%LATEXBLOCK${latexBlocks.length - 1}%%`; });
-            content = content.replace(/\\\[([\s\S]*?)\\\]/g, (m, p1) => { latexBlocks.push(p1.trim()); return `%%LATEXBLOCK${latexBlocks.length - 1}%%`; });
-            content = content.replace(/\$([^\$\n]+?)\$/g, (m, p1) => { latexInlines.push(p1.trim()); return `%%LATEXINLINE${latexInlines.length - 1}%%`; });
-            content = content.replace(/\\\(([^\n]+?)\\\)/g, (m, p1) => { latexInlines.push(p1.trim()); return `%%LATEXINLINE${latexInlines.length - 1}%%`; });
-            let html = escapeHtml(content);
-            html = html
+
+            content = content.replace(/\$\$([\s\S]*?)\$\$/g, (match, p1) => {
+                latexBlocks.push(p1.trim());
+                return `%%LATEXBLOCK${latexBlocks.length - 1}%%`;
+            });
+
+            content = content.replace(/\$([^\$\n]+?)\$/g, (match, p1) => {
+                latexInlines.push(p1.trim());
+                return `%%LATEXINLINE${latexInlines.length - 1}%%`;
+            });
+
+            let html = content
                 .replace(/^### (.*$)/gm, '<h3>$1</h3>')
                 .replace(/^## (.*$)/gm, '<h2>$1</h2>')
                 .replace(/^# (.*$)/gm, '<h1>$1</h1>')
@@ -8888,11 +8894,19 @@
                 .replace(/\*(.*?)\*/g, '<em>$1</em>')
                 .replace(/^- (.*$)/gm, '<li>$1</li>')
                 .replace(/^(\d+)\. (.*$)/gm, '<li>$2</li>')
-                .replace(/`([^`]+)`/g, '<code>$1</code>')
                 .replace(/\n\n/g, '</p><p>')
                 .replace(/\n/g, '<br>');
-            html = html.replace(/%%LATEXBLOCK(\d+)%%/g, (m, idx) => { return `</p><div class="latex-display">$$${latexBlocks[parseInt(idx)]}$$</div><p>`; });
-            html = html.replace(/%%LATEXINLINE(\d+)%%/g, (m, idx) => { return `$${latexInlines[parseInt(idx)]}$`; });
+
+            html = html.replace(/%%LATEXBLOCK(\d+)%%/g, (match, idx) => {
+                const latex = latexBlocks[parseInt(idx)];
+                return `</p><div class="latex-display">$$${latex}$$</div><p>`;
+            });
+
+            html = html.replace(/%%LATEXINLINE(\d+)%%/g, (match, idx) => {
+                const latex = latexInlines[parseInt(idx)];
+                return `$${latex}$`;
+            });
+
             return '<p>' + html + '</p>';
         }
 
