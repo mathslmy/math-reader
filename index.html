@@ -6759,15 +6759,6 @@
             ocrBtn.textContent = 'OCR识别中...';
             
             try {
-                // Check if API is configured
-                const apiUrl = appData.settings.aiApiUrl;
-                const apiKey = appData.settings.aiApiKey;
-                
-                if (!apiUrl || !apiKey) {
-                    showToast('请先在设置中配置API');
-                    return;
-                }
-                
                 showToast('正在进行OCR识别...');
                 
                 // OCR current page (or visible pages in continuous mode)
@@ -6799,21 +6790,7 @@
                         ]
                     }];
                     
-                    const response = await fetch(apiUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': 'Bearer ' + apiKey
-                        },
-                        body: JSON.stringify({
-                            model: appData.settings.aiModel || 'deepseek-chat',
-                            messages,
-                            max_tokens: 8192
-                        })
-                    });
-                    
-                    const result = await response.json();
-                    const ocrText = result.choices?.[0]?.message?.content || '';
+                    const ocrText = await callAI('你是OCR识别助手，识别图片中的文字和数学公式。', messages) || '';
                     
                     ocrTextCache[pageNum] = {
                         text: ocrText,
@@ -7031,18 +7008,10 @@
             const canvas = document.getElementById('noteCanvas');
             const dataUrl = canvas.toDataURL('image/png');
 
-            const apiUrl = appData.settings.aiApiUrl;
-            const apiKey = appData.settings.aiApiKey;
-            const model = appData.settings.aiModel || 'deepseek-chat';
-
-            if (!apiUrl || !apiKey) {
-                showToast('请先设置API');
-                return;
-            }
-
             showToast('识别中...');
 
             try {
+                const systemPrompt = '你是一个手写识别助手。识别图中手写内容，数学公式用LaTeX，只输出结果。';
                 const messages = [{
                     role: 'user',
                     content: [
@@ -7051,17 +7020,7 @@
                     ]
                 }];
 
-                const resp = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + apiKey
-                    },
-                    body: JSON.stringify({ model, messages, max_tokens: 8192 })
-                });
-
-                const result = await resp.json();
-                const text = result.choices?.[0]?.message?.content || '识别失败';
+                const text = await callAI(systemPrompt, messages) || '识别失败';
                 
                 // 直接保存
                 addDocNote(currentDoc.id, currentNotePosition.page, currentNotePosition.x, currentNotePosition.y, text, dataUrl);
@@ -8833,8 +8792,16 @@
             }
             const doc = appData.books.find(b => b.id === docId) || appData.papers.find(p => p.id === docId);
             if (doc) {
+                // 内存中保留screenshot供显示
                 doc.chatHistory = history;
-                saveData();
+                // 存localStorage时去掉screenshot防止撑爆
+                const orig = doc.chatHistory;
+                doc.chatHistory = history.map(h => {
+                    if (h.screenshot) { const c = Object.assign({}, h); delete c.screenshot; return c; }
+                    return h;
+                });
+                try { saveData(); } catch (e) { console.error('saveData failed:', e); }
+                doc.chatHistory = orig;
             }
         }
 
@@ -8946,7 +8913,12 @@
             input.value = '';
 
             // Capture current page screenshot with annotations
-            const screenshot = captureCurrentPageScreenshot();
+            let screenshot = null;
+            try {
+                screenshot = captureCurrentPageScreenshot();
+            } catch (e) {
+                console.error('截图失败:', e);
+            }
 
             // Add user message
             let history = loadReaderChatHistory(currentDoc.id);
@@ -8956,57 +8928,18 @@
             saveReaderChatHistory(currentDoc.id, history);
             renderReaderChatHistory();
 
-            // Find current chapter/section based on currentPage
-            let chapterInfo = '';
-            let sectionStartPage = currentPage;
-            let sectionEndPage = currentPage;
-            const outline = currentDoc.aiOutline;
-            const lectureData = appData.lectures && appData.lectures[currentDoc.id];
-            const chapters = (outline && Array.isArray(outline.chapters) && outline.chapters.length > 0)
-                ? outline.chapters
-                : (lectureData && Array.isArray(lectureData.chapters) ? lectureData.chapters : null);
-            if (chapters) {
-                for (let i = 0; i < chapters.length; i++) {
-                    const ch = chapters[i];
-                    if (currentPage >= ch.startPage && currentPage <= ch.endPage) {
-                        chapterInfo = ch.title || ('第' + (i + 1) + '节');
-                        sectionStartPage = ch.startPage;
-                        sectionEndPage = ch.endPage;
-                        break;
-                    }
-                }
-            }
-
             // Build system prompt with context
             const notes = getDocAnnotations(currentDoc.id, currentPage, 'note');
             const notesSummary = notes.map(n => n.text).filter(Boolean).join('; ');
             const systemPrompt = `你是一个数学阅读AI助手。
 当前文档: ${currentDoc.title} (${currentDoc.type.toUpperCase()})
 当前页码: ${currentPage}/${totalPages}
-${chapterInfo ? '当前章节: ' + chapterInfo + ' (第' + sectionStartPage + '-' + sectionEndPage + '页)' : ''}
 阅读进度: ${currentDoc.progress}%
 该页笔记: ${notesSummary || '无'}
-${chapterInfo ? '附件PDF是当前章节的内容，请结合附件回答用户的问题。' : '附件PDF是当前阅读页面，请结合附件回答用户的问题。'}
-简洁、准确、数学专业。`;
+请根据用户的问题和当前阅读上下文给出帮助。简洁、准确、数学专业。`;
 
             // Build messages for API (exclude screenshots to save tokens)
             const apiMessages = history.map(h => ({ role: h.role, content: h.content }));
-
-            // Slice PDF for current section
-            let pdfAttachment = null;
-            if (currentDoc.type === 'pdf') {
-                try {
-                    const fullBytes = await loadBookPdfBytes(currentDoc);
-                    const slice = await slicePdfPages(fullBytes, sectionStartPage, sectionEndPage);
-                    pdfAttachment = {
-                        bytes: slice.bytes,
-                        base64: slice.base64,
-                        name: (currentDoc.title || 'doc') + '_p' + sectionStartPage + '-' + sectionEndPage + '.pdf'
-                    };
-                } catch (e) {
-                    console.warn('PDF切片失败，将仅发送文本:', e);
-                }
-            }
 
             // Show typing indicator
             const container = document.getElementById('readerChatContainer');
@@ -9028,9 +8961,7 @@ ${chapterInfo ? '附件PDF是当前章节的内容，请结合附件回答用户
             container.scrollTop = container.scrollHeight;
 
             try {
-                const aiOptions = {};
-                if (pdfAttachment) aiOptions.pdfAttachment = pdfAttachment;
-                const result = await callReaderAI(systemPrompt, apiMessages, aiOptions);
+                const result = await callReaderAI(systemPrompt, apiMessages);
                 document.getElementById('readerChatLoading')?.remove();
 
                 if (result) {
@@ -9038,6 +8969,7 @@ ${chapterInfo ? '附件PDF是当前章节的内容，请结合附件回答用户
                     saveReaderChatHistory(currentDoc.id, history);
                     renderReaderChatHistory();
                 } else {
+                    // No API configured - placeholder
                     document.getElementById('readerChatLoading')?.remove();
                     const replies = [
                         '这个问题很好。建议你先回顾这一页的定义和关键定理。',
@@ -9054,7 +8986,7 @@ ${chapterInfo ? '附件PDF是当前章节的内容，请结合附件回答用户
             } catch (e) {
                 console.error('Reader chat error:', e);
                 document.getElementById('readerChatLoading')?.remove();
-                history.push({ role: 'assistant', content: '请求失败: ' + e.message });
+                history.push({ role: 'assistant', content: '请求失败，请稍后重试。' });
                 saveReaderChatHistory(currentDoc.id, history);
                 renderReaderChatHistory();
             }
@@ -9273,10 +9205,27 @@ ${chapterInfo ? '附件PDF是当前章节的内容，请结合附件回答用户
             if (options.pdfAttachment) {
                 contents = await buildGeminiContentsWithPdf(base, config.key, messages, options.pdfAttachment);
             } else {
-                contents = messages.map(m => ({
-                    role: m.role === 'assistant' ? 'model' : 'user',
-                    parts: [{ text: String(m.content || '') }]
-                }));
+                contents = messages.map(m => {
+                    const role = m.role === 'assistant' ? 'model' : 'user';
+                    // 处理多模态内容(content为数组时，包含image_url和text)
+                    if (Array.isArray(m.content)) {
+                        const parts = [];
+                        for (const item of m.content) {
+                            if (item.type === 'text') {
+                                parts.push({ text: item.text || '' });
+                            } else if (item.type === 'image_url' && item.image_url?.url) {
+                                const dataUrl = item.image_url.url;
+                                const match = dataUrl.match(/^data:(image\/[^;]+);base64,(.+)$/);
+                                if (match) {
+                                    parts.push({ inline_data: { mime_type: match[1], data: match[2] } });
+                                }
+                            }
+                        }
+                        if (parts.length === 0) parts.push({ text: '' });
+                        return { role, parts };
+                    }
+                    return { role, parts: [{ text: String(m.content || '') }] };
+                });
             }
 
             const body = {
@@ -9397,8 +9346,8 @@ ${chapterInfo ? '附件PDF是当前章节的内容，请结合附件回答用户
         }
 
         // OpenAI-compatible API call with message history (保留兼容)
-        async function callReaderAI(systemPrompt, messages, options) {
-            return await callAI(systemPrompt, messages, options || {});
+        async function callReaderAI(systemPrompt, messages) {
+            return await callAI(systemPrompt, messages);
         }
 
         function exportReaderChatHistory() {
@@ -10820,15 +10769,6 @@ ${existingOutline ? 'PDF 已有书签（供参考，页码以附件实际内容�
             
             hideLectureSelectionMenu();
             
-            const apiUrl = appData.settings.aiApiUrl;
-            const apiKey = appData.settings.aiApiKey;
-            const model = appData.settings.aiModel;
-            
-            if (!apiUrl || !apiKey) {
-                showToast('请先设置API');
-                return;
-            }
-            
             showToast('正在询问AI...');
             
             const prompt = `请简洁解释以下数学内容，直接给出解释，不要重复问题：
@@ -10836,27 +10776,13 @@ ${existingOutline ? 'PDF 已有书签（供参考，页码以附件实际内容�
 "${lectureSelectedText}"`;
             
             try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + apiKey
-                    },
-                    body: JSON.stringify({
-                        model: model || 'deepseek-chat',
-                        messages: [{ role: 'user', content: prompt }],
-                        max_tokens: 8192
-                    })
-                });
-                
-                const data = await response.json();
-                const aiResponse = data.choices?.[0]?.message?.content || '无法获取回答';
+                const aiResponse = await callAI('你是数学助手，简洁解释数学内容。', [{ role: 'user', content: prompt }]) || '无法获取回答';
                 
                 insertLectureNote(aiResponse);
                 showToast('已添加笔记');
             } catch (err) {
                 console.error(err);
-                showToast('AI请求失败');
+                showToast('AI请求失败: ' + err.message);
             }
         }
 
