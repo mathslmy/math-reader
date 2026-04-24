@@ -1747,21 +1747,6 @@
             border-bottom-left-radius: 4px;
         }
 
-        .chat-bubble p { margin: 0 0 6px 0; }
-        .chat-bubble p:last-child { margin-bottom: 0; }
-        .chat-bubble p:empty { display: none; }
-        .chat-bubble h1, .chat-bubble h2, .chat-bubble h3 { margin: 8px 0 4px 0; font-size: 15px; font-weight: 600; }
-        .chat-bubble h1 { font-size: 16px; }
-        .chat-bubble strong { font-weight: 600; }
-        .chat-bubble em { font-style: italic; }
-        .chat-bubble li { margin-left: 16px; list-style: disc; }
-        .chat-bubble code { background: rgba(0,0,0,0.06); padding: 1px 4px; border-radius: 3px; font-size: 13px; }
-        .chat-bubble .latex-display { margin: 8px 0; overflow-x: auto; }
-        .chat-bubble .katex { font-size: 0.95em; }
-        .chat-bubble .katex-display { margin: 8px 0; }
-        .chat-bubble .katex-display > .katex { text-align: left; }
-        body.dark .chat-bubble code { background: rgba(255,255,255,0.1); }
-
         body.dark .chat-message.user .chat-bubble {
             background: #fff;
             color: #000;
@@ -6774,15 +6759,6 @@
             ocrBtn.textContent = 'OCR识别中...';
             
             try {
-                // Check if API is configured
-                const apiUrl = appData.settings.aiApiUrl;
-                const apiKey = appData.settings.aiApiKey;
-                
-                if (!apiUrl || !apiKey) {
-                    showToast('请先在设置中配置API');
-                    return;
-                }
-                
                 showToast('正在进行OCR识别...');
                 
                 // OCR current page (or visible pages in continuous mode)
@@ -6814,21 +6790,7 @@
                         ]
                     }];
                     
-                    const response = await fetch(apiUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': 'Bearer ' + apiKey
-                        },
-                        body: JSON.stringify({
-                            model: appData.settings.aiModel || 'deepseek-chat',
-                            messages,
-                            max_tokens: 8192
-                        })
-                    });
-                    
-                    const result = await response.json();
-                    const ocrText = result.choices?.[0]?.message?.content || '';
+                    const ocrText = await callAI('你是OCR识别助手，识别图片中的文字和数学公式。', messages) || '';
                     
                     ocrTextCache[pageNum] = {
                         text: ocrText,
@@ -7046,18 +7008,10 @@
             const canvas = document.getElementById('noteCanvas');
             const dataUrl = canvas.toDataURL('image/png');
 
-            const apiUrl = appData.settings.aiApiUrl;
-            const apiKey = appData.settings.aiApiKey;
-            const model = appData.settings.aiModel || 'deepseek-chat';
-
-            if (!apiUrl || !apiKey) {
-                showToast('请先设置API');
-                return;
-            }
-
             showToast('识别中...');
 
             try {
+                const systemPrompt = '你是一个手写识别助手。识别图中手写内容，数学公式用LaTeX，只输出结果。';
                 const messages = [{
                     role: 'user',
                     content: [
@@ -7066,17 +7020,7 @@
                     ]
                 }];
 
-                const resp = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + apiKey
-                    },
-                    body: JSON.stringify({ model, messages, max_tokens: 8192 })
-                });
-
-                const result = await resp.json();
-                const text = result.choices?.[0]?.message?.content || '识别失败';
+                const text = await callAI(systemPrompt, messages) || '识别失败';
                 
                 // 直接保存
                 addDocNote(currentDoc.id, currentNotePosition.page, currentNotePosition.x, currentNotePosition.y, text, dataUrl);
@@ -8849,11 +8793,7 @@
             const doc = appData.books.find(b => b.id === docId) || appData.papers.find(p => p.id === docId);
             if (doc) {
                 doc.chatHistory = history;
-                try {
-                    saveData();
-                } catch (e) {
-                    console.error('saveData failed:', e);
-                }
+                saveData();
             }
         }
 
@@ -8885,12 +8825,12 @@
                 messageDiv.className = `chat-message ${isUser ? 'user' : 'ai'}`;
                 messageDiv.dataset.msgIndex = index;
 
+                // If message has screenshot, show it
                 let contentHtml = '';
-                if (isUser) {
-                    contentHtml = escapeHtml(msg.content);
-                } else {
-                    contentHtml = renderChatMarkdownLatex(msg.content);
+                if (msg.screenshot) {
+                    contentHtml += `<img src="${msg.screenshot}" style="max-width:100%;border-radius:8px;margin-bottom:6px;cursor:pointer;" onclick="window.open(this.src)">`;
                 }
+                contentHtml += escapeHtml(msg.content);
 
                 messageDiv.innerHTML = `
                     ${avatarHtml}
@@ -8898,60 +8838,10 @@
                 `;
                 container.appendChild(messageDiv);
 
+                // Long press to delete (faithful to original)
                 setupReaderChatLongPress(messageDiv, index);
             });
             container.scrollTop = container.scrollHeight;
-
-            // KaTeX渲染
-            renderLectureMath(container);
-        }
-
-        function renderChatMarkdownLatex(text) {
-            if (!text) return '';
-            let content = text;
-            const latexBlocks = [];
-            const latexInlines = [];
-
-            content = content.replace(/\$\$([\s\S]*?)\$\$/g, (match, p1) => {
-                latexBlocks.push(p1.trim());
-                return `%%LATEXBLOCK${latexBlocks.length - 1}%%`;
-            });
-            content = content.replace(/\\\[([\s\S]*?)\\\]/g, (match, p1) => {
-                latexBlocks.push(p1.trim());
-                return `%%LATEXBLOCK${latexBlocks.length - 1}%%`;
-            });
-            content = content.replace(/\$([^\$\n]+?)\$/g, (match, p1) => {
-                latexInlines.push(p1.trim());
-                return `%%LATEXINLINE${latexInlines.length - 1}%%`;
-            });
-            content = content.replace(/\\\(([^\n]+?)\\\)/g, (match, p1) => {
-                latexInlines.push(p1.trim());
-                return `%%LATEXINLINE${latexInlines.length - 1}%%`;
-            });
-
-            let html = escapeHtml(content);
-            html = html
-                .replace(/^### (.*$)/gm, '<h3>$1</h3>')
-                .replace(/^## (.*$)/gm, '<h2>$1</h2>')
-                .replace(/^# (.*$)/gm, '<h1>$1</h1>')
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                .replace(/^- (.*$)/gm, '<li>$1</li>')
-                .replace(/^(\d+)\. (.*$)/gm, '<li>$2</li>')
-                .replace(/`([^`]+)`/g, '<code>$1</code>')
-                .replace(/\n\n/g, '</p><p>')
-                .replace(/\n/g, '<br>');
-
-            html = html.replace(/%%LATEXBLOCK(\d+)%%/g, (match, idx) => {
-                const latex = latexBlocks[parseInt(idx)];
-                return `</p><div class="latex-display">$$${latex}$$</div><p>`;
-            });
-            html = html.replace(/%%LATEXINLINE(\d+)%%/g, (match, idx) => {
-                const latex = latexInlines[parseInt(idx)];
-                return `$${latex}$`;
-            });
-
-            return '<p>' + html + '</p>';
         }
 
         let readerChatLongPressTimer = null;
@@ -8989,11 +8879,16 @@
 
             let history = loadReaderChatHistory(currentDoc.id);
             if (history.length === 0) {
+                // Auto-capture screenshot and generate greeting
+                const screenshot = captureCurrentPageScreenshot();
                 const notes = getDocAnnotations(currentDoc.id, currentPage, 'note');
                 const notesSummary = notes.map(n => n.text).filter(Boolean).join('; ');
 
                 const greeting = `你好! 我是你的 AI 阅读助手。当前文档: ${currentDoc.title}，第 ${currentPage}/${totalPages} 页。${notesSummary ? '你在这里记了一些笔记: ' + notesSummary + '。' : ''}有什么我可以帮你的?`;
                 history = [{ role: 'assistant', content: greeting }];
+                if (screenshot) {
+                    history[0].screenshot = screenshot;
+                }
                 saveReaderChatHistory(currentDoc.id, history);
             }
 
@@ -9009,49 +8904,28 @@
 
             input.value = '';
 
+            // Capture current page screenshot with annotations
+            const screenshot = captureCurrentPageScreenshot();
+
             // Add user message
             let history = loadReaderChatHistory(currentDoc.id);
-            history.push({ role: 'user', content: message });
+            const userMsg = { role: 'user', content: message };
+            if (screenshot) userMsg.screenshot = screenshot;
+            history.push(userMsg);
             saveReaderChatHistory(currentDoc.id, history);
             renderReaderChatHistory();
-
-            // 切出当前页的PDF作为附件
-            let pdfAttachment = null;
-            if (currentDoc.type === 'pdf') {
-                try {
-                    const fullBytes = await loadBookPdfBytes(currentDoc);
-                    const slice = await slicePdfPages(fullBytes, currentPage, currentPage);
-                    pdfAttachment = { bytes: slice.bytes, base64: slice.base64, name: `${currentDoc.title}_p${currentPage}.pdf` };
-                } catch (e) {
-                    console.error('切出当前页PDF失败:', e);
-                }
-            }
-
-            // 提取当前页文本内容(作为fallback上下文)
-            let pageTextContent = '';
-            try {
-                if (pdfDoc) {
-                    const page = await pdfDoc.getPage(currentPage);
-                    const tc = await page.getTextContent();
-                    pageTextContent = tc.items.map(it => it.str).join(' ').trim();
-                }
-            } catch (e) {
-                console.error('提取页面文本失败:', e);
-            }
 
             // Build system prompt with context
             const notes = getDocAnnotations(currentDoc.id, currentPage, 'note');
             const notesSummary = notes.map(n => n.text).filter(Boolean).join('; ');
-            let systemPrompt = `你是一个数学阅读AI助手。
+            const systemPrompt = `你是一个数学阅读AI助手。
 当前文档: ${currentDoc.title} (${currentDoc.type.toUpperCase()})
 当前页码: ${currentPage}/${totalPages}
 阅读进度: ${currentDoc.progress}%
 该页笔记: ${notesSummary || '无'}
 请根据用户的问题和当前阅读上下文给出帮助。简洁、准确、数学专业。`;
-            if (pageTextContent) {
-                systemPrompt += `\n\n当前页面文字内容:\n${pageTextContent}`;
-            }
 
+            // Build messages for API (exclude screenshots to save tokens)
             const apiMessages = history.map(h => ({ role: h.role, content: h.content }));
 
             // Show typing indicator
@@ -9074,7 +8948,7 @@
             container.scrollTop = container.scrollHeight;
 
             try {
-                const result = await callReaderAI(systemPrompt, apiMessages, { pdfAttachment });
+                const result = await callReaderAI(systemPrompt, apiMessages);
                 document.getElementById('readerChatLoading')?.remove();
 
                 if (result) {
@@ -9082,6 +8956,7 @@
                     saveReaderChatHistory(currentDoc.id, history);
                     renderReaderChatHistory();
                 } else {
+                    // No API configured - placeholder
                     document.getElementById('readerChatLoading')?.remove();
                     const replies = [
                         '这个问题很好。建议你先回顾这一页的定义和关键定理。',
@@ -9098,10 +8973,7 @@
             } catch (e) {
                 console.error('Reader chat error:', e);
                 document.getElementById('readerChatLoading')?.remove();
-                const errMsg = (e.message || '').includes('Load failed') || (e.message || '').includes('Failed to fetch')
-                    ? '网络请求失败，请检查API地址和网络连接'
-                    : '请求失败: ' + (e.message || '未知错误');
-                history.push({ role: 'assistant', content: errMsg });
+                history.push({ role: 'assistant', content: '请求失败，请稍后重试。' });
                 saveReaderChatHistory(currentDoc.id, history);
                 renderReaderChatHistory();
             }
@@ -9320,10 +9192,27 @@
             if (options.pdfAttachment) {
                 contents = await buildGeminiContentsWithPdf(base, config.key, messages, options.pdfAttachment);
             } else {
-                contents = messages.map(m => ({
-                    role: m.role === 'assistant' ? 'model' : 'user',
-                    parts: [{ text: String(m.content || '') }]
-                }));
+                contents = messages.map(m => {
+                    const role = m.role === 'assistant' ? 'model' : 'user';
+                    // 处理多模态内容(content为数组时，包含image_url和text)
+                    if (Array.isArray(m.content)) {
+                        const parts = [];
+                        for (const item of m.content) {
+                            if (item.type === 'text') {
+                                parts.push({ text: item.text || '' });
+                            } else if (item.type === 'image_url' && item.image_url?.url) {
+                                const dataUrl = item.image_url.url;
+                                const match = dataUrl.match(/^data:(image\/[^;]+);base64,(.+)$/);
+                                if (match) {
+                                    parts.push({ inline_data: { mime_type: match[1], data: match[2] } });
+                                }
+                            }
+                        }
+                        if (parts.length === 0) parts.push({ text: '' });
+                        return { role, parts };
+                    }
+                    return { role, parts: [{ text: String(m.content || '') }] };
+                });
             }
 
             const body = {
@@ -9444,8 +9333,8 @@
         }
 
         // OpenAI-compatible API call with message history (保留兼容)
-        async function callReaderAI(systemPrompt, messages, options = {}) {
-            return await callAI(systemPrompt, messages, options);
+        async function callReaderAI(systemPrompt, messages) {
+            return await callAI(systemPrompt, messages);
         }
 
         function exportReaderChatHistory() {
@@ -10867,15 +10756,6 @@ ${existingOutline ? 'PDF 已有书签（供参考，页码以附件实际内容�
             
             hideLectureSelectionMenu();
             
-            const apiUrl = appData.settings.aiApiUrl;
-            const apiKey = appData.settings.aiApiKey;
-            const model = appData.settings.aiModel;
-            
-            if (!apiUrl || !apiKey) {
-                showToast('请先设置API');
-                return;
-            }
-            
             showToast('正在询问AI...');
             
             const prompt = `请简洁解释以下数学内容，直接给出解释，不要重复问题：
@@ -10883,27 +10763,13 @@ ${existingOutline ? 'PDF 已有书签（供参考，页码以附件实际内容�
 "${lectureSelectedText}"`;
             
             try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + apiKey
-                    },
-                    body: JSON.stringify({
-                        model: model || 'deepseek-chat',
-                        messages: [{ role: 'user', content: prompt }],
-                        max_tokens: 8192
-                    })
-                });
-                
-                const data = await response.json();
-                const aiResponse = data.choices?.[0]?.message?.content || '无法获取回答';
+                const aiResponse = await callAI('你是数学助手，简洁解释数学内容。', [{ role: 'user', content: prompt }]) || '无法获取回答';
                 
                 insertLectureNote(aiResponse);
                 showToast('已添加笔记');
             } catch (err) {
                 console.error(err);
-                showToast('AI请求失败');
+                showToast('AI请求失败: ' + err.message);
             }
         }
 
