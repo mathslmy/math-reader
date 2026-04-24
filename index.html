@@ -5759,6 +5759,7 @@
             annoCanvas.addEventListener('pointerdown', (e) => {
                 if (isPinching) return;
                 if (!penMode) return;
+                e.preventDefault();
                 // 入栈当前页快照，供撤销回滚（全局 stack 里带 pageNum）
                 saveStrokeState(pageNum, annoCanvas);
                 drawing = true;
@@ -6080,6 +6081,7 @@
                 doc.annotations = doc.annotations.filter(a => !(a.page === page && a.type === 'drawing'));
             }
             doc.annotations.push({ page, type, data, createdAt: new Date().toISOString() });
+            doc.annotationsUpdatedAt = Date.now();
         }
 
         function addDocNote(docId, page, x, y, text, canvasData) {
@@ -6089,6 +6091,7 @@
                 page, type: 'note', x, y, text, canvasData,
                 createdAt: new Date().toISOString()
             });
+            doc.annotationsUpdatedAt = Date.now();
         }
 
         // 编辑笔记
@@ -6129,6 +6132,7 @@
                         doc.annotations.splice(idx, 1);
                     }
                 }
+                doc.annotationsUpdatedAt = Date.now();
             }
             
             saveData();
@@ -6904,6 +6908,13 @@
                 annoCanvas.style.pointerEvents = penMode ? 'auto' : 'none';
                 annoCanvas.style.cursor = penMode ? 'crosshair' : 'default';
             });
+
+            // 画笔模式下禁止文本选择，防止书写时误触选择
+            const readerCont = document.getElementById('readerContainer');
+            if (readerCont) {
+                readerCont.style.webkitUserSelect = penMode ? 'none' : '';
+                readerCont.style.userSelect = penMode ? 'none' : '';
+            }
         }
 
         // ==================== Notes (long press) ====================
@@ -8586,24 +8597,37 @@
                 if (!cloudDoc || !cloudDoc.id) return cloudDoc;
                 const local = localMap[cloudDoc.id];
                 if (!local) return cloudDoc;
+                const result = { ...cloudDoc };
+                // 阅读进度：保留较新的
                 const localTs = Number(local.progressUpdatedAt) || 0;
                 const cloudTs = Number(cloudDoc.progressUpdatedAt) || 0;
                 if (localTs > cloudTs) {
-                    return {
-                        ...cloudDoc,
-                        currentPage: local.currentPage,
-                        progress: (typeof local.progress === 'number') ? local.progress : cloudDoc.progress,
-                        progressUpdatedAt: local.progressUpdatedAt
-                    };
+                    result.currentPage = local.currentPage;
+                    result.progress = (typeof local.progress === 'number') ? local.progress : cloudDoc.progress;
+                    result.progressUpdatedAt = local.progressUpdatedAt;
                 }
-                return cloudDoc;
+                // 每个字段独立时间戳，独立合并，谁新用谁
+                const fields = [
+                    { key: 'bookmarks', tsKey: 'bookmarksUpdatedAt' },
+                    { key: 'aiOutline', tsKey: 'outlineUpdatedAt' },
+                    { key: 'chatHistory', tsKey: 'chatUpdatedAt' },
+                    { key: 'annotations', tsKey: 'annotationsUpdatedAt' }
+                ];
+                for (const f of fields) {
+                    const localFTs = Number(local[f.tsKey]) || 0;
+                    const cloudFTs = Number(cloudDoc[f.tsKey]) || 0;
+                    if (localFTs >= cloudFTs) {
+                        result[f.key] = local[f.key];
+                        result[f.tsKey] = local[f.tsKey];
+                    }
+                }
+                return result;
             });
             const baseline = Number(cloudSyncedAtMs) || 0;
             (localDocs || []).forEach(local => {
                 if (!local || !local.id) return;
                 if (cloudIds.has(local.id)) return;
                 const addedAtMs = local.addedAt ? Date.parse(local.addedAt) : NaN;
-                // 只有 addedAt 能解析且晚于云端 syncedAt 才算本地新加，保留
                 if (!isNaN(addedAtMs) && addedAtMs > baseline) {
                     merged.push(local);
                 }
@@ -8826,6 +8850,7 @@
             const doc = appData.books.find(b => b.id === docId) || appData.papers.find(p => p.id === docId);
             if (doc) {
                 doc.chatHistory = history;
+                doc.chatUpdatedAt = Date.now();
                 // 存localStorage时去掉screenshot防止撑爆
                 const orig = doc.chatHistory;
                 doc.chatHistory = history.map(h => {
@@ -9675,6 +9700,8 @@ ${existingOutline ? 'PDF 已有书签（供参考，页码以附件实际内容�
                     page: ch.startPage,
                     lectureIndex: idx
                 }));
+                book.bookmarksUpdatedAt = Date.now();
+                book.outlineUpdatedAt = Date.now();
                 saveData();
                 showToast(`大纲已生成（${chapters.length} 节）`);
             } catch (e) {
@@ -9740,7 +9767,7 @@ ${existingOutline ? 'PDF 已有书签（供参考，页码以附件实际内容�
                 page: ch.startPage,
                 lectureIndex: idx
             }));
-
+            book.bookmarksUpdatedAt = Date.now();
             lectureData.status = 'ready';
             saveData();
             showToast(`已加载 ${lectureData.chapters.length} 节大纲`);
@@ -10813,6 +10840,16 @@ ${existingOutline ? 'PDF 已有书签（供参考，页码以附件实际内容�
         // 页面加载完成后初始化
         document.addEventListener('DOMContentLoaded', initLectureSelection);
 
+        // 禁止iPad/Safari阅读区域和讲义区域长按弹出原生菜单
+        document.addEventListener('DOMContentLoaded', function() {
+            ['readerContainer', 'lectureViewerContent'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.addEventListener('contextmenu', e => e.preventDefault());
+                }
+            });
+        });
+
         function handleLectureSelection(e) {
             setTimeout(() => {
                 const selection = window.getSelection();
@@ -11260,26 +11297,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 }
             });
 
-            // Double tap to reset zoom
-            let lastTap = 0;
-            document.getElementById('page2')?.addEventListener('touchend', (e) => {
-                if (e.touches.length > 0 || isPinching) return;
-                const now = Date.now();
-                if (now - lastTap < 300) {
-                    // Double tap - 平滑过渡
-                    const targetScale = currentScale > 1.05 ? 1 : doubleTapZoomTarget;
-                    if (wrapper) {
-                        wrapper.style.transition = 'transform 0.2s ease-out';
-                        wrapper.style.transform = targetScale === 1 ? '' : `scale(${targetScale})`;
-                        wrapper.style.transformOrigin = 'center top';
-                        currentScale = targetScale;
-                        setTimeout(() => {
-                            if (wrapper) wrapper.style.transition = '';
-                        }, 200);
-                    }
-                }
-                lastTap = now;
-            });
+            // (double-tap zoom removed)
         })();
 
         // Close note bubbles on tap outside
