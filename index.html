@@ -3633,6 +3633,11 @@
 
     <!-- ==================== Page 5: Classroom ==================== -->
     <div class="page" id="page5">
+        <!-- 页面头部 -->
+        <div class="page1-header" id="classroomHeader">
+            <div></div>
+            <button class="archive-btn" onclick="toggleClassroomArchive()">存档</button>
+        </div>
         <!-- 主视图：两栏 -->
         <div class="classroom-grid" id="classroomGrid">
             <div class="classroom-column" onclick="onClassroomColumnClick(event, 'course')">
@@ -3642,7 +3647,7 @@
                 </div>
                 <div class="item-list" id="courseList">
                     <div class="empty-state">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 10l-10-5L2 10l10 5 10-5z"/><path d="M6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/></svg>
                         <p>点击空白处新建课堂</p>
                     </div>
                 </div>
@@ -3689,6 +3694,29 @@
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
                 </button>
             </div>
+        </div>
+        <!-- 课堂存档视图 -->
+        <div id="classroomArchiveView" style="display:none;">
+            <div class="column-header" style="margin:12px 16px 0;">
+                <span class="column-title">存档</span>
+                <button class="archive-btn" onclick="toggleClassroomArchive()">返回</button>
+            </div>
+            <div class="item-list" id="classroomArchiveList" style="padding:0 16px 80px;">
+                <div class="empty-state"><p>暂无存档</p></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 课堂源素材预览浮层 -->
+    <div class="modal-overlay" id="sourcePreviewModal" onclick="hideModal('sourcePreviewModal')" style="z-index:3000;">
+        <div onclick="event.stopPropagation()" style="width:100%;height:100%;display:flex;flex-direction:column;">
+            <div style="display:flex;align-items:center;padding:8px 12px;gap:10px;">
+                <button class="lecture-back-btn" onclick="hideModal('sourcePreviewModal')">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+                <span id="sourcePreviewTitle" style="flex:1;font-size:14px;font-weight:600;color:white;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+            </div>
+            <div id="sourcePreviewBody" style="flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;padding:8px;"></div>
         </div>
     </div>
 
@@ -11776,9 +11804,11 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
 
         function renderClassroomPage() {
             if (!appData.classroom) appData.classroom = { courses: [], seminars: [] };
-            // 如果在子视图中，不渲染主视图
+            if (!appData.classroom.archived) appData.classroom.archived = [];
+            // 如果在子视图或存档视图中，不渲染主视图
             if (document.getElementById('classroomFolderView').style.display !== 'none') return;
             if (document.getElementById('classroomSessionView').style.display !== 'none') return;
+            if (document.getElementById('classroomArchiveView').style.display !== 'none') return;
 
             const courses = appData.classroom.courses || [];
             const seminars = appData.classroom.seminars || [];
@@ -11789,11 +11819,11 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             const seminarList = document.getElementById('seminarList');
 
             if (courses.length === 0) {
-                courseList.innerHTML = '<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg><p>点击空白处新建课堂</p></div>';
+                courseList.innerHTML = '<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 10l-10-5L2 10l10 5 10-5z"/><path d="M6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/></svg><p>点击空白处新建课堂</p></div>';
             } else {
                 courseList.innerHTML = courses.map(c => `
-                    <div class="item-card" onclick="event.stopPropagation(); openClassroomFolder('course', '${c.id}')">
-                        <div class="item-card-title">${c.name}</div>
+                    <div class="item-card" data-cls-id="${c.id}" data-cls-type="course">
+                        <div class="item-card-title">${escapeHtml(c.name)}</div>
                         <div class="item-card-meta">
                             <span class="item-card-type">${(c.sessions || []).length} 讲</span>
                         </div>
@@ -11805,14 +11835,42 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 seminarList.innerHTML = '<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><p>点击空白处新建讲座</p></div>';
             } else {
                 seminarList.innerHTML = seminars.map(s => `
-                    <div class="item-card" onclick="event.stopPropagation(); openClassroomFolder('seminar', '${s.id}')">
-                        <div class="item-card-title">${s.name}</div>
+                    <div class="item-card" data-cls-id="${s.id}" data-cls-type="seminar">
+                        <div class="item-card-title">${escapeHtml(s.name)}</div>
                         <div class="item-card-meta">
                             <span class="item-card-type">${(s.sessions || []).length} 讲</span>
                         </div>
                     </div>
                 `).join('');
             }
+
+            // 绑定点击和长按事件
+            document.querySelectorAll('#courseList .item-card, #seminarList .item-card').forEach(card => {
+                const id = card.dataset.clsId;
+                const type = card.dataset.clsType;
+                if (!id) return;
+                let pressTimer = null;
+                let isLongPress = false;
+
+                card.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (!isLongPress) openClassroomFolder(type, id);
+                    isLongPress = false;
+                });
+                card.addEventListener('touchstart', (e) => {
+                    isLongPress = false;
+                    pressTimer = setTimeout(() => {
+                        isLongPress = true;
+                        showClassroomLongPressMenu(e, id, type);
+                    }, 500);
+                }, { passive: true });
+                card.addEventListener('touchend', () => clearTimeout(pressTimer));
+                card.addEventListener('touchmove', () => clearTimeout(pressTimer));
+                card.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    showClassroomLongPressMenu(e, id, type);
+                });
+            });
 
             // 清理过期照片
             cleanExpiredPhotos();
@@ -11832,6 +11890,123 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             });
             saveData();
             renderClassroomPage();
+        }
+
+        function showClassroomLongPressMenu(e, id, type) {
+            closeLongPressMenu();
+
+            const overlay = document.createElement('div');
+            overlay.className = 'longpress-overlay';
+            overlay.onclick = closeLongPressMenu;
+
+            const menu = document.createElement('div');
+            menu.className = 'longpress-menu';
+            menu.id = 'longpressMenu';
+
+            menu.innerHTML = `
+                <button class="longpress-menu-item" onclick="archiveClassroomItem('${id}', '${type}')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
+                    存档
+                </button>
+                <button class="longpress-menu-item danger" onclick="deleteClassroomItem('${id}', '${type}')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                    删除
+                </button>
+            `;
+
+            document.body.appendChild(overlay);
+            document.body.appendChild(menu);
+
+            const touch = e.touches ? e.touches[0] : e;
+            let x = touch.clientX;
+            let y = touch.clientY;
+            const menuWidth = 140;
+            const menuHeight = 100;
+            if (x + menuWidth > window.innerWidth) x = window.innerWidth - menuWidth - 10;
+            if (y + menuHeight > window.innerHeight) y = window.innerHeight - menuHeight - 10;
+            menu.style.left = x + 'px';
+            menu.style.top = y + 'px';
+        }
+
+        function archiveClassroomItem(id, type) {
+            closeLongPressMenu();
+            if (!appData.classroom.archived) appData.classroom.archived = [];
+            const list = type === 'course' ? appData.classroom.courses : appData.classroom.seminars;
+            const idx = list.findIndex(i => i.id === id);
+            if (idx === -1) return;
+            const item = list.splice(idx, 1)[0];
+            item._type = type;
+            appData.classroom.archived.push(item);
+            saveData();
+            renderClassroomPage();
+            showToast('已存档');
+        }
+
+        function deleteClassroomItem(id, type) {
+            closeLongPressMenu();
+            if (!confirm('确定删除此项目？所有讲次和笔记将被永久删除。')) return;
+            const list = type === 'course' ? appData.classroom.courses : appData.classroom.seminars;
+            const idx = list.findIndex(i => i.id === id);
+            if (idx === -1) return;
+            const item = list[idx];
+            // 清理IndexedDB中的源素材文件
+            (item.sessions || []).forEach(ses => {
+                (ses.sources || []).forEach(src => {
+                    deleteFileData(src.dataKey).catch(() => {});
+                });
+            });
+            list.splice(idx, 1);
+            saveData();
+            renderClassroomPage();
+            showToast('已删除');
+        }
+
+        function toggleClassroomArchive() {
+            const grid = document.getElementById('classroomGrid');
+            const header = document.getElementById('classroomHeader');
+            const archive = document.getElementById('classroomArchiveView');
+            if (archive.style.display === 'none') {
+                grid.style.display = 'none';
+                header.style.display = 'none';
+                archive.style.display = 'block';
+                renderClassroomArchive();
+            } else {
+                grid.style.display = '';
+                header.style.display = '';
+                archive.style.display = 'none';
+                renderClassroomPage();
+            }
+        }
+
+        function renderClassroomArchive() {
+            if (!appData.classroom.archived) appData.classroom.archived = [];
+            const list = document.getElementById('classroomArchiveList');
+            if (appData.classroom.archived.length === 0) {
+                list.innerHTML = '<div class="empty-state"><p>暂无存档</p></div>';
+                return;
+            }
+            list.innerHTML = appData.classroom.archived.map(item => `
+                <div class="item-card" onclick="restoreClassroomItem('${item.id}')">
+                    <div class="item-card-title">${escapeHtml(item.name)}</div>
+                    <div class="item-card-meta">
+                        <span class="item-card-type">${item._type === 'course' ? '课堂' : '讲座'} / ${(item.sessions || []).length} 讲 / 已存档</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function restoreClassroomItem(id) {
+            if (!appData.classroom.archived) return;
+            const idx = appData.classroom.archived.findIndex(a => a.id === id);
+            if (idx === -1) return;
+            const item = appData.classroom.archived.splice(idx, 1)[0];
+            const type = item._type || 'course';
+            delete item._type;
+            if (type === 'course') appData.classroom.courses.push(item);
+            else appData.classroom.seminars.push(item);
+            saveData();
+            renderClassroomArchive();
+            showToast('已恢复');
         }
 
         function openClassroomFolder(type, folderId) {
@@ -12150,17 +12325,55 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 const data = await getFileData(source.dataKey);
                 if (!data) { showToast('文件已过期或被删除'); return; }
 
+                document.getElementById('sourcePreviewTitle').textContent = source.name;
+                const body = document.getElementById('sourcePreviewBody');
+
                 if (source.type === 'image') {
-                    // 在新窗口中显示图片
-                    const w = window.open('', '_blank');
-                    if (w) {
-                        w.document.write(`<html><head><title>${source.name}</title><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#000;"><img src="${data}" style="max-width:100%;max-height:100vh;object-fit:contain;"></body></html>`);
+                    body.innerHTML = `<img src="${data}" style="max-width:100%;max-height:100%;object-fit:contain;">`;
+                } else if (source.name.toLowerCase().endsWith('.pdf')) {
+                    // PDF: 用pdf.js渲染第一页作为预览
+                    const bytes = new Uint8Array(data);
+                    try {
+                        const pdf = await pdfjsLib.getDocument({ data: bytes.slice(0) }).promise;
+                        body.innerHTML = '';
+                        const wrapper = document.createElement('div');
+                        wrapper.style.cssText = 'overflow-y:auto;width:100%;height:100%;';
+                        const numPages = Math.min(pdf.numPages, 10);
+                        for (let i = 1; i <= numPages; i++) {
+                            const page = await pdf.getPage(i);
+                            const viewport = page.getViewport({ scale: 1.5 });
+                            const canvas = document.createElement('canvas');
+                            canvas.width = viewport.width;
+                            canvas.height = viewport.height;
+                            canvas.style.cssText = 'width:100%;height:auto;display:block;margin-bottom:4px;';
+                            const ctx = canvas.getContext('2d');
+                            await page.render({ canvasContext: ctx, viewport }).promise;
+                            wrapper.appendChild(canvas);
+                        }
+                        if (pdf.numPages > 10) {
+                            const more = document.createElement('p');
+                            more.style.cssText = 'text-align:center;color:#999;padding:12px;';
+                            more.textContent = '... 仅预览前10页 (共' + pdf.numPages + '页)';
+                            wrapper.appendChild(more);
+                        }
+                        body.appendChild(wrapper);
+                    } catch (e) {
+                        body.innerHTML = '<p style="color:#999;">PDF 预览失败</p>';
                     }
                 } else {
-                    showToast('文件: ' + source.name);
+                    // 文本文件
+                    try {
+                        const decoder = new TextDecoder();
+                        const text = decoder.decode(new Uint8Array(data));
+                        body.innerHTML = `<pre style="color:white;white-space:pre-wrap;word-break:break-word;padding:16px;width:100%;height:100%;overflow:auto;font-size:14px;margin:0;">${text.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre>`;
+                    } catch (e) {
+                        body.innerHTML = '<p style="color:#999;">无法预览此文件格式</p>';
+                    }
                 }
+
+                showModal('sourcePreviewModal');
             } catch (e) {
-                showToast('无法加载文件');
+                showToast('无法加载文件: ' + e.message);
             }
         }
 
