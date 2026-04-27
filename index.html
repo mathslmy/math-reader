@@ -11964,6 +11964,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             (item.sessions || []).forEach(ses => {
                 (ses.sources || []).forEach(src => {
                     deleteFileData(src.dataKey).catch(() => {});
+                    deleteClassroomFileFromCloud(src.dataKey);
                 });
             });
             list.splice(idx, 1);
@@ -12139,6 +12140,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             const session = currentClassroomFolder.sessions[idx];
             (session.sources || []).forEach(src => {
                 deleteFileData(src.dataKey).catch(() => {});
+                deleteClassroomFileFromCloud(src.dataKey);
             });
             currentClassroomFolder.sessions.splice(idx, 1);
             saveData();
@@ -12329,6 +12331,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 if (idx === -1) return;
                 const src = session.sources[idx];
                 deleteFileData(src.dataKey).catch(() => {});
+                deleteClassroomFileFromCloud(src.dataKey);
                 session.sources.splice(idx, 1);
             } else if (itemType === 'note') {
                 if (!confirm('确定删除此笔记？')) return;
@@ -12361,20 +12364,19 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 const sourceId = 'src_' + Date.now() + '_' + uploadIndex;
                 const dataKey = 'classroom_' + sourceId;
 
-                // 读取文件数据
+                // 读取文件数据 - 统一用dataURL，便于云同步和预览
                 const fileData = await new Promise((resolve, reject) => {
                     const reader = new FileReader();
                     reader.onload = () => resolve(reader.result);
                     reader.onerror = reject;
-                    if (isImage) {
-                        reader.readAsDataURL(file);
-                    } else {
-                        reader.readAsArrayBuffer(file);
-                    }
+                    reader.readAsDataURL(file);
                 });
 
                 // 存入IndexedDB
                 await saveFileData(dataKey, fileData);
+
+                // 上传到R2云端
+                uploadClassroomFile(dataKey, fileData).catch(e => console.warn('课堂文件上传失败:', e));
 
                 const expiresAt = (isImage && retentionDays > 0) ? new Date(Date.now() + retentionDays * 86400000).toISOString() : null;
 
@@ -12440,10 +12442,13 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 } else {
                     // 对于非图片文件，尝试提取文本
                     let textContent = '';
-                    if (file.type === 'application/pdf') {
+                    if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
                         try {
-                            const bytes = new Uint8Array(fileData);
-                            const pdf = await pdfjsLib.getDocument({ data: bytes.slice(0) }).promise;
+                            const base64 = fileData.split(',')[1];
+                            const binStr = atob(base64);
+                            const bytes = new Uint8Array(binStr.length);
+                            for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i);
+                            const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
                             const parts = [];
                             for (let i = 1; i <= pdf.numPages; i++) {
                                 const page = await pdf.getPage(i);
@@ -12456,8 +12461,8 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                         }
                     } else {
                         try {
-                            const decoder = new TextDecoder();
-                            textContent = decoder.decode(new Uint8Array(fileData));
+                            const base64 = fileData.split(',')[1];
+                            textContent = decodeURIComponent(escape(atob(base64)));
                         } catch (e) {
                             textContent = '[文件内容读取失败]';
                         }
@@ -12514,8 +12519,12 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             if (!source) { showToast('未找到源素材'); return; }
 
             try {
-                const data = await getFileData(source.dataKey);
-                if (!data) { showToast('文件已过期或被删除'); return; }
+                let data = await getFileData(source.dataKey);
+                if (!data) {
+                    // 尝试从云端下载
+                    data = await downloadClassroomFile(source.dataKey);
+                    if (!data) { showToast('文件已过期或被删除'); return; }
+                }
 
                 document.getElementById('sourcePreviewTitle').textContent = source.name;
                 const body = document.getElementById('sourcePreviewBody');
@@ -12523,10 +12532,13 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 if (source.type === 'image') {
                     body.innerHTML = `<img src="${data}" style="max-width:100%;max-height:100%;object-fit:contain;">`;
                 } else if (source.name.toLowerCase().endsWith('.pdf')) {
-                    // PDF: 用pdf.js渲染第一页作为预览
-                    const bytes = new Uint8Array(data);
                     try {
-                        const pdf = await pdfjsLib.getDocument({ data: bytes.slice(0) }).promise;
+                        // data是dataURL，提取base64部分转为Uint8Array
+                        const base64 = data.split(',')[1];
+                        const binStr = atob(base64);
+                        const bytes = new Uint8Array(binStr.length);
+                        for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i);
+                        const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
                         body.innerHTML = '';
                         const wrapper = document.createElement('div');
                         wrapper.style.cssText = 'overflow-y:auto;width:100%;height:100%;';
@@ -12553,10 +12565,10 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                         body.innerHTML = '<p style="color:#999;">PDF 预览失败</p>';
                     }
                 } else {
-                    // 文本文件
                     try {
-                        const decoder = new TextDecoder();
-                        const text = decoder.decode(new Uint8Array(data));
+                        // data是dataURL，提取base64部分解码为文本
+                        const base64 = data.split(',')[1];
+                        const text = decodeURIComponent(escape(atob(base64)));
                         body.innerHTML = `<pre style="color:white;white-space:pre-wrap;word-break:break-word;padding:16px;width:100%;height:100%;overflow:auto;font-size:14px;margin:0;">${text.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre>`;
                     } catch (e) {
                         body.innerHTML = '<p style="color:#999;">无法预览此文件格式</p>';
@@ -12684,6 +12696,39 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             viewClassroomSource(sourceId, session);
         }
 
+        // ==================== 课堂文件云同步 ====================
+        async function uploadClassroomFile(dataKey, fileData) {
+            const config = appData.settings && appData.settings.r2Config;
+            if (!config || !config.accessKeyId) return;
+            const r2Key = 'classroom_files/' + dataKey;
+            await r2PutObject(r2Key, fileData, 'text/plain');
+        }
+
+        async function downloadClassroomFile(dataKey) {
+            const config = appData.settings && appData.settings.r2Config;
+            if (!config || !config.accessKeyId) return null;
+            try {
+                const r2Key = 'classroom_files/' + dataKey;
+                const data = await r2GetObject(r2Key);
+                if (data) {
+                    await saveFileData(dataKey, data);
+                    return data;
+                }
+            } catch (e) {
+                console.warn('下载课堂文件失败:', e);
+            }
+            return null;
+        }
+
+        async function deleteClassroomFileFromCloud(dataKey) {
+            const config = appData.settings && appData.settings.r2Config;
+            if (!config || !config.accessKeyId) return;
+            try {
+                const r2Key = 'classroom_files/' + dataKey;
+                await r2DeleteObject(r2Key);
+            } catch (e) {}
+        }
+
         // 清理过期照片
         async function cleanExpiredPhotos() {
             if (!appData.classroom) return;
@@ -12696,6 +12741,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     const expired = session.sources.filter(s => s.expiresAt && s.expiresAt < now);
                     for (const src of expired) {
                         try { await deleteFileData(src.dataKey); } catch (e) {}
+                        deleteClassroomFileFromCloud(src.dataKey);
                         session.sources = session.sources.filter(s => s.id !== src.id);
                         changed = true;
                     }
