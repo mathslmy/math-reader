@@ -96,7 +96,8 @@
         }
         /* 其他 page 在分屏时不显示 */
         body.split-mode #page1,
-        body.split-mode #page4 {
+        body.split-mode #page4,
+        body.split-mode #page5 {
             display: none !important;
         }
         /* 分屏时底部导航的 active 指示重新定义：阅读 + 笔记 都高亮 */
@@ -1086,6 +1087,119 @@
             overflow: hidden;
             line-height: 1.5;
         }
+
+        /* ==================== Page 5: Classroom ==================== */
+        #page5 { padding: 0; }
+        #page5.active { display: flex; flex-direction: column; }
+
+        #classroomFolderView, #classroomSessionView {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .classroom-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1px;
+            flex: 1;
+            background: var(--border-color);
+            overflow: hidden;
+        }
+
+        .classroom-column {
+            background: var(--bg-primary);
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .classroom-column:hover { background: var(--bg-secondary); transition: background 0.2s; }
+
+        .classroom-folder-header {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            gap: 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .classroom-folder-title {
+            font-size: 16px;
+            font-weight: 600;
+            flex: 1;
+        }
+
+        .classroom-session-actions {
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            padding: 12px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .classroom-action-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: var(--text-primary);
+            transition: all 0.2s;
+        }
+
+        .classroom-action-btn:active { transform: scale(0.92); }
+        .classroom-action-btn.camera-btn { background: var(--accent); color: white; border-color: var(--accent); }
+        body.dark-theme .classroom-action-btn.camera-btn { color: #000; }
+
+        .classroom-note-card {
+            background: var(--bg-secondary);
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid var(--border-color);
+        }
+        .classroom-note-card:hover { transform: translateX(4px); }
+        .classroom-note-card-title { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+        .classroom-note-card-meta { font-size: 11px; color: var(--text-muted); display: flex; gap: 8px; align-items: center; }
+
+        .classroom-source-section {
+            margin-top: 16px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border-color);
+        }
+        .classroom-source-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+        .classroom-source-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            background: var(--bg-primary);
+            border-radius: 8px;
+            margin-bottom: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            border: 1px solid var(--border-color);
+        }
+        .classroom-source-item:active { transform: scale(0.98); }
+        .classroom-source-item svg { width: 16px; height: 16px; color: var(--text-muted); flex-shrink: 0; }
+        .classroom-source-item-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .classroom-source-item-ref { font-size: 11px; color: var(--text-muted); flex-shrink: 0; }
+
+        .classroom-session-content { padding-bottom: 80px; }
 
         /* ==================== Page 4: Settings ==================== */
         .settings-section {
@@ -3517,6 +3631,70 @@
         </div>
     </div>
 
+    <!-- ==================== Page 5: Classroom ==================== -->
+    <div class="page" id="page5">
+        <!-- 主视图：两栏 -->
+        <div class="classroom-grid" id="classroomGrid">
+            <div class="classroom-column" onclick="onClassroomColumnClick(event, 'course')">
+                <div class="column-header">
+                    <span class="column-title">课堂</span>
+                    <span class="column-count" id="courseCount">0</span>
+                </div>
+                <div class="item-list" id="courseList">
+                    <div class="empty-state">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
+                        <p>点击空白处新建课堂</p>
+                    </div>
+                </div>
+            </div>
+            <div class="classroom-column" onclick="onClassroomColumnClick(event, 'seminar')">
+                <div class="column-header">
+                    <span class="column-title">讲座</span>
+                    <span class="column-count" id="seminarCount">0</span>
+                </div>
+                <div class="item-list" id="seminarList">
+                    <div class="empty-state">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        <p>点击空白处新建讲座</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- 子目录视图(课堂/讲座的讲次列表) -->
+        <div id="classroomFolderView" style="display:none;">
+            <div class="classroom-folder-header">
+                <button class="lecture-back-btn" onclick="closeClassroomFolder()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
+                <span class="classroom-folder-title" id="classroomFolderTitle">课堂</span>
+            </div>
+            <div class="item-list" id="classroomFolderContent" onclick="onClassroomSubfolderClick(event)" style="padding:12px; flex:1; overflow-y:auto;"></div>
+        </div>
+        <!-- 子子目录视图(某一讲的内容：笔记+源素材) -->
+        <div id="classroomSessionView" style="display:none;">
+            <div class="classroom-folder-header">
+                <button class="lecture-back-btn" onclick="closeClassroomSession()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
+                <span class="classroom-folder-title" id="classroomSessionTitle">第一讲</span>
+            </div>
+            <div class="classroom-session-content" id="classroomSessionContent" style="padding:12px; flex:1; overflow-y:auto;">
+            </div>
+            <div class="classroom-session-actions">
+                <label class="classroom-action-btn" title="上传文件">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    <input type="file" accept="image/*,.pdf,.doc,.docx,.txt,.md" multiple style="display:none;" onchange="onClassroomFileUpload(event)">
+                </label>
+                <button class="classroom-action-btn camera-btn" onclick="onClassroomCamera()" title="拍照">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 课堂拍照隐藏input -->
+    <input type="file" id="classroomCameraInput" accept="image/*" capture="environment" style="display:none;" onchange="onClassroomCameraCapture(event)">
+
     <!-- ==================== Page 4: Settings ==================== -->
     <div class="page" id="page4">
         <div style="margin-bottom:16px;">
@@ -3608,6 +3786,23 @@
             </div>
             <div class="ai-persona-edit" id="aiPersonaEdit" style="display: none;">
                 <textarea id="aiPersonaText" placeholder="描述你希望AI具有的性格特点..." onblur="saveAIPersona()">你是一个温柔且有耐心的助手，善于鼓励用户完成任务。</textarea>
+            </div>
+        </div>
+
+        <!-- Classroom Settings -->
+        <div class="settings-section">
+            <div class="settings-section-title">课堂设置</div>
+            <div class="setting-item">
+                <div class="setting-item-left">
+                    <div class="setting-item-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                    </div>
+                    <div>
+                        <div class="setting-item-label">照片储存天数</div>
+                        <div class="setting-item-desc">0 表示永不删除</div>
+                    </div>
+                </div>
+                <input type="number" id="photoRetentionDays" value="0" min="0" class="settings-input" style="width:60px;text-align:center;" onchange="savePhotoRetention()">
             </div>
         </div>
 
@@ -4204,6 +4399,10 @@
 
     <!-- ==================== Bottom Nav ==================== -->
     <div class="bottom-nav">
+        <div class="nav-item" id="navClassroom" onclick="switchPage(5)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/><line x1="12" y1="7" x2="12" y2="21"/></svg>
+            <span>课堂</span>
+        </div>
         <div class="nav-item active" onclick="switchPage(1)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
             <span>书架</span>
@@ -4229,6 +4428,10 @@
             papers: [],
             notes: {},       // { docId: [{ page, text, x, y, canvasData }] }
             archived: [],
+            classroom: {
+                courses: [],    // { id, name, createdAt, sessions: [{ id, title, createdAt, notes: [{ id, title, content, status, progress, maxProgress, scrollPosition, generatedAt, ref }], sources: [{ id, ref, name, type, dataKey, uploadedAt, expiresAt }] }] }
+                seminars: []
+            },
             settings: {
                 supabaseUrl: '',
                 supabaseKey: '',
@@ -4241,7 +4444,8 @@
                 userAvatar: '',
                 aiName: 'AI助手',
                 aiAvatar: '',
-                aiPersona: '你是一个温柔且有耐心的助手，善于鼓励用户完成任务。'
+                aiPersona: '你是一个温柔且有耐心的助手，善于鼓励用户完成任务。',
+                photoRetentionDays: 0
             }
         };
 
@@ -4274,6 +4478,11 @@
             applySettings();
             renderLibrary();
             renderNotesPage();
+            renderClassroomPage();
+
+            // Load photo retention setting
+            const retEl = document.getElementById('photoRetentionDays');
+            if (retEl) retEl.value = appData.settings.photoRetentionDays || 0;
             
             // 初始化R2自动同步
             initR2AutoSync();
@@ -4381,6 +4590,7 @@
                     if (!appData.notes) appData.notes = {};
                     if (!appData.archived) appData.archived = [];
                     if (!appData.settings) appData.settings = {};
+                    if (!appData.classroom) appData.classroom = { courses: [], seminars: [] };
                 } catch(e) {}
             }
         }
@@ -4395,6 +4605,9 @@
         }
 
         // ==================== Navigation ====================
+        // nav-item index mapping: page num -> nav index
+        const pageToNavIndex = { 5: 0, 1: 1, 2: 2, 3: 3, 4: 4 };
+
         function switchPage(num) {
             // 分屏切换触发后 600ms 内忽略随之而来的 click，防止两指压下/抬起时触发误点
             if (window.__lastSplitToggleAt && (Date.now() - window.__lastSplitToggleAt) < 600) {
@@ -4409,7 +4622,8 @@
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
             document.getElementById('page' + num).classList.add('active');
-            document.querySelectorAll('.nav-item')[num - 1].classList.add('active');
+            const navIdx = pageToNavIndex[num];
+            if (navIdx !== undefined) document.querySelectorAll('.nav-item')[navIdx].classList.add('active');
 
             // 关闭讲义阅读器
             if (document.getElementById('lectureViewer').classList.contains('show')) {
@@ -4434,6 +4648,10 @@
                 renderNotesPage();
                 // 自动打开上次的讲义
                 restoreLastLecture();
+            }
+
+            if (num === 5) {
+                renderClassroomPage();
             }
         }
 
@@ -4498,7 +4716,7 @@
             const page2 = document.getElementById('page2');
             if (page2) page2.classList.add('active');
             const navItems = document.querySelectorAll('.nav-item');
-            if (navItems[1]) navItems[1].classList.add('active'); // 第 2 个是"阅读"
+            if (navItems[pageToNavIndex[2]]) navItems[pageToNavIndex[2]].classList.add('active');
             document.body.classList.add('page2-active'); // 草稿小条显示
             // 重新渲染 PDF 以匹配恢复后的宽度
             setTimeout(() => {
@@ -11543,6 +11761,650 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js').catch(() => {});
         }
+
+        // ==================== Classroom ====================
+        let currentClassroomType = null; // 'course' or 'seminar'
+        let currentClassroomFolder = null; // the folder object
+        let currentClassroomSession = null; // the session object
+
+        function savePhotoRetention() {
+            const val = parseInt(document.getElementById('photoRetentionDays').value) || 0;
+            appData.settings.photoRetentionDays = Math.max(0, val);
+            saveData();
+            showToast('已保存');
+        }
+
+        function renderClassroomPage() {
+            if (!appData.classroom) appData.classroom = { courses: [], seminars: [] };
+            // 如果在子视图中，不渲染主视图
+            if (document.getElementById('classroomFolderView').style.display !== 'none') return;
+            if (document.getElementById('classroomSessionView').style.display !== 'none') return;
+
+            const courses = appData.classroom.courses || [];
+            const seminars = appData.classroom.seminars || [];
+            document.getElementById('courseCount').textContent = courses.length;
+            document.getElementById('seminarCount').textContent = seminars.length;
+
+            const courseList = document.getElementById('courseList');
+            const seminarList = document.getElementById('seminarList');
+
+            if (courses.length === 0) {
+                courseList.innerHTML = '<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg><p>点击空白处新建课堂</p></div>';
+            } else {
+                courseList.innerHTML = courses.map(c => `
+                    <div class="item-card" onclick="event.stopPropagation(); openClassroomFolder('course', '${c.id}')">
+                        <div class="item-card-title">${c.name}</div>
+                        <div class="item-card-meta">
+                            <span class="item-card-type">${(c.sessions || []).length} 讲</span>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            if (seminars.length === 0) {
+                seminarList.innerHTML = '<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><p>点击空白处新建讲座</p></div>';
+            } else {
+                seminarList.innerHTML = seminars.map(s => `
+                    <div class="item-card" onclick="event.stopPropagation(); openClassroomFolder('seminar', '${s.id}')">
+                        <div class="item-card-title">${s.name}</div>
+                        <div class="item-card-meta">
+                            <span class="item-card-type">${(s.sessions || []).length} 讲</span>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            // 清理过期照片
+            cleanExpiredPhotos();
+        }
+
+        function onClassroomColumnClick(event, type) {
+            if (event.target.closest('.item-card')) return;
+            const name = prompt(type === 'course' ? '新建课堂名称:' : '新建讲座名称:');
+            if (!name || !name.trim()) return;
+            if (!appData.classroom) appData.classroom = { courses: [], seminars: [] };
+            const list = type === 'course' ? appData.classroom.courses : appData.classroom.seminars;
+            list.push({
+                id: 'cls_' + Date.now(),
+                name: name.trim(),
+                createdAt: new Date().toISOString(),
+                sessions: []
+            });
+            saveData();
+            renderClassroomPage();
+        }
+
+        function openClassroomFolder(type, folderId) {
+            const list = type === 'course' ? appData.classroom.courses : appData.classroom.seminars;
+            const folder = list.find(f => f.id === folderId);
+            if (!folder) return;
+            currentClassroomType = type;
+            currentClassroomFolder = folder;
+            currentClassroomSession = null;
+
+            document.getElementById('classroomGrid').style.display = 'none';
+            document.getElementById('classroomFolderView').style.display = 'flex';
+            document.getElementById('classroomSessionView').style.display = 'none';
+            document.getElementById('classroomFolderTitle').textContent = folder.name;
+
+            renderClassroomFolderContent();
+        }
+
+        function renderClassroomFolderContent() {
+            const folder = currentClassroomFolder;
+            if (!folder) return;
+            const sessions = folder.sessions || [];
+            const container = document.getElementById('classroomFolderContent');
+
+            let html = sessions.map(s => {
+                const noteCount = (s.notes || []).length;
+                const sourceCount = (s.sources || []).length;
+                return `
+                    <div class="item-card" onclick="event.stopPropagation(); openClassroomSession('${s.id}')" style="position:relative;">
+                        <div class="item-card-title">${s.title}</div>
+                        <div class="item-card-meta">
+                            <span class="item-card-type">${noteCount} 笔记 / ${sourceCount} 素材</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            if (!html) {
+                html = '<div class="empty-state"><p>点击空白处新建讲次</p></div>';
+            }
+            container.innerHTML = html;
+        }
+
+        function onClassroomSubfolderClick(event) {
+            if (event.target.closest('.item-card')) return;
+            createNewSession();
+        }
+
+        function createNewSession() {
+            if (!currentClassroomFolder) return;
+            const sessions = currentClassroomFolder.sessions || [];
+            const today = new Date();
+            const dateStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+            const existingToday = sessions.filter(s => s.title.startsWith(dateStr)).length;
+            const lectureNum = existingToday + 1;
+            const lectureNames = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
+            const numStr = lectureNum <= 10 ? lectureNames[lectureNum - 1] : String(lectureNum);
+            const defaultTitle = dateStr + '-第' + numStr + '讲';
+
+            const title = prompt('讲次标题:', defaultTitle);
+            if (!title || !title.trim()) return;
+
+            if (!currentClassroomFolder.sessions) currentClassroomFolder.sessions = [];
+            const session = {
+                id: 'ses_' + Date.now(),
+                title: title.trim(),
+                createdAt: new Date().toISOString(),
+                notes: [],
+                sources: []
+            };
+            currentClassroomFolder.sessions.push(session);
+            saveData();
+            renderClassroomFolderContent();
+        }
+
+        function closeClassroomFolder() {
+            currentClassroomFolder = null;
+            currentClassroomType = null;
+            document.getElementById('classroomGrid').style.display = '';
+            document.getElementById('classroomFolderView').style.display = 'none';
+            renderClassroomPage();
+        }
+
+        function openClassroomSession(sessionId) {
+            if (!currentClassroomFolder) return;
+            const session = currentClassroomFolder.sessions.find(s => s.id === sessionId);
+            if (!session) return;
+            currentClassroomSession = session;
+
+            document.getElementById('classroomFolderView').style.display = 'none';
+            document.getElementById('classroomSessionView').style.display = 'flex';
+            document.getElementById('classroomSessionTitle').textContent = session.title;
+
+            renderClassroomSessionContent();
+        }
+
+        function closeClassroomSession() {
+            currentClassroomSession = null;
+            document.getElementById('classroomSessionView').style.display = 'none';
+            document.getElementById('classroomFolderView').style.display = 'flex';
+            renderClassroomFolderContent();
+        }
+
+        function renderClassroomSessionContent() {
+            const session = currentClassroomSession;
+            if (!session) return;
+            const container = document.getElementById('classroomSessionContent');
+
+            // 笔记列表
+            let notesHtml = '';
+            if (session.notes && session.notes.length) {
+                notesHtml = session.notes.map((n, idx) => `
+                    <div class="classroom-note-card" onclick="openClassroomNote('${session.id}', ${idx})">
+                        <div class="classroom-note-card-title">${n.title || '笔记'}</div>
+                        <div class="classroom-note-card-meta">
+                            <span>${n.status === 'generating' ? '生成中...' : (n.status === 'error' ? '生成失败' : (n.maxProgress || 0) + '%')}</span>
+                            <span>${n.ref || ''}</span>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                notesHtml = '<div style="color:var(--text-muted);font-size:13px;text-align:center;padding:20px;">上传文件或拍照以生成笔记</div>';
+            }
+
+            // 源素材列表
+            let sourcesHtml = '';
+            if (session.sources && session.sources.length) {
+                sourcesHtml = session.sources.map(s => `
+                    <div class="classroom-source-item" onclick="viewClassroomSource('${s.id}')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${s.type === 'image' ? '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>' : '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>'}</svg>
+                        <span class="classroom-source-item-name">${s.name}</span>
+                        <span class="classroom-source-item-ref">${s.ref}</span>
+                    </div>
+                `).join('');
+            }
+
+            container.innerHTML = notesHtml +
+                (session.sources && session.sources.length ? `
+                    <div class="classroom-source-section">
+                        <div class="classroom-source-title">源素材</div>
+                        ${sourcesHtml}
+                    </div>
+                ` : '');
+        }
+
+        function getClassroomRef(folderName, sessionTitle, uploadIndex) {
+            return folderName + '-' + sessionTitle + '-' + String(uploadIndex).padStart(3, '0');
+        }
+
+        async function processClassroomUpload(files) {
+            if (!currentClassroomFolder || !currentClassroomSession) return;
+            const session = currentClassroomSession;
+            if (!session.sources) session.sources = [];
+            if (!session.notes) session.notes = [];
+
+            const retentionDays = appData.settings.photoRetentionDays || 0;
+
+            for (const file of files) {
+                const isImage = file.type.startsWith('image/');
+                const uploadIndex = session.sources.length + 1;
+                const ref = getClassroomRef(currentClassroomFolder.name, session.title, uploadIndex);
+                const sourceId = 'src_' + Date.now() + '_' + uploadIndex;
+                const dataKey = 'classroom_' + sourceId;
+
+                // 读取文件数据
+                const fileData = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = reject;
+                    if (isImage) {
+                        reader.readAsDataURL(file);
+                    } else {
+                        reader.readAsArrayBuffer(file);
+                    }
+                });
+
+                // 存入IndexedDB
+                await saveFileData(dataKey, fileData);
+
+                const expiresAt = (isImage && retentionDays > 0) ? new Date(Date.now() + retentionDays * 86400000).toISOString() : null;
+
+                session.sources.push({
+                    id: sourceId,
+                    ref: ref,
+                    name: file.name,
+                    type: isImage ? 'image' : 'file',
+                    dataKey: dataKey,
+                    uploadedAt: new Date().toISOString(),
+                    expiresAt: expiresAt
+                });
+
+                // 创建笔记条目
+                const noteId = 'note_' + Date.now() + '_' + uploadIndex;
+                const note = {
+                    id: noteId,
+                    title: '生成中...',
+                    content: null,
+                    status: 'pending',
+                    progress: 0,
+                    maxProgress: 0,
+                    scrollPosition: 0,
+                    generatedAt: null,
+                    ref: ref,
+                    sourceId: sourceId
+                };
+                session.notes.push(note);
+                saveData();
+                renderClassroomSessionContent();
+
+                // 异步调用AI生成笔记
+                generateClassroomNote(session, note, file, fileData, isImage);
+            }
+        }
+
+        async function generateClassroomNote(session, note, file, fileData, isImage) {
+            note.status = 'generating';
+            saveData();
+            renderClassroomSessionContent();
+
+            try {
+                const systemPrompt = `你是一个专业的笔记整理助手。用户会给你一张课堂照片或文件，请将内容转化为结构清晰、易于阅读的笔记。
+
+要求：
+- 使用 ## 作为主标题（内容总览）
+- 使用 ### 作为次级标题（对应源素材的各个部分）
+- 在每个次级标题后注明对应源素材引用：[来源: ${note.ref}]
+- 使用严谨的语言，保留数学公式（LaTeX格式：行内 $...$，独立 $$...$$）
+- 补充必要的解释和上下文
+- 如果内容不清晰，尽量根据上下文推断`;
+
+                let messages;
+                if (isImage) {
+                    messages = [{
+                        role: 'user',
+                        content: [
+                            { type: 'image_url', image_url: { url: fileData } },
+                            { type: 'text', text: `请将这张课堂照片整理为结构化笔记。文件名: ${file.name}，引用编号: ${note.ref}` }
+                        ]
+                    }];
+                } else {
+                    // 对于非图片文件，尝试提取文本
+                    let textContent = '';
+                    if (file.type === 'application/pdf') {
+                        try {
+                            const bytes = new Uint8Array(fileData);
+                            const pdf = await pdfjsLib.getDocument({ data: bytes.slice(0) }).promise;
+                            const parts = [];
+                            for (let i = 1; i <= pdf.numPages; i++) {
+                                const page = await pdf.getPage(i);
+                                const tc = await page.getTextContent();
+                                parts.push(tc.items.map(item => item.str).join(' '));
+                            }
+                            textContent = parts.join('\n\n');
+                        } catch (e) {
+                            textContent = '[PDF文本提取失败]';
+                        }
+                    } else {
+                        try {
+                            const decoder = new TextDecoder();
+                            textContent = decoder.decode(new Uint8Array(fileData));
+                        } catch (e) {
+                            textContent = '[文件内容读取失败]';
+                        }
+                    }
+                    messages = [{
+                        role: 'user',
+                        content: `请将以下内容整理为结构化笔记。文件名: ${file.name}，引用编号: ${note.ref}\n\n---\n${textContent}`
+                    }];
+                }
+
+                const result = await callAI(systemPrompt, messages, { maxTokens: 4096 });
+                note.content = result || '内容生成失败';
+                note.status = 'ready';
+                note.generatedAt = new Date().toISOString();
+
+                // 从内容中提取主标题作为笔记标题
+                const titleMatch = (note.content || '').match(/^##\s+(.+)$/m);
+                note.title = titleMatch ? titleMatch[1].trim() : file.name;
+
+            } catch (err) {
+                console.error('生成课堂笔记失败:', err);
+                note.content = null;
+                note.status = 'error';
+                note.title = file.name + ' (生成失败)';
+                showToast('笔记生成失败: ' + err.message);
+            }
+            saveData();
+            renderClassroomSessionContent();
+        }
+
+        function onClassroomFileUpload(event) {
+            const files = Array.from(event.target.files);
+            if (!files.length) return;
+            event.target.value = '';
+            processClassroomUpload(files);
+        }
+
+        function onClassroomCamera() {
+            document.getElementById('classroomCameraInput').click();
+        }
+
+        function onClassroomCameraCapture(event) {
+            const files = Array.from(event.target.files);
+            if (!files.length) return;
+            event.target.value = '';
+            processClassroomUpload(files);
+        }
+
+        async function viewClassroomSource(sourceId) {
+            if (!currentClassroomSession) return;
+            const source = currentClassroomSession.sources.find(s => s.id === sourceId);
+            if (!source) return;
+
+            try {
+                const data = await getFileData(source.dataKey);
+                if (!data) { showToast('文件已过期或被删除'); return; }
+
+                if (source.type === 'image') {
+                    // 在新窗口中显示图片
+                    const w = window.open('', '_blank');
+                    if (w) {
+                        w.document.write(`<html><head><title>${source.name}</title><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#000;"><img src="${data}" style="max-width:100%;max-height:100vh;object-fit:contain;"></body></html>`);
+                    }
+                } else {
+                    showToast('文件: ' + source.name);
+                }
+            } catch (e) {
+                showToast('无法加载文件');
+            }
+        }
+
+        // 打开课堂笔记 - 复用讲义阅读器
+        function openClassroomNote(sessionId, noteIndex) {
+            if (!currentClassroomFolder || !currentClassroomSession) return;
+            const session = currentClassroomSession.id === sessionId ? currentClassroomSession : null;
+            if (!session) return;
+            const note = session.notes[noteIndex];
+            if (!note) return;
+
+            // 把课堂笔记伪装成讲义章节，复用lectureViewer
+            currentLecture = {
+                bookId: '__classroom__' + session.id,
+                chapterIndex: noteIndex,
+                isClassroom: true,
+                session: session,
+                folder: currentClassroomFolder
+            };
+
+            document.getElementById('lectureViewerTitle').textContent = note.title || '笔记';
+            document.getElementById('lectureProgressBadge').textContent = '0%';
+
+            displayClassroomNoteContent(note);
+            updateClassroomNoteNavButtons(session, noteIndex);
+
+            document.getElementById('lectureViewer').classList.add('show');
+            document.getElementById('lectureFooter').style.display = 'flex';
+            document.body.classList.add('lecture-active');
+            document.getElementById('lectureDraftMiniBar').style.display = '';
+            document.getElementById('lectureDraftPanel').classList.remove('show');
+            initLectureFontsize();
+        }
+
+        function displayClassroomNoteContent(note) {
+            const container = document.getElementById('lectureViewerContent');
+
+            if (note.status === 'generating') {
+                container.innerHTML = '<div class="generating-indicator"><div class="generating-spinner"></div><span>正在生成笔记...</span></div>';
+                return;
+            }
+            if (!note.content) {
+                container.innerHTML = '<p style="text-align:center;color:var(--text-muted);">内容加载失败</p>';
+                return;
+            }
+
+            // 复用讲义的markdown+latex渲染
+            let content = note.content;
+            const latexBlocks = [];
+            const latexInlines = [];
+            content = content.replace(/\$\$([\s\S]*?)\$\$/g, (match, p1) => {
+                latexBlocks.push(p1.trim());
+                return `%%LATEXBLOCK${latexBlocks.length - 1}%%`;
+            });
+            content = content.replace(/\$([^\$\n]+?)\$/g, (match, p1) => {
+                latexInlines.push(p1.trim());
+                return `%%LATEXINLINE${latexInlines.length - 1}%%`;
+            });
+
+            // 将 [来源: xxx] 转换为可点击的链接
+            content = content.replace(/\[来源:\s*([^\]]+)\]/g, (match, ref) => {
+                return `<a class="classroom-source-link" onclick="jumpToClassroomSource('${ref.trim()}')" style="color:var(--accent);cursor:pointer;text-decoration:underline;font-size:12px;">[来源: ${ref.trim()}]</a>`;
+            });
+
+            let html = content
+                .replace(/^### (.*$)/gm, '<h3>$1</h3>')
+                .replace(/^## (.*$)/gm, '<h2>$1</h2>')
+                .replace(/^# (.*$)/gm, '<h1>$1</h1>')
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/^- (.*$)/gm, '<li>$1</li>')
+                .replace(/^(\d+)\. (.*$)/gm, '<li>$2</li>')
+                .replace(/\n\n/g, '</p><p>')
+                .replace(/\n/g, '<br>');
+
+            html = html.replace(/%%LATEXBLOCK(\d+)%%/g, (match, idx) => {
+                return `</p><div class="latex-display">$$${latexBlocks[parseInt(idx)]}$$</div><p>`;
+            });
+            html = html.replace(/%%LATEXINLINE(\d+)%%/g, (match, idx) => {
+                return `$${latexInlines[parseInt(idx)]}$`;
+            });
+
+            container.innerHTML = '<div class="lecture-body"><p>' + html + '</p></div>';
+
+            // 画布
+            const lectureBody = container.querySelector('.lecture-body');
+            if (lectureBody) {
+                lectureBody.style.position = 'relative';
+                const canvas = document.createElement('canvas');
+                canvas.id = 'lectureDrawCanvas';
+                canvas.className = 'lecture-draw-canvas';
+                lectureBody.appendChild(canvas);
+                setTimeout(() => {
+                    initLectureDrawCanvas();
+                    loadLectureDrawing();
+                }, 100);
+            }
+
+            renderLectureMath(container);
+            container.scrollTop = note.scrollPosition || 0;
+        }
+
+        function updateClassroomNoteNavButtons(session, noteIndex) {
+            const total = session.notes.length;
+            document.getElementById('lecturePrevBtn').disabled = noteIndex <= 0;
+            document.getElementById('lectureNextBtn').disabled = noteIndex >= total - 1;
+            document.getElementById('lectureNextBtn').textContent = noteIndex >= total - 1 ? '已完成' : '下一节';
+            // 隐藏"查看书籍"按钮
+            document.getElementById('lectureToBookBtn').style.display = 'none';
+        }
+
+        function jumpToClassroomSource(ref) {
+            if (!currentClassroomSession) return;
+            const source = currentClassroomSession.sources.find(s => s.ref === ref);
+            if (source) {
+                viewClassroomSource(source.id);
+            } else {
+                showToast('未找到源素材: ' + ref);
+            }
+        }
+
+        // 清理过期照片
+        async function cleanExpiredPhotos() {
+            if (!appData.classroom) return;
+            const now = new Date().toISOString();
+            let changed = false;
+            const allFolders = [...(appData.classroom.courses || []), ...(appData.classroom.seminars || [])];
+            for (const folder of allFolders) {
+                for (const session of (folder.sessions || [])) {
+                    if (!session.sources) continue;
+                    const expired = session.sources.filter(s => s.expiresAt && s.expiresAt < now);
+                    for (const src of expired) {
+                        try { await deleteFileData(src.dataKey); } catch (e) {}
+                        session.sources = session.sources.filter(s => s.id !== src.id);
+                        changed = true;
+                    }
+                }
+            }
+            if (changed) saveData();
+        }
+
+        // 覆写讲义的prevLecture/nextLecture以支持课堂笔记导航
+        const _origPrevLecture = prevLecture;
+        const _origNextLecture = nextLecture;
+        const _origCloseLectureViewer = closeLectureViewer;
+        const _origConfirmRegenerateLecture = confirmRegenerateLecture;
+        const _origUpdateLectureProgress = updateLectureProgress;
+        const _origDisplayLectureContent = displayLectureContent;
+
+        prevLecture = function() {
+            if (currentLecture && currentLecture.isClassroom) {
+                if (currentLecture.chapterIndex <= 0) return;
+                openClassroomNote(currentLecture.session.id, currentLecture.chapterIndex - 1);
+                return;
+            }
+            _origPrevLecture();
+        };
+
+        nextLecture = function() {
+            if (currentLecture && currentLecture.isClassroom) {
+                const total = currentLecture.session.notes.length;
+                if (currentLecture.chapterIndex >= total - 1) return;
+                openClassroomNote(currentLecture.session.id, currentLecture.chapterIndex + 1);
+                return;
+            }
+            _origNextLecture();
+        };
+
+        closeLectureViewer = function() {
+            if (currentLecture && currentLecture.isClassroom) {
+                saveLectureDraft();
+                collapseLectureDraftPanel();
+                hideLectureSelectionMenu();
+                document.getElementById('lectureViewer').classList.remove('show');
+                document.getElementById('lectureFooter').style.display = 'none';
+                document.body.classList.remove('lecture-active');
+                // 恢复"查看书籍"按钮
+                document.getElementById('lectureToBookBtn').style.display = '';
+                currentLecture = null;
+                renderClassroomSessionContent();
+                return;
+            }
+            _origCloseLectureViewer();
+        };
+
+        confirmRegenerateLecture = function() {
+            if (currentLecture && currentLecture.isClassroom) {
+                const session = currentLecture.session;
+                const note = session.notes[currentLecture.chapterIndex];
+                if (!note) return;
+                if (confirm('确定要重新生成「' + (note.title || '笔记') + '」吗？当前内容将被覆盖。')) {
+                    note.content = null;
+                    note.status = 'pending';
+                    note.scrollPosition = 0;
+                    note.maxProgress = 0;
+                    saveData();
+                    // 需要重新获取源文件来重新生成
+                    regenerateClassroomNote(session, note);
+                    displayClassroomNoteContent(note);
+                }
+                return;
+            }
+            _origConfirmRegenerateLecture();
+        };
+
+        async function regenerateClassroomNote(session, note) {
+            const source = session.sources.find(s => s.id === note.sourceId);
+            if (!source) {
+                showToast('源素材已被删除');
+                return;
+            }
+            try {
+                const fileData = await getFileData(source.dataKey);
+                if (!fileData) { showToast('源文件已过期'); return; }
+                const isImage = source.type === 'image';
+                const fakeFile = { name: source.name, type: isImage ? 'image/jpeg' : 'application/octet-stream' };
+                generateClassroomNote(session, note, fakeFile, fileData, isImage);
+            } catch (e) {
+                showToast('重新生成失败: ' + e.message);
+            }
+        }
+
+        // 覆写updateLectureProgress以支持课堂笔记
+        updateLectureProgress = function() {
+            if (!currentLecture) return;
+            const container = document.getElementById('lectureViewerContent');
+            const scrollHeight = container.scrollHeight - container.clientHeight;
+            const progress = scrollHeight > 0 ? Math.round((container.scrollTop / scrollHeight) * 100) : 100;
+
+            if (currentLecture.isClassroom) {
+                const note = currentLecture.session.notes[currentLecture.chapterIndex];
+                if (note) {
+                    note.maxProgress = Math.max(note.maxProgress || 0, progress);
+                    note.scrollPosition = container.scrollTop;
+                }
+            } else {
+                const chapter = appData.lectures[currentLecture.bookId].chapters[currentLecture.chapterIndex];
+                chapter.maxProgress = Math.max(chapter.maxProgress || 0, progress);
+                chapter.scrollPosition = container.scrollTop;
+            }
+
+            document.getElementById('lectureProgressBadge').textContent = progress + '%';
+            clearTimeout(window.lectureProgressSaveTimeout);
+            window.lectureProgressSaveTimeout = setTimeout(() => saveData(), 1000);
+        };
 
         // Init
         init();
