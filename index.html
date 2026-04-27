@@ -12357,26 +12357,30 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
 
             const retentionDays = appData.settings.photoRetentionDays || 0;
 
-            for (const file of files) {
+            // 并行读取所有文件
+            const readPromises = Array.from(files).map(file => {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve({ file, data: reader.result });
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+            });
+            const readResults = await Promise.all(readPromises);
+
+            // 处理每个文件：存本地 + 加入上传队列 + 创建笔记
+            for (const { file, data: fileData } of readResults) {
                 const isImage = file.type.startsWith('image/');
                 const uploadIndex = session.sources.length + 1;
                 const ref = getClassroomRef(currentClassroomFolder.name, session.title, uploadIndex);
                 const sourceId = 'src_' + Date.now() + '_' + uploadIndex;
                 const dataKey = 'classroom_' + sourceId;
 
-                // 读取文件数据 - 统一用dataURL，便于云同步和预览
-                const fileData = await new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onload = () => resolve(reader.result);
-                    reader.onerror = reject;
-                    reader.readAsDataURL(file);
-                });
-
-                // 存入IndexedDB
+                // 存入本地IndexedDB（不等云端）
                 await saveFileData(dataKey, fileData);
 
-                // 上传到R2云端
-                uploadClassroomFile(dataKey, fileData).catch(e => console.warn('课堂文件上传失败:', e));
+                // 排入后台上传队列（不阻塞）
+                uploadClassroomFile(dataKey, fileData);
 
                 const expiresAt = (isImage && retentionDays > 0) ? new Date(Date.now() + retentionDays * 86400000).toISOString() : null;
 
@@ -12390,7 +12394,6 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     expiresAt: expiresAt
                 });
 
-                // 创建笔记条目
                 const noteId = 'note_' + Date.now() + '_' + uploadIndex;
                 const note = {
                     id: noteId,
@@ -12405,13 +12408,15 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     sourceId: sourceId
                 };
                 session.notes.push(note);
-                saveData();
-                debouncedChatSync();
-                renderClassroomSessionContent();
 
-                // 异步调用AI生成笔记
+                // 异步AI生成（不阻塞循环）
                 generateClassroomNote(session, note, file, fileData, isImage);
             }
+
+            // 一次性保存 + 一次性元数据同步
+            saveData();
+            debouncedChatSync();
+            renderClassroomSessionContent();
         }
 
         async function generateClassroomNote(session, note, file, fileData, isImage) {
@@ -12697,11 +12702,42 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
         }
 
         // ==================== 课堂文件云同步 ====================
-        async function uploadClassroomFile(dataKey, fileData) {
+        // 后台上传队列：元数据立即同步，文件排队后台并行上传
+        const classroomFileQueue = [];
+        let classroomFileUploading = false;
+        const CLASSROOM_UPLOAD_CONCURRENCY = 3;
+
+        function enqueueClassroomFileUpload(dataKey, fileData) {
+            classroomFileQueue.push({ dataKey, fileData });
+            processClassroomFileQueue();
+        }
+
+        async function processClassroomFileQueue() {
+            if (classroomFileUploading || classroomFileQueue.length === 0) return;
             const config = appData.settings && appData.settings.r2Config;
-            if (!config || !config.accessKeyId) return;
-            const r2Key = 'classroom_files/' + dataKey;
-            await r2PutObject(r2Key, fileData, 'text/plain');
+            if (!config || !config.accessKeyId) { classroomFileQueue.length = 0; return; }
+
+            classroomFileUploading = true;
+            try {
+                while (classroomFileQueue.length > 0) {
+                    // 取出最多 CONCURRENCY 个任务并行上传
+                    const batch = classroomFileQueue.splice(0, CLASSROOM_UPLOAD_CONCURRENCY);
+                    await Promise.all(batch.map(async (task) => {
+                        try {
+                            const r2Key = 'classroom_files/' + task.dataKey;
+                            await r2PutObject(r2Key, task.fileData, 'text/plain');
+                        } catch (e) {
+                            console.warn('课堂文件上传失败:', task.dataKey, e);
+                        }
+                    }));
+                }
+            } finally {
+                classroomFileUploading = false;
+            }
+        }
+
+        async function uploadClassroomFile(dataKey, fileData) {
+            enqueueClassroomFileUpload(dataKey, fileData);
         }
 
         async function downloadClassroomFile(dataKey) {
