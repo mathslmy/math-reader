@@ -7817,7 +7817,7 @@
                         books: appData.books.map(b => cleanDocForSync(b)),
                         papers: appData.papers.map(p => cleanDocForSync(p)),
                         notes: appData.notes,
-                        archived: appData.archived
+                        archived: (appData.archived || []).map(a => cleanDocForSync(a))
                     }),
                     updated_at: new Date().toISOString()
                 };
@@ -8053,7 +8053,7 @@
                 books: appData.books.map(b => cleanDocForSync(b)),
                 papers: appData.papers.map(p => cleanDocForSync(p)),
                 notes: appData.notes,
-                archived: appData.archived,
+                archived: (appData.archived || []).map(a => cleanDocForSync(a)),
                 settings: settingsToSync,
                 lectures: appData.lectures,
                 drafts: appData.drafts,
@@ -8545,7 +8545,13 @@
             'supabaseUrl', 'supabaseKey',
             'mathpixAppId', 'mathpixAppKey',
             'draftPenEnabled', 'draftPenColor', 'draftPenSize', 'draftEraserEnabled',
-            'lectureDraftPenEnabled', 'lectureDraftPenColor', 'lectureDraftPenSize'
+            'lectureDraftPenEnabled', 'lectureDraftPenColor', 'lectureDraftPenSize',
+            'lastDocId', 'lastLectureBookId', 'lastLectureChapterIndex',
+            'penColor', 'penSize', 'penMode',
+            'notify', 'isDark', 'colorTheme',
+            'bgImage', 'bgOpacity', 'bgBlur',
+            'userAvatar', 'aiAvatar',
+            'lectureFontsize'
         ];
         function stripApiSettingsFrom(settings) {
             const clean = { ...settings };
@@ -8580,7 +8586,7 @@
                     books: appData.books.map(b => cleanDocForSync(b)),
                     papers: appData.papers.map(p => cleanDocForSync(p)),
                     notes: appData.notes,
-                    archived: appData.archived,
+                    archived: (appData.archived || []).map(a => cleanDocForSync(a)),
                     settings: settingsToSync,
                     lectures: appData.lectures,
                     drafts: appData.drafts || {},
@@ -8824,7 +8830,7 @@
                 books: appData.books.map(b => cleanDocForSync(b)),
                 papers: appData.papers.map(p => cleanDocForSync(p)),
                 notes: appData.notes,
-                archived: appData.archived,
+                archived: (appData.archived || []).map(a => cleanDocForSync(a)),
                 settings: appData.settings,
                 exportedAt: new Date().toISOString()
             };
