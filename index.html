@@ -4543,8 +4543,7 @@
             if (container.scrollHeight <= container.clientHeight + 10) return;
             const scrollTop = container.scrollTop;
             const containerHeight = container.clientHeight;
-            const scale = readerZoomScale || 1;
-            const scrollCenter = scrollTop / scale + containerHeight / scale / 2;
+            const scrollCenter = scrollTop + containerHeight / 2;
             let page = 1;
             for (let i = 1; i <= totalPages; i++) {
                 const pd = pageElements[i];
@@ -5905,13 +5904,8 @@
             const container = document.getElementById('readerContainer');
             const containerRect = container.getBoundingClientRect();
             const scrollTop = container.scrollTop;
-            const scale = readerZoomScale || 1;
-            // 缩放后，offsetTop 返回的是未缩放的布局值，但滚动空间被放大了
-            // 实际可见范围需要用 scrollTop / scale 来映射回未缩放坐标系
-            const adjustedScrollTop = scrollTop / scale;
-            const adjustedHeight = containerRect.height / scale;
-            const viewportTop = adjustedScrollTop - adjustedHeight;
-            const viewportBottom = adjustedScrollTop + adjustedHeight * 2;
+            const viewportTop = scrollTop - containerRect.height;
+            const viewportBottom = scrollTop + containerRect.height * 2;
 
             for (let i = 1; i <= totalPages; i++) {
                 const pageData = pageElements[i];
@@ -6228,10 +6222,10 @@
         }
 
         function handleContinuousScroll() {
-            // 缩放或双指平移期间，不触发页码更新和懒渲染，避免过度翻页和白屏
             if (isPinching) return;
             if (scrollUpdateTimer) clearTimeout(scrollUpdateTimer);
             scrollUpdateTimer = setTimeout(() => {
+                if (isPinching) return;
                 updateCurrentPageFromScroll();
                 renderVisiblePages();
             }, 100);
@@ -6241,9 +6235,7 @@
             const container = document.getElementById('readerContainer');
             const scrollTop = container.scrollTop;
             const containerHeight = container.clientHeight;
-            const scale = readerZoomScale || 1;
-            // 缩放后 offsetTop 是未缩放值，scrollTop 是缩放后的值
-            const scrollCenter = scrollTop / scale + containerHeight / scale / 2;
+            const scrollCenter = scrollTop + containerHeight / 2;
 
             let newCurrentPage = 1;
             for (let i = 1; i <= totalPages; i++) {
@@ -6291,9 +6283,8 @@
             
             const container = document.getElementById('readerContainer');
             const targetEl = pageData.placeholder;
-            const scale = readerZoomScale || 1;
             container.scrollTo({
-                top: targetEl.offsetTop * scale - 12,
+                top: targetEl.offsetTop - 12,
                 behavior: 'smooth'
             });
             
@@ -11618,6 +11609,9 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             document.addEventListener('touchmove', (e) => {
                 if (e.touches.length !== 2 || !pinchCandidate || initialDistance <= 0 || !wrapper) return;
 
+                // 双指一旦确认，立即阻止浏览器原生滚动，避免过度翻页
+                e.preventDefault();
+
                 const dist = getDistance(e.touches[0], e.touches[1]);
                 const cy = getCenterY(e.touches[0], e.touches[1]);
                 const cx = getCenterX(e.touches[0], e.touches[1]);
@@ -11633,7 +11627,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                         initialDistance = dist;
                     } else if (Math.abs(dCenterY) >= panActivationThreshold && Math.abs(dCenterY) > Math.abs(dCenterX)) {
                         panStarted = true;
-                        isPinching = true;  // 让画笔 handler 视其为非绘图
+                        isPinching = true;
                         lastCenterY = cy;
                     } else {
                         return;
@@ -11641,19 +11635,15 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 }
 
                 if (panStarted) {
-                    // 双指上下滑动 → 直接滚动 reader 容器（1:1 跟随）
-                    // 手指下滑（cy 增大）→ 页面应往上滚（scrollTop 减小）
                     const deltaY = cy - lastCenterY;
                     lastCenterY = cy;
                     if (readerContainerEl) {
                         readerContainerEl.scrollTop -= deltaY;
                     }
-                    e.preventDefault();
                     return;
                 }
 
                 // Pinch 缩放
-                e.preventDefault();
                 const rawScale = dist / initialDistance;
                 const scaleDelta = (rawScale - 1) * zoomSensitivity;
                 let scale = baseScale * (1 + scaleDelta);
