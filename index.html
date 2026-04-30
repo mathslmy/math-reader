@@ -4543,7 +4543,8 @@
             if (container.scrollHeight <= container.clientHeight + 10) return;
             const scrollTop = container.scrollTop;
             const containerHeight = container.clientHeight;
-            const scrollCenter = scrollTop + containerHeight / 2;
+            const scale = readerZoomScale || 1;
+            const scrollCenter = scrollTop / scale + containerHeight / scale / 2;
             let page = 1;
             for (let i = 1; i <= totalPages; i++) {
                 const pd = pageElements[i];
@@ -5904,8 +5905,13 @@
             const container = document.getElementById('readerContainer');
             const containerRect = container.getBoundingClientRect();
             const scrollTop = container.scrollTop;
-            const viewportTop = scrollTop - containerRect.height;
-            const viewportBottom = scrollTop + containerRect.height * 2;
+            const scale = readerZoomScale || 1;
+            // 缩放后，offsetTop 返回的是未缩放的布局值，但滚动空间被放大了
+            // 实际可见范围需要用 scrollTop / scale 来映射回未缩放坐标系
+            const adjustedScrollTop = scrollTop / scale;
+            const adjustedHeight = containerRect.height / scale;
+            const viewportTop = adjustedScrollTop - adjustedHeight;
+            const viewportBottom = adjustedScrollTop + adjustedHeight * 2;
 
             for (let i = 1; i <= totalPages; i++) {
                 const pageData = pageElements[i];
@@ -5915,7 +5921,6 @@
                 const pageTop = placeholder.offsetTop;
                 const pageBottom = pageTop + placeholder.offsetHeight;
 
-                // 渲染可见范围内的页面（包括上下各一屏的缓冲区）
                 if (pageBottom >= viewportTop && pageTop <= viewportBottom) {
                     await renderSinglePage(i);
                 }
@@ -6223,8 +6228,8 @@
         }
 
         function handleContinuousScroll() {
-            // 画笔模式也使用连续滚动，同样需要更新页码和懒渲染可见页
-            // 使用防抖更新当前页码
+            // 缩放或双指平移期间，不触发页码更新和懒渲染，避免过度翻页和白屏
+            if (isPinching) return;
             if (scrollUpdateTimer) clearTimeout(scrollUpdateTimer);
             scrollUpdateTimer = setTimeout(() => {
                 updateCurrentPageFromScroll();
@@ -6236,7 +6241,9 @@
             const container = document.getElementById('readerContainer');
             const scrollTop = container.scrollTop;
             const containerHeight = container.clientHeight;
-            const scrollCenter = scrollTop + containerHeight / 2;
+            const scale = readerZoomScale || 1;
+            // 缩放后 offsetTop 是未缩放值，scrollTop 是缩放后的值
+            const scrollCenter = scrollTop / scale + containerHeight / scale / 2;
 
             let newCurrentPage = 1;
             for (let i = 1; i <= totalPages; i++) {
@@ -6284,8 +6291,9 @@
             
             const container = document.getElementById('readerContainer');
             const targetEl = pageData.placeholder;
+            const scale = readerZoomScale || 1;
             container.scrollTo({
-                top: targetEl.offsetTop - 12,
+                top: targetEl.offsetTop * scale - 12,
                 behavior: 'smooth'
             });
             
@@ -11547,6 +11555,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
 
         // ==================== Pinch to Zoom ====================
         let isPinching = false;
+        let readerZoomScale = 1; // 暴露给 renderVisiblePages / updateCurrentPageFromScroll
         (function() {
             let initialDistance = 0;
             let currentScale = 1;
@@ -11650,6 +11659,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 let scale = baseScale * (1 + scaleDelta);
                 scale = Math.max(minScale, Math.min(maxScale, scale));
                 currentScale = scale;
+                readerZoomScale = scale;
                 wrapper.style.transform = `scale(${scale})`;
                 wrapper.style.transformOrigin = 'center top';
             }, { passive: false });
@@ -11658,12 +11668,21 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 if (e.touches.length < 2) {
                     initialDistance = 0;
                     pinchCandidate = false;
+                    const wasPinching = pinchStarted || panStarted;
                     pinchStarted = false;
                     panStarted = false;
                     pinchAllowed = false;
-                    setTimeout(() => { isPinching = false; }, 150);
+                    setTimeout(() => {
+                        isPinching = false;
+                        // 缩放/平移结束后，补一次页码更新和可见页渲染
+                        if (wasPinching) {
+                            updateCurrentPageFromScroll();
+                            renderVisiblePages();
+                        }
+                    }, 150);
                     if (currentScale < 1.05) {
                         currentScale = 1;
+                        readerZoomScale = 1;
                         if (wrapper) {
                             wrapper.style.transform = '';
                             wrapper.style.transformOrigin = '';
