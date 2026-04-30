@@ -6218,6 +6218,16 @@
             
             const container = document.getElementById('readerContainer');
             container.addEventListener('scroll', handleContinuousScroll, { passive: true });
+
+            // 在容器上拦截所有双指touchmove的原生滚动
+            // 必须non-passive，否则iPad Safari会忽略preventDefault
+            // 单指滚动不受影响（只拦截touches.length >= 2）
+            container.addEventListener('touchmove', (e) => {
+                if (e.touches.length >= 2) {
+                    e.preventDefault();
+                }
+            }, { passive: false });
+
             scrollListenerAttached = true;
         }
 
