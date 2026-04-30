@@ -11629,13 +11629,17 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 const dCenterX = cx - initialCenterX;
                 const dCenterY = cy - initialCenterY;
 
-                // 激活判定：pinch 需双指间距足够；pan 则无间距要求，任何双指上下滑动都可以翻页
+                // 激活判定
                 if (!pinchStarted && !panStarted) {
+                    // 先判pinch：间距变化够大就是缩放
                     if (pinchAllowed && Math.abs(dDist) >= pinchActivationThreshold) {
                         pinchStarted = true;
                         isPinching = true;
                         initialDistance = dist;
-                    } else if (Math.abs(dCenterY) >= panActivationThreshold && Math.abs(dCenterY) > Math.abs(dCenterX)) {
+                    // 再判pan：中心Y移动够大，且间距几乎没变（排除缩放时的中心点漂移）
+                    } else if (Math.abs(dCenterY) >= panActivationThreshold
+                               && Math.abs(dCenterY) > Math.abs(dCenterX)
+                               && Math.abs(dDist) < pinchActivationThreshold) {
                         panStarted = true;
                         isPinching = true;
                         lastCenterY = cy;
