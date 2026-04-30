@@ -3830,8 +3830,8 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
         </button>
     </div>
-    <input type="file" id="classroomCameraInput" accept="image/*" capture="environment" style="display:none;" onchange="onClassroomCameraCapture(event)">
-    <input type="file" id="classroomFileInput" accept="image/*,.pdf,.doc,.docx,.txt,.md,.tex,.latex" multiple style="display:none;" onchange="onClassroomFileUpload(event)">
+    <input type="file" id="classroomCameraInput" accept="image/*" capture="environment" style="display:none;">
+    <input type="file" id="classroomFileInput" accept="image/*,.pdf,.doc,.docx,.txt,.md,.tex,.latex" multiple style="display:none;">
 
     <!-- ==================== Page 4: Settings ==================== -->
     <div class="page" id="page4">
@@ -4617,6 +4617,10 @@
             // Clean up expired photos
             cleanupExpiredPhotos();
 
+            // Attach initial listeners for classroom file inputs
+            document.getElementById('classroomCameraInput').addEventListener('change', onClassroomCameraCapture);
+            document.getElementById('classroomFileInput').addEventListener('change', onClassroomFileUpload);
+
             // 初始化R2自动同步
             initR2AutoSync();
 
@@ -4735,18 +4739,6 @@
             toSave.books.forEach(b => delete b.data);
             toSave.papers.forEach(p => delete p.data);
             toSave.archived.forEach(a => delete a.data);
-            // 课程素材的 base64 也存在 IndexedDB，localStorage 里不留
-            if (toSave.classroom) {
-                ['courses', 'seminars'].forEach(listKey => {
-                    (toSave.classroom[listKey] || []).forEach(folder => {
-                        (folder.sessions || []).forEach(session => {
-                            (session.sourceFolder || []).forEach(mat => {
-                                delete mat.data;
-                            });
-                        });
-                    });
-                });
-            }
             localStorage.setItem('mathReader', JSON.stringify(toSave));
         }
 
@@ -8457,11 +8449,12 @@
                 settings: settingsToSync,
                 lectures: appData.lectures,
                 drafts: appData.drafts,
-                classroom: cleanClassroomForSync(appData.classroom),
+                classroom: appData.classroom,
                 syncedAt: new Date().toISOString()
             };
             
             await r2PutObject('metadata.json', JSON.stringify(metadata), 'application/json');
+        }
 
         // 清理doc对象用于同步：去掉data、chatHistory中去掉screenshot并限制30条
         function cleanDocForSync(doc) {
@@ -8475,61 +8468,6 @@
                 });
             }
             return cleaned;
-        }
-
-        // 清理 classroom 用于同步：剥掉 sourceFolder 里的 base64 data（图片走单独文件上传）
-        function cleanClassroomForSync(classroom) {
-            if (!classroom) return { courses: [], seminars: [] };
-            const cl = JSON.parse(JSON.stringify(classroom));
-            ['courses', 'seminars'].forEach(listKey => {
-                (cl[listKey] || []).forEach(folder => {
-                    (folder.sessions || []).forEach(session => {
-                        (session.sourceFolder || []).forEach(mat => {
-                            delete mat.data;
-                        });
-                    });
-                });
-            });
-            return cl;
-        }
-
-        // 收集 classroom 里所有素材的 id 列表（用于同步上传/下载）
-        function collectClassroomMaterialIds(classroom) {
-            const ids = [];
-            if (!classroom) return ids;
-            ['courses', 'seminars'].forEach(listKey => {
-                (classroom[listKey] || []).forEach(folder => {
-                    (folder.sessions || []).forEach(session => {
-                        (session.sourceFolder || []).forEach(mat => {
-                            if (mat.id) ids.push(mat.id);
-                        });
-                    });
-                });
-            });
-            return ids;
-        }
-
-        // 按需获取课程素材数据：先查内存 → IndexedDB → R2 云端
-        async function getMaterialData(matId, matDataInMemory) {
-            if (matDataInMemory) return matDataInMemory;
-            // IndexedDB
-            try {
-                const d = await getFileData(matId);
-                if (d) return d;
-            } catch(e) {}
-            // R2 云端按需拉取
-            const config = appData.settings && appData.settings.r2Config;
-            if (config && config.accessKeyId) {
-                try {
-                    const d = await r2GetObject('materials/' + matId);
-                    if (d) {
-                        // 缓存到 IndexedDB 以便下次直接读
-                        try { await saveFileData(matId, d); } catch(e) {}
-                        return d;
-                    }
-                } catch(e) { console.warn('R2按需拉取素材失败:', matId, e); }
-            }
-            return null;
         }
 
         async function triggerSyncOnFileChange(fileId, action) {
@@ -9045,7 +8983,7 @@
                     settings: settingsToSync,
                     lectures: appData.lectures,
                     drafts: appData.drafts || {},
-                    classroom: cleanClassroomForSync(appData.classroom),
+                    classroom: appData.classroom,
                     syncedAt: new Date().toISOString()
                 };
                 
@@ -9060,18 +8998,6 @@
                     if (fileData) {
                         const fileKey = 'files/' + doc.id + '.pdf';
                         await r2PutObject(fileKey, fileData, 'application/pdf');
-                        uploadedFiles++;
-                    }
-                }
-
-                // 3. 上传课程素材文件（图片等，从IndexedDB获取）
-                const matIds = collectClassroomMaterialIds(appData.classroom);
-                for (const matId of matIds) {
-                    let matData = null;
-                    try { matData = await getFileData(matId); } catch(e) {}
-                    if (matData) {
-                        const matKey = 'materials/' + matId;
-                        await r2PutObject(matKey, matData, 'application/octet-stream');
                         uploadedFiles++;
                     }
                 }
@@ -9279,21 +9205,6 @@
                         }
                     } catch (e) {
                         console.warn('Failed to download file:', doc.id, e);
-                    }
-                }
-
-                // 3. 下载课程素材文件（图片等）
-                const matIds = collectClassroomMaterialIds(appData.classroom);
-                for (const matId of matIds) {
-                    const matKey = 'materials/' + matId;
-                    try {
-                        const matData = await r2GetObject(matKey);
-                        if (matData) {
-                            await saveFileData(matId, matData);
-                            downloadedFiles++;
-                        }
-                    } catch (e) {
-                        console.warn('Failed to download material:', matId, e);
                     }
                 }
                 
@@ -12379,25 +12290,35 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
 
         function classroomTakePhoto() {
             if (!currentClassroomSession) { showToast('请先打开子文件夹'); return; }
-            document.getElementById('classroomCameraInput').click();
+            // Clone and replace the input to guarantee iOS Safari re-triggers file picker
+            const oldInput = document.getElementById('classroomCameraInput');
+            const newInput = oldInput.cloneNode(true);
+            newInput.value = '';
+            oldInput.parentNode.replaceChild(newInput, oldInput);
+            newInput.addEventListener('change', onClassroomCameraCapture);
+            newInput.click();
         }
 
         function classroomUploadFile() {
             if (!currentClassroomSession) { showToast('请先打开子文件夹'); return; }
-            document.getElementById('classroomFileInput').click();
+            // Clone and replace the input to guarantee browser re-triggers file picker
+            const oldInput = document.getElementById('classroomFileInput');
+            const newInput = oldInput.cloneNode(true);
+            newInput.value = '';
+            oldInput.parentNode.replaceChild(newInput, oldInput);
+            newInput.addEventListener('change', onClassroomFileUpload);
+            newInput.click();
         }
 
         async function onClassroomCameraCapture(e) {
             const file = e.target.files[0];
             if (!file) return;
-            e.target.value = '';
             await processClassroomUpload([file]);
         }
 
         async function onClassroomFileUpload(e) {
             const files = Array.from(e.target.files);
             if (!files.length) return;
-            e.target.value = '';
             await processClassroomUpload(files);
         }
 
@@ -12426,20 +12347,13 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     reader.readAsDataURL(file);
                 });
 
-                // 把大数据存 IndexedDB，不留在 appData 里（否则 localStorage 会爆）
-                try {
-                    await saveFileData(matId, base64);
-                } catch(err) {
-                    console.error('保存素材到IndexedDB失败:', err);
-                }
-
                 const material = {
                     id: matId,
                     name: file.name,
                     ref: ref,
                     type: isImage ? 'image' : 'file',
                     mimeType: file.type,
-                    data: base64,  // 内存中保留供当次使用，saveData时会剥掉
+                    data: base64,
                     uploadedAt: new Date().toISOString(),
                     retentionStart: isImage ? new Date().toISOString() : null
                 };
@@ -12487,17 +12401,16 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 let options = { maxTokens: 4096 };
 
                 // For images, include the image
-                if (material.type === 'image') {
-                    const imgData = await getMaterialData(material.id, material.data);
-                    if (imgData) {
-                        msgContent = [{
-                            role: 'user',
-                            content: [
-                                { type: 'image_url', image_url: { url: imgData } },
-                                { type: 'text', text: userMsg }
-                            ]
-                        }];
-                    }
+                if (material.type === 'image' && material.data) {
+                    const base64Data = material.data.split(',')[1];
+                    const mimeType = material.mimeType || 'image/jpeg';
+                    msgContent = [{
+                        role: 'user',
+                        content: [
+                            { type: 'image_url', image_url: { url: material.data } },
+                            { type: 'text', text: userMsg }
+                        ]
+                    }];
                 }
 
                 const result = await callAI(systemPrompt, msgContent, options);
@@ -12696,7 +12609,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             viewClassroomSourceItem(type, folderId, sessionId, mat.id);
         }
 
-        async function viewClassroomSourceItem(type, folderId, sessionId, matId) {
+        function viewClassroomSourceItem(type, folderId, sessionId, matId) {
             const folder = getClassroomFolder(type, folderId);
             if (!folder) return;
             const session = (folder.sessions || []).find(s => s.id === sessionId);
@@ -12704,15 +12617,13 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             const mat = (session.sourceFolder || []).find(m => m.id === matId);
             if (!mat) return;
 
-            if (mat.type === 'image') {
-                const imgData = await getMaterialData(mat.id, mat.data);
-                if (!imgData) { showToast('图片数据已过期'); return; }
-
+            if (mat.type === 'image' && mat.data) {
+                // Show image in a simple modal
                 const overlay = document.createElement('div');
                 overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9000;display:flex;align-items:center;justify-content:center;cursor:pointer;';
                 overlay.onclick = () => overlay.remove();
                 const img = document.createElement('img');
-                img.src = imgData;
+                img.src = mat.data;
                 img.style.cssText = 'max-width:95%;max-height:90%;object-fit:contain;border-radius:8px;';
                 const label = document.createElement('div');
                 label.textContent = mat.ref;
@@ -12759,16 +12670,12 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     (folder.sessions || []).forEach(session => {
                         if (!session.sourceFolder) return;
                         const before = session.sourceFolder.length;
-                        const removed = [];
                         session.sourceFolder = session.sourceFolder.filter(mat => {
                             if (mat.type !== 'image') return true;
                             if (!mat.retentionStart) return true;
                             const age = now - new Date(mat.retentionStart).getTime();
-                            if (age >= maxAge) { removed.push(mat.id); return false; }
-                            return true;
+                            return age < maxAge;
                         });
-                        // 清理 IndexedDB 里对应的图片数据
-                        removed.forEach(id => { try { deleteFileData(id); } catch(e) {} });
                         if (session.sourceFolder.length < before) changed = true;
                     });
                 });
