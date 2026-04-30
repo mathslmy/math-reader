@@ -473,6 +473,12 @@
             -webkit-touch-callout: none;
         }
 
+        .reader-container.pinch-active {
+            touch-action: none !important;
+        }
+
+        /* 额外保险：pinch时用CSS也尝试禁止 */
+
         .pdf-canvas-wrapper {
             display: flex;
             flex-direction: column;
@@ -11581,6 +11587,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             let initialCenterY = 0;
             const panActivationThreshold = 10; // 中心点位移达到此值才视为 pan 手势
             let readerContainerEl = null;
+            let pinchScrollLock = null; // pinch开始时的scrollTop，用于强制恢复
 
             function getDistance(t1, t2) {
                 return Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
@@ -11596,8 +11603,10 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 readerContainerEl = container;
 
                 if (e.touches.length === 2) {
-                    // 第二根手指一落下就立刻中止任何正在进行的画笔，并回滚已画出的短线。
                     isPinching = true;
+                    container.classList.add('pinch-active');
+                    // 记录pinch开始时的scrollTop
+                    pinchScrollLock = container.scrollTop;
                     if (typeof rollbackActivePenStroke === 'function') {
                         rollbackActivePenStroke();
                     }
@@ -11644,6 +11653,10 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                         isPinching = true;
                         lastCenterY = cy;
                     } else {
+                        // 尚未激活任何手势，但浏览器可能已经原生滚动了，强制恢复
+                        if (pinchScrollLock !== null && readerContainerEl) {
+                            readerContainerEl.scrollTop = pinchScrollLock;
+                        }
                         return;
                     }
                 }
@@ -11654,10 +11667,15 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     if (readerContainerEl) {
                         readerContainerEl.scrollTop -= deltaY;
                     }
+                    // 更新锁定值为pan后的位置
+                    pinchScrollLock = readerContainerEl ? readerContainerEl.scrollTop : pinchScrollLock;
                     return;
                 }
 
-                // Pinch 缩放
+                // Pinch 缩放 —— 强制恢复scrollTop防止浏览器原生滚动导致翻页
+                if (pinchScrollLock !== null && readerContainerEl) {
+                    readerContainerEl.scrollTop = pinchScrollLock;
+                }
                 const rawScale = dist / initialDistance;
                 const scaleDelta = (rawScale - 1) * zoomSensitivity;
                 let scale = baseScale * (1 + scaleDelta);
@@ -11676,9 +11694,12 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     pinchStarted = false;
                     panStarted = false;
                     pinchAllowed = false;
+                    pinchScrollLock = null;
+                    if (readerContainerEl) {
+                        readerContainerEl.classList.remove('pinch-active');
+                    }
                     setTimeout(() => {
                         isPinching = false;
-                        // 缩放/平移结束后，补一次页码更新和可见页渲染
                         if (wasPinching) {
                             updateCurrentPageFromScroll();
                             renderVisiblePages();
