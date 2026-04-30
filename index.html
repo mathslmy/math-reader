@@ -12311,11 +12311,22 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 html += `<div style="margin-bottom:12px;font-size:13px;font-weight:600;color:var(--text-secondary);">AI 笔记</div>`;
                 session.notes.forEach((note, idx) => {
                     const progress = note.maxProgress || note.progress || 0;
+                    // 去重ref，只显示不重复的来源
+                    const uniqueRefs = [];
+                    if (note.subtitles) {
+                        const seen = new Set();
+                        note.subtitles.forEach(sub => {
+                            if (sub.ref && !seen.has(sub.ref)) {
+                                seen.add(sub.ref);
+                                uniqueRefs.push(sub.ref);
+                            }
+                        });
+                    }
                     html += `<div class="classroom-note-card" onclick="openClassroomNote('${type}','${folder.id}','${session.id}',${idx})">
                         <div class="classroom-note-card-title">${escapeHtml(note.title || '笔记')}</div>
-                        ${note.subtitles ? note.subtitles.map(sub =>
-                            `<div class="classroom-note-card-sub" onclick="event.stopPropagation();viewClassroomSource('${type}','${folder.id}','${session.id}','${sub.ref}')">${escapeHtml(sub.text)} [${sub.ref}]</div>`
-                        ).join('') : ''}
+                        ${uniqueRefs.map(ref =>
+                            `<div class="classroom-note-card-sub" onclick="event.stopPropagation();viewClassroomSource('${type}','${folder.id}','${session.id}','${ref}')">${escapeHtml(ref)}</div>`
+                        ).join('')}
                         <div class="classroom-note-progress">
                             <div class="classroom-note-progress-bar"><div class="classroom-note-progress-fill" style="width:${progress}%"></div></div>
                             <span class="classroom-note-progress-text">${progress}%</span>
