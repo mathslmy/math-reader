@@ -11794,14 +11794,13 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
         // ==================== Pinch to Zoom ====================
         // 方案：pinch 过程中用 CSS transform 做实时预览（轻量），
         // 手指松开后把 userZoom 写入，重新渲染所有页面为真实尺寸，
-        // 滚动位置按比例修正。这样 scrollTop / offsetTop 永远准确。
+        // 滚动位置按焦点页面精确修正。这样 scrollTop / offsetTop 永远准确。
         let isPinching = false;
         let _pinchRebuildScheduled = false;
 
-        async function rebuildPagesForZoom(newZoom, scrollRatio) {
+        async function rebuildPagesForZoom(newZoom, focusPageNum) {
             if (_pinchRebuildScheduled) return;
             _pinchRebuildScheduled = true;
-            const oldZoom = userZoom;
             userZoom = newZoom;
 
             const container = document.getElementById('readerContainer');
@@ -11812,24 +11811,29 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             wrapper.style.transform = '';
             wrapper.style.transformOrigin = '';
 
-            // 记住当前滚动比例
-            const oldScrollH = container.scrollHeight - container.clientHeight;
-            const ratio = (scrollRatio != null) ? scrollRatio
-                : (oldScrollH > 0 ? container.scrollTop / oldScrollH : 0);
+            // 记住焦点页面在视口中的相对位置
+            const focusEl = pageElements[focusPageNum];
+            let focusOffsetRatio = 0;
+            if (focusEl) {
+                const containerRect = container.getBoundingClientRect();
+                const elRect = focusEl.getBoundingClientRect();
+                focusOffsetRatio = (containerRect.top - elRect.top) / elRect.height;
+            }
 
             // 重新渲染（会重建所有 placeholder 尺寸）
             suppressScrollWriteback = true;
             const savedPage = currentPage;
             renderedPages.clear();
             for (let k in pageElements) { if (pageElements[k]) pageElements[k].rendered = false; }
-            // 强制解锁，因为上面已经清了所有状态
             isRenderingAllPages = false;
             await renderAllPDFPages();
 
-            // 恢复滚动位置
-            const newScrollH = container.scrollHeight - container.clientHeight;
-            if (newScrollH > 0) {
-                container.scrollTop = ratio * newScrollH;
+            // 恢复滚动位置：把焦点页面放回视口中原来的相对位置
+            const newFocusEl = pageElements[focusPageNum];
+            if (newFocusEl) {
+                const newElTop = newFocusEl.offsetTop;
+                const newElHeight = newFocusEl.offsetHeight;
+                container.scrollTop = newElTop + focusOffsetRatio * newElHeight * -1;
             }
             currentPage = savedPage;
             document.getElementById('pageInfo').textContent = `${currentPage} / ${totalPages}`;
@@ -11841,11 +11845,10 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             let initialDistance = 0;
             let liveScale = 1;       // CSS transform 实时预览用
             let baseZoom = 1;        // pinch 开始时的 userZoom
-            const minZoom = 1;
+            const minZoom = 0.5;
             const maxZoom = 4;
-            const minPinchDistance = 120;
-            const pinchActivationThreshold = 20;
-            const zoomSensitivity = 0.35;
+            const minPinchDistance = 80;
+            const pinchActivationThreshold = 15;
             let wrapper = null;
             let pinchCandidate = false;
             let pinchStarted = false;
@@ -11854,8 +11857,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             let lastCenterY = 0;
             let initialCenterX = 0;
             let initialCenterY = 0;
-            // 记住 pinch 焦点在容器里的相对位置，用于修正滚动
-            let pinchFocusContainerY = 0;
+            let pinchFocusPageNum = 1;
             const panActivationThreshold = 10;
             let readerContainerEl = null;
 
@@ -11864,6 +11866,19 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             }
             function getCenterX(t1, t2) { return (t1.clientX + t2.clientX) / 2; }
             function getCenterY(t1, t2) { return (t1.clientY + t2.clientY) / 2; }
+
+            // 根据屏幕坐标找到当前焦点所在的页码
+            function getPageAtPoint(container, clientY) {
+                const scrollY = container.scrollTop + (clientY - container.getBoundingClientRect().top);
+                for (let p = 1; p <= totalPages; p++) {
+                    const el = pageElements[p];
+                    if (!el) continue;
+                    if (scrollY >= el.offsetTop && scrollY < el.offsetTop + el.offsetHeight) {
+                        return p;
+                    }
+                }
+                return currentPage || 1;
+            }
 
             document.addEventListener('touchstart', (e) => {
                 const container = document.getElementById('readerContainer');
@@ -11887,9 +11902,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     initialCenterX = getCenterX(e.touches[0], e.touches[1]);
                     initialCenterY = getCenterY(e.touches[0], e.touches[1]);
                     lastCenterY = initialCenterY;
-                    // 记录焦点在滚动内容里的相对位置
-                    const rect = container.getBoundingClientRect();
-                    pinchFocusContainerY = (initialCenterY - rect.top + container.scrollTop);
+                    pinchFocusPageNum = getPageAtPoint(container, initialCenterY);
                     pinchAllowed = dist >= minPinchDistance;
                 }
             }, { passive: false });
@@ -11931,8 +11944,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 // Pinch 缩放——实时预览用 CSS transform
                 e.preventDefault();
                 const rawScale = dist / initialDistance;
-                const scaleDelta = (rawScale - 1) * zoomSensitivity;
-                let targetZoom = baseZoom * (1 + scaleDelta);
+                let targetZoom = baseZoom * rawScale;
                 targetZoom = Math.max(minZoom, Math.min(maxZoom, targetZoom));
                 liveScale = targetZoom / baseZoom;
 
@@ -11956,25 +11968,73 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     setTimeout(() => { isPinching = false; }, 150);
 
                     if (wasPinchZoom && wrapper) {
-                        let newZoom = baseZoom * (1 + (finalLiveScale - 1));
+                        let newZoom = baseZoom * finalLiveScale;
                         newZoom = Math.max(minZoom, Math.min(maxZoom, newZoom));
-                        // 缩放不够明显就弹回1
-                        if (newZoom < 1.05) newZoom = 1;
+                        // 缩放到接近1就弹回1
+                        if (newZoom > 0.9 && newZoom < 1.1) newZoom = 1;
 
                         if (Math.abs(newZoom - userZoom) < 0.02) {
                             // 没实际变化，去掉预览
                             wrapper.style.transform = '';
                             wrapper.style.transformOrigin = '';
                         } else {
-                            // 计算滚动比例，让焦点尽量不跳
-                            const container = readerContainerEl;
-                            const oldScrollH = container.scrollHeight - container.clientHeight;
-                            const scrollRatio = oldScrollH > 0 ? container.scrollTop / oldScrollH : 0;
-                            rebuildPagesForZoom(newZoom, scrollRatio);
+                            rebuildPagesForZoom(newZoom, pinchFocusPageNum);
                         }
                         liveScale = 1;
                     }
                 }
+            });
+
+            // Mac trackpad / 桌面端滚轮缩放 (Ctrl+滚轮 或 trackpad pinch)
+            document.addEventListener('wheel', (e) => {
+                if (!e.ctrlKey && !e.metaKey) return;
+                const container = document.getElementById('readerContainer');
+                if (!container || !container.closest('.page.active')) return;
+                e.preventDefault();
+
+                const delta = -e.deltaY * 0.01;
+                let newZoom = userZoom * (1 + delta);
+                newZoom = Math.max(minZoom, Math.min(maxZoom, newZoom));
+                if (newZoom > 0.9 && newZoom < 1.1 && Math.abs(delta) < 0.05) newZoom = 1;
+
+                const focusPage = getPageAtPoint(container, e.clientY);
+                rebuildPagesForZoom(newZoom, focusPage);
+            }, { passive: false });
+
+            // Safari gesture events (iOS Safari, Mac Safari)
+            let gestureBaseZoom = 1;
+            document.addEventListener('gesturestart', (e) => {
+                const container = document.getElementById('readerContainer');
+                if (!container || !container.closest('.page.active')) return;
+                e.preventDefault();
+                gestureBaseZoom = userZoom;
+            });
+            document.addEventListener('gesturechange', (e) => {
+                const container = document.getElementById('readerContainer');
+                if (!container || !container.closest('.page.active')) return;
+                e.preventDefault();
+                wrapper = document.getElementById('pdfCanvasWrapper');
+                if (!wrapper) return;
+                let targetZoom = gestureBaseZoom * e.scale;
+                targetZoom = Math.max(minZoom, Math.min(maxZoom, targetZoom));
+                const ls = targetZoom / userZoom;
+                const rect = container.getBoundingClientRect();
+                const originX = rect.width / 2;
+                const originY = rect.height / 2 + container.scrollTop;
+                wrapper.style.transformOrigin = `${originX}px ${originY}px`;
+                wrapper.style.transform = `scale(${ls})`;
+                liveScale = ls;
+            });
+            document.addEventListener('gestureend', (e) => {
+                const container = document.getElementById('readerContainer');
+                if (!container || !container.closest('.page.active')) return;
+                e.preventDefault();
+                let newZoom = gestureBaseZoom * e.scale;
+                newZoom = Math.max(minZoom, Math.min(maxZoom, newZoom));
+                if (newZoom > 0.9 && newZoom < 1.1) newZoom = 1;
+                const focusPage = getPageAtPoint(container, container.getBoundingClientRect().top + container.clientHeight / 2);
+                rebuildPagesForZoom(newZoom, focusPage);
+                liveScale = 1;
             });
         })();
 
