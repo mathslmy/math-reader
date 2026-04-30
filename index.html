@@ -473,12 +473,6 @@
             -webkit-touch-callout: none;
         }
 
-        .reader-container.pinch-active {
-            touch-action: none !important;
-        }
-
-        /* 额外保险：pinch时用CSS也尝试禁止 */
-
         .pdf-canvas-wrapper {
             display: flex;
             flex-direction: column;
@@ -11562,61 +11556,27 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
 
         // ==================== Pinch to Zoom ====================
         let isPinching = false;
-        let readerZoomScale = 1; // 暴露给 renderVisiblePages / updateCurrentPageFromScroll
         (function() {
             let initialDistance = 0;
             let currentScale = 1;
             let baseScale = 1;
             const minScale = 1;
             const maxScale = 4;
-            // 最小双指距离：两指间距至少达到这个值才考虑作为缩放候选
             const minPinchDistance = 120;
-            // 激活阈值：双指间距变化超过此值后，才真正进入缩放模式（防止握持/稳定触摸被误判为缩放）
             const pinchActivationThreshold = 20;
-            // 缩放灵敏度，0-1之间，越小越平滑
             const zoomSensitivity = 0.25;
-            // 双击放大目标倍率
             const doubleTapZoomTarget = 1.5;
             let wrapper = null;
-            let pinchCandidate = false; // 已满足起始条件，但尚未超过激活阈值
-            let pinchStarted = false;   // 真正进入缩放模式
-            let pinchAllowed = false;   // 双指间距是否足够大，允许 pinch 缩放（pan 不受此限制）
-            let panStarted = false;     // 已进入双指上下滚动模式
-            let lastCenterY = 0;        // 上一次 touchmove 的两指中心 Y（用于增量滚动）
+            let pinchCandidate = false;
+            let pinchStarted = false;
+            let pinchAllowed = false;
+            let panStarted = false;
+            let lastCenterY = 0;
             let initialCenterX = 0;
             let initialCenterY = 0;
-            const panActivationThreshold = 10; // 中心点位移达到此值才视为 pan 手势
+            const panActivationThreshold = 10;
             let readerContainerEl = null;
-            let pinchScrollLock = null;
-            let pinchScrollRAF = null;
-
-            // 在整个pinch期间，用rAF循环持续把scrollTop钉死在锁定值
-            // 这是对抗iPad Safari合成器线程惯性滚动的唯一可靠方式
-            function pinchScrollGuardLoop() {
-                if (pinchScrollLock !== null && readerContainerEl) {
-                    if (readerContainerEl.scrollTop !== pinchScrollLock) {
-                        readerContainerEl.scrollTop = pinchScrollLock;
-                    }
-                    pinchScrollRAF = requestAnimationFrame(pinchScrollGuardLoop);
-                } else {
-                    pinchScrollRAF = null;
-                }
-            }
-
-            function startPinchScrollGuard(container) {
-                pinchScrollLock = container.scrollTop;
-                if (!pinchScrollRAF) {
-                    pinchScrollRAF = requestAnimationFrame(pinchScrollGuardLoop);
-                }
-            }
-
-            function stopPinchScrollGuard() {
-                pinchScrollLock = null;
-                if (pinchScrollRAF) {
-                    cancelAnimationFrame(pinchScrollRAF);
-                    pinchScrollRAF = null;
-                }
-            }
+            let savedScrollTop = 0;
 
             function getDistance(t1, t2) {
                 return Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
@@ -11633,13 +11593,11 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
 
                 if (e.touches.length === 2) {
                     isPinching = true;
-                    container.classList.add('pinch-active');
-                    startPinchScrollGuard(container);
+                    savedScrollTop = container.scrollTop;
                     if (typeof rollbackActivePenStroke === 'function') {
                         rollbackActivePenStroke();
                     }
                     const dist = getDistance(e.touches[0], e.touches[1]);
-                    // 双指手势候选总是记录，不管距离大小（pan 对间距没有要求）
                     pinchCandidate = true;
                     pinchStarted = false;
                     panStarted = false;
@@ -11648,16 +11606,12 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     initialCenterX = getCenterX(e.touches[0], e.touches[1]);
                     initialCenterY = getCenterY(e.touches[0], e.touches[1]);
                     lastCenterY = initialCenterY;
-                    // 只有双指间距足够大才允许进入 pinch 缩放模式
                     pinchAllowed = dist >= minPinchDistance;
                 }
             }, { passive: false });
 
             document.addEventListener('touchmove', (e) => {
                 if (e.touches.length !== 2 || !pinchCandidate || initialDistance <= 0 || !wrapper) return;
-
-                // 双指一旦确认，立即阻止浏览器原生滚动，避免过度翻页
-                e.preventDefault();
 
                 const dist = getDistance(e.touches[0], e.touches[1]);
                 const cy = getCenterY(e.touches[0], e.touches[1]);
@@ -11666,17 +11620,12 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 const dCenterX = cx - initialCenterX;
                 const dCenterY = cy - initialCenterY;
 
-                // 激活判定
                 if (!pinchStarted && !panStarted) {
-                    // 先判pinch：间距变化够大就是缩放
                     if (pinchAllowed && Math.abs(dDist) >= pinchActivationThreshold) {
                         pinchStarted = true;
                         isPinching = true;
                         initialDistance = dist;
-                    // 再判pan：中心Y移动够大，且间距几乎没变（排除缩放时的中心点漂移）
-                    } else if (Math.abs(dCenterY) >= panActivationThreshold
-                               && Math.abs(dCenterY) > Math.abs(dCenterX)
-                               && Math.abs(dDist) < pinchActivationThreshold) {
+                    } else if (Math.abs(dCenterY) >= panActivationThreshold && Math.abs(dCenterY) > Math.abs(dCenterX)) {
                         panStarted = true;
                         isPinching = true;
                         lastCenterY = cy;
@@ -11690,44 +11639,41 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     lastCenterY = cy;
                     if (readerContainerEl) {
                         readerContainerEl.scrollTop -= deltaY;
-                        pinchScrollLock = readerContainerEl.scrollTop;
                     }
+                    e.preventDefault();
                     return;
                 }
 
-                // Pinch缩放 —— rAF guard持续恢复scrollTop，这里不需要额外操作
+                // Pinch zoom
+                e.preventDefault();
+                if (readerContainerEl) {
+                    readerContainerEl.scrollTop = savedScrollTop;
+                }
                 const rawScale = dist / initialDistance;
                 const scaleDelta = (rawScale - 1) * zoomSensitivity;
                 let scale = baseScale * (1 + scaleDelta);
                 scale = Math.max(minScale, Math.min(maxScale, scale));
                 currentScale = scale;
-                readerZoomScale = scale;
                 wrapper.style.transform = `scale(${scale})`;
-                wrapper.style.transformOrigin = 'center top';
+                const rect = readerContainerEl.getBoundingClientRect();
+                const originX = cx - rect.left + readerContainerEl.scrollLeft;
+                const originY = cy - rect.top + savedScrollTop;
+                wrapper.style.transformOrigin = `${originX}px ${originY}px`;
             }, { passive: false });
 
             document.addEventListener('touchend', (e) => {
                 if (e.touches.length < 2) {
                     initialDistance = 0;
                     pinchCandidate = false;
-                    const wasPinching = pinchStarted || panStarted;
                     pinchStarted = false;
                     panStarted = false;
                     pinchAllowed = false;
-                    stopPinchScrollGuard();
                     if (readerContainerEl) {
-                        readerContainerEl.classList.remove('pinch-active');
+                        readerContainerEl.scrollTop = savedScrollTop;
                     }
-                    setTimeout(() => {
-                        isPinching = false;
-                        if (wasPinching) {
-                            updateCurrentPageFromScroll();
-                            renderVisiblePages();
-                        }
-                    }, 150);
+                    setTimeout(() => { isPinching = false; }, 150);
                     if (currentScale < 1.05) {
                         currentScale = 1;
-                        readerZoomScale = 1;
                         if (wrapper) {
                             wrapper.style.transform = '';
                             wrapper.style.transformOrigin = '';
@@ -11739,7 +11685,8 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             // (double-tap zoom removed)
         })();
 
-        // Close note bubbles on tap outside
+
+                // Close note bubbles on tap outside
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.annotation-marker') && !e.target.closest('.note-bubble')) {
                 document.querySelectorAll('.note-bubble').forEach(b => b.remove());
