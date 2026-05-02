@@ -12426,8 +12426,11 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             // AI-generated notes
             if (session.notes.length > 0) {
                 html += `<div style="margin-bottom:12px;font-size:13px;font-weight:600;color:var(--text-secondary);">AI 笔记</div>`;
+                const sourceIds = new Set((session.sourceFolder || []).map(m => m.id));
                 session.notes.forEach((note, idx) => {
                     const progress = note.maxProgress || note.progress || 0;
+                    const hasSource = note.materialId && sourceIds.has(note.materialId);
+                    const orphanStyle = hasSource ? '' : 'border-left:3px solid #ef4444;';
                     // 去重ref，只显示不重复的来源
                     const uniqueRefs = [];
                     if (note.subtitles) {
@@ -12439,8 +12442,8 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                             }
                         });
                     }
-                    html += `<div class="classroom-note-card" onclick="openClassroomNote('${type}','${folder.id}','${session.id}',${idx})">
-                        <div class="classroom-note-card-title">${escapeHtml(note.title || '笔记')}</div>
+                    html += `<div class="classroom-note-card" style="${orphanStyle}" onclick="openClassroomNote('${type}','${folder.id}','${session.id}',${idx})" oncontextmenu="event.preventDefault();showClassroomNoteLongPress(event,'${type}','${folder.id}','${session.id}',${idx})" ontouchstart="startClassroomNoteLongPress(event,'${type}','${folder.id}','${session.id}',${idx})" ontouchend="cancelClassroomLongPress()" ontouchmove="cancelClassroomLongPress()">
+                        <div class="classroom-note-card-title">${escapeHtml(note.title || '笔记')}${hasSource ? '' : '<span style="color:#ef4444;font-size:11px;margin-left:6px;">源素材已删除</span>'}</div>
                         ${uniqueRefs.map(ref =>
                             `<div class="classroom-note-card-sub" onclick="event.stopPropagation();viewClassroomSource('${type}','${folder.id}','${session.id}','${ref}')">${escapeHtml(ref)}</div>`
                         ).join('')}
@@ -12460,7 +12463,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             } else {
                 session.sourceFolder.forEach(mat => {
                     const isImg = mat.type === 'image';
-                    html += `<div class="classroom-material-card" onclick="viewClassroomSourceItem('${type}','${folder.id}','${session.id}','${mat.id}')">
+                    html += `<div class="classroom-material-card" onclick="viewClassroomSourceItem('${type}','${folder.id}','${session.id}','${mat.id}')" oncontextmenu="event.preventDefault();showClassroomMatLongPress(event,'${type}','${folder.id}','${session.id}','${mat.id}')" ontouchstart="startClassroomMatLongPress(event,'${type}','${folder.id}','${session.id}','${mat.id}')" ontouchend="cancelClassroomLongPress()" ontouchmove="cancelClassroomLongPress()">
                         <div class="classroom-material-icon">
                             ${isImg ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>'
                                     : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'}
@@ -12490,7 +12493,121 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             renderClassroomSessionDetail(folder, session, type);
         }
 
-        // 从IndexedDB懒加载素材base64数据到内存
+        // ==================== 课堂素材/笔记长按删除 ====================
+        let _classroomLongPressTimer = null;
+
+        function cancelClassroomLongPress() {
+            if (_classroomLongPressTimer) { clearTimeout(_classroomLongPressTimer); _classroomLongPressTimer = null; }
+        }
+
+        // 源素材长按
+        function startClassroomMatLongPress(e, type, folderId, sessionId, matId) {
+            cancelClassroomLongPress();
+            const touch = e.touches ? e.touches[0] : e;
+            const cx = touch.clientX, cy = touch.clientY;
+            _classroomLongPressTimer = setTimeout(() => {
+                _classroomLongPressTimer = null;
+                showClassroomMatLongPress({ clientX: cx, clientY: cy }, type, folderId, sessionId, matId);
+            }, 500);
+        }
+
+        function showClassroomMatLongPress(e, type, folderId, sessionId, matId) {
+            closeLongPressMenu();
+            const overlay = document.createElement('div');
+            overlay.className = 'longpress-overlay';
+            overlay.onclick = closeLongPressMenu;
+            const menu = document.createElement('div');
+            menu.className = 'longpress-menu';
+            menu.id = 'longpressMenu';
+            menu.innerHTML = `
+                <button class="longpress-menu-item danger" onclick="deleteClassroomMaterial('${type}','${folderId}','${sessionId}','${matId}')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                    删除素材
+                </button>`;
+            document.body.appendChild(overlay);
+            document.body.appendChild(menu);
+            const touch = e.touches ? e.touches[0] : e;
+            let x = touch.clientX || e.clientX;
+            let y = touch.clientY || e.clientY;
+            if (x + 140 > window.innerWidth) x = window.innerWidth - 150;
+            if (y + 60 > window.innerHeight) y = window.innerHeight - 70;
+            menu.style.left = x + 'px';
+            menu.style.top = y + 'px';
+        }
+
+        function deleteClassroomMaterial(type, folderId, sessionId, matId) {
+            closeLongPressMenu();
+            if (!confirm('删除此素材？')) return;
+            const folder = getClassroomFolder(type, folderId);
+            if (!folder) return;
+            const session = (folder.sessions || []).find(s => s.id === sessionId);
+            if (!session || !session.sourceFolder) return;
+            const idx = session.sourceFolder.findIndex(m => m.id === matId);
+            if (idx < 0) return;
+            session.sourceFolder.splice(idx, 1);
+            // 清理IndexedDB和云端
+            try { deleteFileData('classroom_' + matId); } catch(e){}
+            triggerSyncOnFileChange(matId, 'classroom_delete');
+            saveData();
+            debouncedChatSync();
+            renderClassroomSessionDetail(folder, session, type);
+            showToast('素材已删除');
+        }
+
+        // 笔记长按
+        function startClassroomNoteLongPress(e, type, folderId, sessionId, noteIdx) {
+            cancelClassroomLongPress();
+            const touch = e.touches ? e.touches[0] : e;
+            const cx = touch.clientX, cy = touch.clientY;
+            _classroomLongPressTimer = setTimeout(() => {
+                _classroomLongPressTimer = null;
+                showClassroomNoteLongPress({ clientX: cx, clientY: cy }, type, folderId, sessionId, noteIdx);
+            }, 500);
+        }
+
+        function showClassroomNoteLongPress(e, type, folderId, sessionId, noteIdx) {
+            closeLongPressMenu();
+            const overlay = document.createElement('div');
+            overlay.className = 'longpress-overlay';
+            overlay.onclick = closeLongPressMenu;
+            const menu = document.createElement('div');
+            menu.className = 'longpress-menu';
+            menu.id = 'longpressMenu';
+            menu.innerHTML = `
+                <button class="longpress-menu-item danger" onclick="deleteClassroomNote('${type}','${folderId}','${sessionId}',${noteIdx})">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                    删除笔记
+                </button>`;
+            document.body.appendChild(overlay);
+            document.body.appendChild(menu);
+            const touch = e.touches ? e.touches[0] : e;
+            let x = touch.clientX || e.clientX;
+            let y = touch.clientY || e.clientY;
+            if (x + 140 > window.innerWidth) x = window.innerWidth - 150;
+            if (y + 60 > window.innerHeight) y = window.innerHeight - 70;
+            menu.style.left = x + 'px';
+            menu.style.top = y + 'px';
+        }
+
+        function deleteClassroomNote(type, folderId, sessionId, noteIdx) {
+            closeLongPressMenu();
+            if (!confirm('删除此笔记？')) return;
+            const folder = getClassroomFolder(type, folderId);
+            if (!folder) return;
+            const session = (folder.sessions || []).find(s => s.id === sessionId);
+            if (!session || !session.notes) return;
+            if (noteIdx < 0 || noteIdx >= session.notes.length) return;
+            // 清理该笔记关联的手写绘图数据
+            const drawKey = `classroomDrawing_${folderId}_${sessionId}_${noteIdx}`;
+            if (appData.lectureDrawings && appData.lectureDrawings[drawKey]) {
+                delete appData.lectureDrawings[drawKey];
+            }
+            session.notes.splice(noteIdx, 1);
+            saveData();
+            debouncedChatSync();
+            renderClassroomSessionDetail(folder, session, type);
+            showToast('笔记已删除');
+        }
         async function ensureMaterialData(mat) {
             if (mat.data) return mat.data;
             // 1. 先从IndexedDB取
