@@ -3896,21 +3896,6 @@
                 </div>
                 <input type="number" id="photoRetentionDays" value="0" min="0" class="settings-input" style="width:80px;" onblur="savePhotoRetentionDays()">
             </div>
-
-            <div class="setting-item" onclick="manualRequestPersist()">
-                <div class="setting-item-left">
-                    <div class="setting-item-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                    </div>
-                    <div>
-                        <div class="setting-item-label">存储持久化</div>
-                        <div class="setting-item-desc" id="storageStatusDesc">检测中…</div>
-                    </div>
-                </div>
-                <div class="setting-item-right">
-                    <button id="storagePersistBtn" style="padding:6px 14px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);font-size:13px;cursor:pointer;">请求授权</button>
-                </div>
-            </div>
         </div>
 
         <!-- AI Settings -->
@@ -4615,8 +4600,6 @@
         // ==================== Init ====================
         async function init() {
             await initFileDB();
-            // 请求持久化存储，防止浏览器自动清理 IndexedDB
-            await requestStoragePersist();
             loadData();
             // 如果localStorage被iOS清理导致API设置丢失，从IndexedDB恢复
             if (!appData.settings.aiApiKey && !appData.settings.aiApiUrl) {
@@ -4650,12 +4633,7 @@
             window.addEventListener('pagehide', flushOnHide);
             window.addEventListener('beforeunload', flushOnHide);
             document.addEventListener('visibilitychange', () => {
-                if (document.visibilityState === 'hidden') {
-                    flushOnHide();
-                } else {
-                    // 从后台恢复时，检查 IndexedDB 连接是否还活着
-                    ensureFileDB().catch(e => console.warn('恢复前台时 DB 重连失败:', e));
-                }
+                if (document.visibilityState === 'hidden') flushOnHide();
             });
         }
 
@@ -4693,168 +4671,50 @@
             }
         }
 
-        // ==================== Storage Persistence ====================
-        async function requestStoragePersist() {
-            if (!navigator.storage || !navigator.storage.persist) return;
-            try {
-                const persisted = await navigator.storage.persisted();
-                if (!persisted) {
-                    const granted = await navigator.storage.persist();
-                    console.log('Storage persist granted:', granted);
-                }
-            } catch (e) {
-                console.warn('Storage persist request failed:', e);
-            }
-        }
-
-        async function getStorageInfo() {
-            const info = { persisted: false, usage: 0, quota: 0 };
-            if (!navigator.storage) return info;
-            try {
-                if (navigator.storage.persisted) info.persisted = await navigator.storage.persisted();
-                if (navigator.storage.estimate) {
-                    const est = await navigator.storage.estimate();
-                    info.usage = est.usage || 0;
-                    info.quota = est.quota || 0;
-                }
-            } catch (e) {}
-            return info;
-        }
-
-        async function updateStorageStatusUI() {
-            const info = await getStorageInfo();
-            const el = document.getElementById('storageStatusDesc');
-            if (!el) return;
-            const usedMB = (info.usage / 1024 / 1024).toFixed(1);
-            const totalMB = (info.quota / 1024 / 1024 / 1024).toFixed(1);
-            const statusText = info.persisted ? '✅ 已持久化' : '⚠️ 未持久化（可能被清理）';
-            el.textContent = `${statusText} · 已用 ${usedMB} MB / ${totalMB} GB`;
-
-            const btn = document.getElementById('storagePersistBtn');
-            if (btn) {
-                if (info.persisted) {
-                    btn.textContent = '已授权';
-                    btn.disabled = true;
-                    btn.style.opacity = '0.5';
-                } else {
-                    btn.textContent = '请求授权';
-                    btn.disabled = false;
-                    btn.style.opacity = '1';
-                }
-            }
-        }
-
-        async function manualRequestPersist() {
-            if (!navigator.storage || !navigator.storage.persist) {
-                showToast('此浏览器不支持持久化存储');
-                return;
-            }
-            const granted = await navigator.storage.persist();
-            if (granted) {
-                showToast('已获得持久化存储授权');
-            } else {
-                showToast('授权未通过，请将此页加入书签或添加到主屏幕后重试');
-            }
-            updateStorageStatusUI();
-        }
-
         // ==================== IndexedDB for large files ====================
         let fileDB = null;
-        let fileDBReady = false;
         
         function initFileDB() {
             return new Promise((resolve, reject) => {
-                try {
-                    const request = indexedDB.open('mathReaderFiles', 1);
-                    request.onerror = () => { fileDBReady = false; reject(request.error); };
-                    request.onsuccess = () => {
-                        fileDB = request.result;
-                        fileDBReady = true;
-                        // 监听连接意外关闭（iOS/Safari 后台回收、版本变更等）
-                        fileDB.onclose = () => {
-                            console.warn('[IndexedDB] 连接被关闭，将在下次操作时自动重连');
-                            fileDB = null;
-                            fileDBReady = false;
-                        };
-                        fileDB.onversionchange = () => {
-                            fileDB.close();
-                            fileDB = null;
-                            fileDBReady = false;
-                        };
-                        resolve();
-                    };
-                    request.onupgradeneeded = (e) => {
-                        const db = e.target.result;
-                        if (!db.objectStoreNames.contains('files')) {
-                            db.createObjectStore('files', { keyPath: 'id' });
-                        }
-                    };
-                } catch (e) {
-                    fileDBReady = false;
-                    reject(e);
-                }
-            });
-        }
-
-        // 确保 DB 连接可用，断开时自动重连
-        async function ensureFileDB() {
-            if (fileDB && fileDBReady) return true;
-            try {
-                await initFileDB();
-                return true;
-            } catch (e) {
-                console.error('[IndexedDB] 重连失败:', e);
-                return false;
-            }
-        }
-        
-        async function saveFileData(id, data) {
-            if (!await ensureFileDB()) throw new Error('IndexedDB 不可用');
-            return new Promise((resolve, reject) => {
-                try {
-                    const tx = fileDB.transaction('files', 'readwrite');
-                    tx.objectStore('files').put({ id, data });
-                    tx.oncomplete = () => resolve();
-                    tx.onerror = () => reject(tx.error);
-                    tx.onabort = () => reject(new Error('事务被中止: ' + (tx.error?.message || '未知原因')));
-                } catch (e) {
-                    // 连接可能已失效，标记重连
-                    fileDB = null;
-                    fileDBReady = false;
-                    reject(e);
-                }
+                const request = indexedDB.open('mathReaderFiles', 1);
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => { fileDB = request.result; resolve(); };
+                request.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains('files')) {
+                        db.createObjectStore('files', { keyPath: 'id' });
+                    }
+                };
             });
         }
         
-        async function getFileData(id) {
-            if (!await ensureFileDB()) return null;
+        function saveFileData(id, data) {
             return new Promise((resolve, reject) => {
-                try {
-                    const tx = fileDB.transaction('files', 'readonly');
-                    const req = tx.objectStore('files').get(id);
-                    req.onsuccess = () => resolve(req.result?.data || null);
-                    req.onerror = () => reject(req.error);
-                } catch (e) {
-                    fileDB = null;
-                    fileDBReady = false;
-                    reject(e);
-                }
+                if (!fileDB) { reject(new Error('DB not ready')); return; }
+                const tx = fileDB.transaction('files', 'readwrite');
+                tx.objectStore('files').put({ id, data });
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
             });
         }
         
-        async function deleteFileData(id) {
-            if (!await ensureFileDB()) return;
+        function getFileData(id) {
             return new Promise((resolve, reject) => {
-                try {
-                    const tx = fileDB.transaction('files', 'readwrite');
-                    tx.objectStore('files').delete(id);
-                    tx.oncomplete = () => resolve();
-                    tx.onerror = () => reject(tx.error);
-                } catch (e) {
-                    fileDB = null;
-                    fileDBReady = false;
-                    reject(e);
-                }
+                if (!fileDB) { reject(new Error('DB not ready')); return; }
+                const tx = fileDB.transaction('files', 'readonly');
+                const req = tx.objectStore('files').get(id);
+                req.onsuccess = () => resolve(req.result?.data || null);
+                req.onerror = () => reject(req.error);
+            });
+        }
+        
+        function deleteFileData(id) {
+            return new Promise((resolve, reject) => {
+                if (!fileDB) { resolve(); return; }
+                const tx = fileDB.transaction('files', 'readwrite');
+                tx.objectStore('files').delete(id);
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
             });
         }
 
@@ -4862,71 +4722,15 @@
             const saved = localStorage.getItem('mathReader');
             if (saved) {
                 try {
-                    const parsed = JSON.parse(saved);
-                    // 校验关键字段存在且是数组，防止损坏数据覆盖
-                    if (!Array.isArray(parsed.books) || !Array.isArray(parsed.papers)) {
-                        throw new Error('数据结构损坏: books/papers 不是数组');
-                    }
-                    appData = parsed;
+                    appData = JSON.parse(saved);
                     // Ensure all fields exist
                     if (!appData.notes) appData.notes = {};
                     if (!appData.archived) appData.archived = [];
                     if (!appData.classroom) appData.classroom = { courses: [], seminars: [] };
                     if (!appData.settings) appData.settings = {};
                     if (appData.settings.photoRetentionDays === undefined) appData.settings.photoRetentionDays = 0;
-                } catch(e) {
-                    console.error('[loadData] 主数据损坏，尝试从备份恢复:', e);
-                    // 尝试从 IndexedDB 备份恢复
-                    tryRestoreAppDataFromBackup();
-                }
+                } catch(e) {}
             }
-        }
-
-        // 从 IndexedDB 备份恢复 appData
-        async function tryRestoreAppDataFromBackup() {
-            try {
-                const backupStr = await getFileData('__appdata_backup__');
-                if (backupStr) {
-                    const backup = JSON.parse(backupStr);
-                    if (Array.isArray(backup.books) && Array.isArray(backup.papers)) {
-                        appData = backup;
-                        if (!appData.notes) appData.notes = {};
-                        if (!appData.archived) appData.archived = [];
-                        if (!appData.classroom) appData.classroom = { courses: [], seminars: [] };
-                        if (!appData.settings) appData.settings = {};
-                        // 写回 localStorage
-                        try { localStorage.setItem('mathReader', JSON.stringify(appData)); } catch(e2) {}
-                        console.log('[loadData] 已从 IndexedDB 备份恢复数据');
-                        showToast('已从备份恢复数据');
-                        return;
-                    }
-                }
-            } catch(e) {
-                console.error('[loadData] IndexedDB 备份恢复也失败:', e);
-            }
-            showToast('数据加载异常，请从云端同步恢复');
-        }
-
-        // 节流备份到 IndexedDB（每 30 秒最多一次）
-        let _lastBackupTime = 0;
-        function backupAppDataToIDB() {
-            const now = Date.now();
-            if (now - _lastBackupTime < 30000) return;
-            _lastBackupTime = now;
-            const toBackup = JSON.parse(JSON.stringify(appData));
-            toBackup.books.forEach(b => delete b.data);
-            toBackup.papers.forEach(p => delete p.data);
-            toBackup.archived.forEach(a => delete a.data);
-            ['courses', 'seminars'].forEach(listKey => {
-                (toBackup.classroom?.[listKey] || []).forEach(folder => {
-                    (folder.sessions || []).forEach(session => {
-                        (session.sourceFolder || []).forEach(mat => { delete mat.data; });
-                    });
-                });
-            });
-            saveFileData('__appdata_backup__', JSON.stringify(toBackup)).catch(e => {
-                console.warn('[backup] IndexedDB 备份失败:', e);
-            });
         }
 
         function saveData() {
@@ -4945,24 +4749,7 @@
                     });
                 });
             });
-            try {
-                localStorage.setItem('mathReader', JSON.stringify(toSave));
-            } catch (e) {
-                console.error('[saveData] localStorage 写入失败:', e);
-                // QuotaExceeded 时尝试清理 screenshot 等大字段后重试
-                try {
-                    toSave.books.forEach(b => delete b.screenshot);
-                    toSave.papers.forEach(p => delete p.screenshot);
-                    toSave.archived.forEach(a => delete a.screenshot);
-                    localStorage.setItem('mathReader', JSON.stringify(toSave));
-                    console.log('[saveData] 清理 screenshot 后重试成功');
-                } catch (e2) {
-                    console.error('[saveData] 重试仍失败:', e2);
-                    showToast('存储空间不足，数据可能未保存');
-                }
-            }
-            // 异步备份到 IndexedDB（双保险）
-            backupAppDataToIDB();
+            localStorage.setItem('mathReader', JSON.stringify(toSave));
         }
 
         // ==================== Navigation ====================
@@ -5014,10 +4801,6 @@
 
             if (num === 5) {
                 renderClassroomPage();
-            }
-
-            if (num === 4) {
-                updateStorageStatusUI();
             }
         }
 
@@ -5811,16 +5594,6 @@
             reader.onload = async function(e) {
                 try {
                     const docId = Date.now().toString();
-                    
-                    // 先存文件数据到IndexedDB，确保成功后再添加元数据
-                    await saveFileData(docId, e.target.result);
-                    
-                    // 验证文件确实写入成功
-                    const verify = await getFileData(docId);
-                    if (!verify) {
-                        throw new Error('文件写入验证失败，数据未持久化');
-                    }
-
                     const doc = {
                         id: docId,
                         title: document.getElementById('uploadTitle').value || pendingFile.name.replace(/\.[^/.]+$/, ''),
@@ -5832,6 +5605,9 @@
                         totalPages: 0,
                         addedAt: new Date().toISOString()
                     };
+
+                    // 存文件数据到IndexedDB
+                    await saveFileData(docId, e.target.result);
 
                     if (currentUploadType === 'book') {
                         appData.books.push(doc);
@@ -6126,26 +5902,8 @@
                 if (!fileData) {
                     fileData = await getFileData(doc.id);
                 }
-                // IndexedDB 也没有，尝试从 R2 云端拉取恢复
                 if (!fileData) {
-                    const r2cfg = appData.settings?.r2Config;
-                    if (r2cfg?.endpoint && r2cfg?.accessKeyId && r2cfg?.secretAccessKey && r2cfg?.bucketName) {
-                        showToast('本地文件丢失，正在从云端恢复…');
-                        try {
-                            const cloudData = await r2GetObject('files/' + doc.id + '.pdf');
-                            if (cloudData) {
-                                fileData = cloudData;
-                                // 恢复到 IndexedDB
-                                await saveFileData(doc.id, cloudData);
-                                showToast('已从云端恢复文件');
-                            }
-                        } catch (e) {
-                            console.error('云端恢复失败:', e);
-                        }
-                    }
-                }
-                if (!fileData) {
-                    showToast('文件数据丢失，请重新导入或从云端同步');
+                    showToast('文件数据丢失');
                     return;
                 }
                 
@@ -8173,8 +7931,8 @@
         }
 
         // API设置备份到IndexedDB，防止iOS清理localStorage后丢失
-        async function backupApiSettingsToIDB() {
-            if (!await ensureFileDB()) return;
+        function backupApiSettingsToIDB() {
+            if (!fileDB) return;
             try {
                 const apiSettings = pickApiSettingsFrom(appData.settings);
                 const tx = fileDB.transaction('files', 'readwrite');
@@ -8182,20 +7940,20 @@
             } catch (e) { console.error('备份API设置失败:', e); }
         }
 
-        async function restoreApiSettingsFromIDB() {
-            if (!await ensureFileDB()) return null;
-            try {
-                const tx = fileDB.transaction('files', 'readonly');
-                const req = tx.objectStore('files').get('__api_settings__');
-                return new Promise(resolve => {
+        function restoreApiSettingsFromIDB() {
+            return new Promise(resolve => {
+                if (!fileDB) { resolve(null); return; }
+                try {
+                    const tx = fileDB.transaction('files', 'readonly');
+                    const req = tx.objectStore('files').get('__api_settings__');
                     req.onsuccess = () => {
                         if (req.result && req.result.data) {
                             try { resolve(JSON.parse(req.result.data)); } catch (e) { resolve(null); }
                         } else { resolve(null); }
                     };
                     req.onerror = () => resolve(null);
-                });
-            } catch (e) { return null; }
+                } catch (e) { resolve(null); }
+            });
         }
         
         const defaultAPIUrls = {
