@@ -97,8 +97,7 @@
         /* 其他 page 在分屏时不显示 */
         body.split-mode #page1,
         body.split-mode #page4,
-        body.split-mode #page5,
-        body.split-mode #page6 {
+        body.split-mode #page5 {
             display: none !important;
         }
         /* 分屏时底部导航的 active 指示重新定义：阅读 + 笔记 都高亮 */
@@ -193,14 +192,14 @@
             align-items: center;
             gap: 2px;
             cursor: pointer;
-            padding: 4px 10px;
+            padding: 4px 16px;
             border-radius: 12px;
             transition: all 0.2s;
             -webkit-tap-highlight-color: transparent;
         }
 
-        .nav-item svg { width: 22px; height: 22px; color: var(--text-muted); transition: color 0.2s; }
-        .nav-item span { font-size: 10px; color: var(--text-muted); transition: color 0.2s; }
+        .nav-item svg { width: 24px; height: 24px; color: var(--text-muted); transition: color 0.2s; }
+        .nav-item span { font-size: 11px; color: var(--text-muted); transition: color 0.2s; }
         .nav-item.active svg { color: var(--accent); }
         .nav-item.active span { color: var(--accent); font-weight: 600; }
 
@@ -3497,499 +3496,6 @@
         .toggle-switch.on .toggle-thumb {
             left: 22px;
         }
-
-        /* ==================== Page 6: Dictionary ==================== */
-        :root {
-            --hex-sat: 42%;
-            --hex-ltn: 72%;
-            --hex-text: #1a1a1a;
-            --hex-text-sub: rgba(26,26,26,0.55);
-            --hex-border: rgba(0,0,0,0.12);
-        }
-        body.dark {
-            --hex-sat: 35%;
-            --hex-ltn: 28%;
-            --hex-text: #eaeaea;
-            --hex-text-sub: rgba(234,234,234,0.5);
-            --hex-border: rgba(255,255,255,0.1);
-        }
-        body.blue-dark {
-            --hex-sat: 42%;
-            --hex-ltn: 28%;
-            --hex-text: #d4e0f7;
-            --hex-text-sub: rgba(212,224,247,0.5);
-            --hex-border: rgba(96,165,250,0.15);
-        }
-        body.warm {
-            --hex-sat: 35%;
-            --hex-ltn: 76%;
-            --hex-text: #3c2f1a;
-            --hex-text-sub: rgba(60,47,26,0.5);
-            --hex-border: rgba(107,76,42,0.15);
-        }
-
-        #page6 { padding: 0; display: none; flex-direction: column; height: calc(100vh - 56px); }
-        #page6.active { display: flex !important; }
-
-        .dict-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px 16px 6px;
-            flex-shrink: 0;
-        }
-        .dict-header-title { font-size: 20px; font-weight: 700; }
-        .dict-history-btn {
-            padding: 6px 14px;
-            border-radius: 8px;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            font-size: 13px;
-            cursor: pointer;
-            color: var(--text-primary);
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-        .dict-history-btn svg { width: 16px; height: 16px; }
-        .dict-history-btn:active { transform: scale(0.96); }
-
-        /* ---- Hexagonal honeycomb grid (flat-top, true tessellation) ----
-         * Flat-top hex: clip-path polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)
-         * Regular hex aspect-ratio W:H = 2:√3 ≈ 1.155
-         * Columns overlap by 25% of hex width (shared diagonal edges)
-         * Right column offset vertically by H/2 (≈24.74% of grid width)
-         * Same-column hexes share flat top/bottom edges (zero gap)
-         */
-        .dict-hex-scroll {
-            flex: 1;
-            overflow-y: auto;
-            -webkit-overflow-scrolling: touch;
-            padding: 4px 20px 24px;
-        }
-        .dict-hex-grid {
-            display: flex;
-            max-width: 280px;
-            margin: 0 auto;
-        }
-        .dict-hex-col {
-            flex: 0 0 57.14%;
-            display: flex;
-            flex-direction: column;
-        }
-        .dict-hex-col.right-col {
-            margin-left: -14.28%;
-            margin-top: 24.74%;
-        }
-
-        .dict-hex-cell {
-            width: 100%;
-            aspect-ratio: 1.155;
-            position: relative;
-            cursor: pointer;
-            transition: transform 0.15s;
-        }
-        .dict-hex-cell:active {
-            transform: scale(0.93);
-            z-index: 2;
-        }
-
-        /* Outer hex = border */
-        .dict-hex-cell .hex-outer {
-            position: absolute;
-            inset: 0;
-            clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
-            background: var(--hex-border);
-        }
-        /* Inner hex = gradient fill */
-        .dict-hex-cell .hex-inner {
-            position: absolute;
-            inset: 1px;
-            clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
-            background: linear-gradient(
-                150deg,
-                hsl(var(--hex-hue), var(--hex-sat), var(--hex-ltn)),
-                hsl(var(--hex-hue), var(--hex-sat), calc(var(--hex-ltn) - 6%))
-            );
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 1px;
-            padding: 10px 6px;
-        }
-        .dict-hex-cell .hex-label-zh {
-            font-size: 13px;
-            font-weight: 700;
-            color: var(--hex-text);
-            line-height: 1.2;
-            text-align: center;
-        }
-        .dict-hex-cell .hex-label-en {
-            font-size: 8.5px;
-            font-weight: 500;
-            color: var(--hex-text-sub);
-            line-height: 1.15;
-            text-align: center;
-        }
-
-        /* ---- Course detail view ---- */
-        .dict-course-view {
-            display: none;
-            flex-direction: column;
-            position: fixed;
-            inset: 0;
-            bottom: 56px;
-            background: var(--bg-primary);
-            z-index: 500;
-        }
-        .dict-course-view.show { display: flex; }
-        @supports (padding-bottom: env(safe-area-inset-bottom)) {
-            .dict-course-view { bottom: calc(56px + env(safe-area-inset-bottom)); }
-        }
-        .dict-course-header {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 10px 14px;
-            border-bottom: 1px solid var(--border-color);
-            flex-shrink: 0;
-        }
-        .dict-course-back {
-            width: 32px; height: 32px;
-            border-radius: 8px;
-            background: var(--bg-secondary);
-            border: none; cursor: pointer;
-            display: flex; align-items: center; justify-content: center;
-            flex-shrink: 0;
-        }
-        .dict-course-back svg { width: 18px; height: 18px; }
-        .dict-course-name {
-            flex: 1;
-            font-size: 17px;
-            font-weight: 700;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        .dict-course-name-en {
-            font-size: 11px;
-            font-weight: 400;
-            color: var(--text-muted);
-        }
-
-        /* ======== 2D Theorem Graph Map ======== */
-        .dict-kb-scroll {
-            flex: 1;
-            overflow: scroll;
-            -webkit-overflow-scrolling: touch;
-            position: relative;
-        }
-        .graph-map {
-            position: relative;
-            min-width: 700px;
-        }
-        .graph-map svg.graph-lines {
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            pointer-events: none;
-            z-index: 0;
-        }
-        .graph-map svg.graph-lines line {
-            stroke: var(--border-color);
-            stroke-width: 1.5;
-        }
-        .graph-map svg.graph-lines .arrow-head {
-            fill: var(--text-muted);
-        }
-        /* Era label */
-        .gm-era-label {
-            position: absolute;
-            font-size: 10px;
-            font-weight: 700;
-            color: var(--text-muted);
-            writing-mode: vertical-rl;
-            text-orientation: mixed;
-            letter-spacing: 1px;
-            opacity: 0.5;
-        }
-        /* Node chip */
-        .gm-node {
-            position: absolute;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 6px 10px;
-            cursor: pointer;
-            z-index: 1;
-            transition: transform 0.12s, box-shadow 0.12s;
-            max-width: 180px;
-            border-left: 3px solid var(--node-c, var(--accent));
-        }
-        .gm-node:active {
-            transform: scale(1.05);
-            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-            z-index: 5;
-        }
-        .gm-node-top {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-        .gm-badge {
-            font-size: 8px;
-            font-weight: 700;
-            padding: 1px 5px;
-            border-radius: 3px;
-            flex-shrink: 0;
-        }
-        .gm-badge-def  { background: #dbeafe; color: #1e40af; }
-        .gm-badge-thm  { background: #fef3c7; color: #92400e; }
-        .gm-badge-lem  { background: #d1fae5; color: #065f46; }
-        .gm-badge-cor  { background: #ede9fe; color: #5b21b6; }
-        .gm-badge-tech { background: #e0e7ff; color: #3730a3; }
-        body.dark .gm-badge-def  { background:#1e3a5f; color:#93c5fd; }
-        body.dark .gm-badge-thm  { background:#4a3520; color:#fcd34d; }
-        body.dark .gm-badge-lem  { background:#14402a; color:#6ee7b7; }
-        body.dark .gm-badge-cor  { background:#2e1065; color:#c4b5fd; }
-        body.dark .gm-badge-tech { background:#1e1b4b; color:#a5b4fc; }
-        body.blue-dark .gm-badge-def  { background:#1e3a5f; color:#93c5fd; }
-        body.blue-dark .gm-badge-thm  { background:#4a3520; color:#fcd34d; }
-        body.blue-dark .gm-badge-lem  { background:#14402a; color:#6ee7b7; }
-        body.blue-dark .gm-badge-cor  { background:#2e1065; color:#c4b5fd; }
-        body.blue-dark .gm-badge-tech { background:#1e1b4b; color:#a5b4fc; }
-        .gm-name {
-            font-size: 11px;
-            font-weight: 600;
-            color: var(--text-primary);
-            line-height: 1.2;
-        }
-        .gm-tex {
-            font-size: 10.5px;
-            color: var(--text-secondary);
-            margin-top: 3px;
-            line-height: 1.5;
-            overflow: hidden;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-        }
-        .gm-tex .katex { font-size: 0.92em; }
-
-        /* Popup detail (shown when tapping a node) */
-        .gm-detail {
-            display: none;
-            position: fixed;
-            bottom: 110px; left: 12px; right: 12px;
-            background: var(--bg-primary);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 14px;
-            z-index: 600;
-            box-shadow: 0 -4px 24px rgba(0,0,0,0.12);
-            max-height: 45vh;
-            overflow-y: auto;
-        }
-        .gm-detail.show { display: block; }
-        .gm-detail-close {
-            position: absolute; top: 8px; right: 10px;
-            background: var(--bg-secondary); border: none;
-            width: 24px; height: 24px; border-radius: 50%;
-            cursor: pointer; font-size: 14px; color: var(--text-muted);
-        }
-        .gm-detail-type {
-            font-size: 10px; font-weight: 700;
-            margin-bottom: 4px;
-        }
-        .gm-detail-name {
-            font-size: 16px; font-weight: 700;
-            margin-bottom: 6px;
-        }
-        .gm-detail-tex {
-            font-size: 14px; line-height: 1.8;
-            color: var(--text-secondary);
-        }
-        .gm-detail-tex .katex { font-size: 1em; }
-        .gm-detail-ask {
-            margin-top: 10px;
-            padding: 8px 16px;
-            background: var(--accent);
-            color: #fff;
-            border: none; border-radius: 8px;
-            font-size: 13px; font-weight: 600;
-            cursor: pointer; width: 100%;
-        }
-        body.dark .gm-detail-ask { color: #000; }
-
-        @supports (padding-bottom: env(safe-area-inset-bottom)) {
-            .gm-detail { bottom: calc(110px + env(safe-area-inset-bottom)); }
-        }
-
-        /* Result overlay inside course view */
-        .dict-result-overlay {
-            display: none;
-            flex-direction: column;
-            position: absolute;
-            inset: 0;
-            top: 53px;
-            background: var(--bg-primary);
-            z-index: 2;
-        }
-        .dict-result-overlay.show { display: flex; }
-        .dict-result-bar {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 14px;
-            border-bottom: 1px solid var(--border-color);
-            flex-shrink: 0;
-        }
-        .dict-result-bar-title {
-            flex: 1;
-            font-size: 14px;
-            font-weight: 600;
-            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-        }
-        .dict-result-close {
-            padding: 4px 12px;
-            border-radius: 6px;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            font-size: 12px;
-            cursor: pointer;
-            color: var(--text-secondary);
-        }
-        .dict-result-close:active { transform: scale(0.96); }
-        .dict-result-scroll {
-            flex: 1;
-            overflow-y: auto;
-            -webkit-overflow-scrolling: touch;
-            padding: 16px;
-        }
-        .dict-result-body {
-            font-size: 14px;
-            line-height: 1.8;
-            color: var(--text-primary);
-        }
-        .dict-result-body h1, .dict-result-body h2, .dict-result-body h3 {
-            margin: 16px 0 8px; font-weight: 600;
-        }
-        .dict-result-body h1 { font-size: 18px; }
-        .dict-result-body h2 { font-size: 16px; }
-        .dict-result-body h3 { font-size: 15px; }
-        .dict-result-body p { margin-bottom: 10px; }
-        .dict-result-body li { margin-bottom: 4px; margin-left: 16px; }
-        .dict-result-body strong { font-weight: 600; }
-        .dict-result-loading {
-            text-align: center; padding: 40px;
-            color: var(--text-muted); font-size: 14px;
-        }
-        .dict-result-loading .spinner {
-            width: 24px; height: 24px;
-            border: 2px solid var(--border-color);
-            border-top-color: var(--accent);
-            border-radius: 50%;
-            margin: 0 auto 12px;
-            animation: ptr-spin 0.6s linear infinite;
-        }
-
-        /* Course search bar */
-        .dict-course-search {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 10px 14px;
-            border-top: 1px solid var(--border-color);
-            background: var(--bg-primary);
-            flex-shrink: 0;
-        }
-        .dict-cs-attach {
-            width: 36px; height: 36px;
-            border-radius: 50%;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            cursor: pointer;
-            display: flex; align-items: center; justify-content: center;
-            flex-shrink: 0;
-            transition: all 0.2s;
-        }
-        .dict-cs-attach:active { transform: scale(0.92); }
-        .dict-cs-attach svg { width: 20px; height: 20px; color: var(--text-secondary); }
-        .dict-cs-attach.has-file { background: var(--accent); border-color: var(--accent); }
-        .dict-cs-attach.has-file svg { color: #fff; }
-        .dict-cs-input {
-            flex: 1;
-            height: 38px;
-            border-radius: 19px;
-            border: 1px solid var(--border-color);
-            padding: 0 16px;
-            font-size: 14px;
-            background: var(--bg-secondary);
-            color: var(--text-primary);
-            outline: none;
-        }
-        .dict-cs-input:focus { border-color: var(--accent); }
-        .dict-cs-input::placeholder { color: var(--text-muted); }
-        .dict-cs-send {
-            width: 38px; height: 38px;
-            border-radius: 50%;
-            background: var(--accent);
-            border: none; cursor: pointer;
-            display: flex; align-items: center; justify-content: center;
-            flex-shrink: 0;
-        }
-        .dict-cs-send:active { transform: scale(0.92); }
-        .dict-cs-send:disabled { opacity: 0.4; cursor: not-allowed; }
-        .dict-cs-send svg { width: 18px; height: 18px; color: #fff; }
-        body.dark .dict-cs-send svg,
-        body.blue-dark .dict-cs-send svg { color: #000; }
-
-        /* Attach preview in course */
-        .dict-cs-attach-bar {
-            display: none;
-            align-items: center;
-            gap: 6px;
-            padding: 6px 14px;
-            background: var(--bg-secondary);
-            border-top: 1px solid var(--border-color);
-            font-size: 12px; color: var(--text-secondary);
-            flex-shrink: 0;
-        }
-        .dict-cs-attach-bar.show { display: flex; }
-        .dict-cs-attach-bar .aname { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-        .dict-cs-attach-bar .aremove {
-            width:20px; height:20px; border-radius:50%;
-            background:var(--bg-tertiary); border:none; cursor:pointer;
-            display:flex; align-items:center; justify-content:center;
-        }
-        .dict-cs-attach-bar .aremove svg { width:12px; height:12px; }
-
-        /* History modal items */
-        .dict-history-list {
-            max-height: 60vh;
-            overflow-y: auto;
-            -webkit-overflow-scrolling: touch;
-        }
-        .dict-history-item {
-            padding: 12px 16px;
-            border-bottom: 1px solid var(--border-color);
-            cursor: pointer;
-        }
-        .dict-history-item:active { background: var(--bg-secondary); }
-        .dict-history-item-query {
-            font-size: 14px; font-weight: 500; margin-bottom: 4px;
-            display: -webkit-box; -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical; overflow: hidden;
-        }
-        .dict-history-item-meta {
-            font-size: 11px; color: var(--text-muted);
-            display: flex; gap: 8px;
-        }
-        .dict-history-empty {
-            text-align: center; padding: 40px 20px;
-            color: var(--text-muted); font-size: 14px;
-        }
     </style>
 </head>
 <body>
@@ -4326,85 +3832,6 @@
     </div>
     <input type="file" id="classroomCameraInput" accept="image/*" capture="environment" style="display:none;">
     <input type="file" id="classroomFileInput" accept="image/*,.pdf,.doc,.docx,.txt,.md,.tex,.latex" multiple style="display:none;">
-
-    <!-- ==================== Page 6: Dictionary ==================== -->
-    <div class="page" id="page6">
-        <div class="dict-header">
-            <span class="dict-header-title">数学字典</span>
-            <button class="dict-history-btn" onclick="showDictHistory()">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                历史
-            </button>
-        </div>
-        <div class="dict-hex-scroll" id="dictHexScroll">
-            <div class="dict-hex-grid">
-                <div class="dict-hex-col left-col" id="dictLeftCol"></div>
-                <div class="dict-hex-col right-col" id="dictRightCol"></div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Course detail view (overlay) -->
-    <div class="dict-course-view" id="dictCourseView">
-        <div class="dict-course-header">
-            <button class="dict-course-back" onclick="closeDictCourse()">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
-            </button>
-            <div style="flex:1;overflow:hidden;">
-                <div class="dict-course-name" id="dictCourseName"></div>
-                <div class="dict-course-name-en" id="dictCourseNameEn"></div>
-            </div>
-        </div>
-        <div class="dict-kb-scroll" id="dictKBScroll"></div>
-        <!-- Node detail popup -->
-        <div class="gm-detail" id="gmDetail">
-            <button class="gm-detail-close" onclick="closeGmDetail()">✕</button>
-            <div class="gm-detail-type" id="gmDetailType"></div>
-            <div class="gm-detail-name" id="gmDetailName"></div>
-            <div class="gm-detail-tex" id="gmDetailTex"></div>
-            <button class="gm-detail-ask" onclick="askGmDetail()">向 AI 提问此定理</button>
-        </div>
-        <!-- Result overlay -->
-        <div class="dict-result-overlay" id="dictResultOverlay">
-            <div class="dict-result-bar">
-                <span class="dict-result-bar-title" id="dictResultTitle"></span>
-                <button class="dict-result-close" onclick="closeDictResult()">返回</button>
-            </div>
-            <div class="dict-result-scroll">
-                <div class="dict-result-body" id="dictResultBody"></div>
-            </div>
-        </div>
-        <!-- Attach preview -->
-        <div class="dict-cs-attach-bar" id="dictCSAttachBar">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;flex-shrink:0;"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
-            <span class="aname" id="dictCSAttachName"></span>
-            <button class="aremove" onclick="removeDictCSAttach()">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
-        </div>
-        <!-- Search bar -->
-        <div class="dict-course-search">
-            <button class="dict-cs-attach" id="dictCSAttachBtn" onclick="dictCSAttachFile()">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
-            </button>
-            <input type="text" class="dict-cs-input" id="dictCSInput" placeholder="查询概念、定理、证明…" onkeydown="if(event.key==='Enter')dictCSSend()">
-            <button class="dict-cs-send" id="dictCSSendBtn" onclick="dictCSSend()">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            </button>
-        </div>
-        <input type="file" id="dictCSFileInput" accept="image/*,.pdf,.txt,.md,.tex" style="display:none;" onchange="onDictCSFileSelected(event)">
-    </div>
-
-    <!-- Dictionary history modal -->
-    <div class="modal-overlay" id="dictHistoryModal" onclick="if(event.target===this)hideModal('dictHistoryModal')">
-        <div class="modal-content" style="max-height:80vh;">
-            <div class="modal-header">
-                <h3>搜索历史</h3>
-                <button class="modal-close" onclick="hideModal('dictHistoryModal')">✕</button>
-            </div>
-            <div class="dict-history-list" id="dictHistoryList"></div>
-        </div>
-    </div>
 
     <!-- ==================== Page 4: Settings ==================== -->
     <div class="page" id="page4">
@@ -5121,10 +4548,6 @@
 
     <!-- ==================== Bottom Nav ==================== -->
     <div class="bottom-nav">
-        <div class="nav-item" onclick="switchPage(6)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/><line x1="9" y1="7" x2="15" y2="7"/><line x1="9" y1="11" x2="15" y2="11"/><line x1="9" y1="15" x2="12" y2="15"/></svg>
-            <span>字典</span>
-        </div>
         <div class="nav-item" onclick="switchPage(5)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
             <span>课堂</span>
@@ -5154,7 +4577,6 @@
             papers: [],
             notes: {},       // { docId: [{ page, text, x, y, canvasData }] }
             archived: [],
-            dictHistory: [],
             classroom: {
                 courses: [],   // [{ id, name, createdAt, sessions: [{ id, title, createdAt, materials: [], notes: [], sourceFolder: [] }] }]
                 seminars: []
@@ -5224,12 +4646,7 @@
 
             // 页面隐藏或关闭前：立刻把当前阅读进度写回（绕开 100ms 防抖），
             // 防止用户快速翻到新页后立刻退出 app 导致进度丢失。
-            const flushOnHide = () => {
-                try { flushCurrentPageNow(); } catch (e) {}
-                // 切后台时强制立即备份到 IndexedDB（绕过节流），防止 iOS 清理 localStorage 后丢失数据
-                _lastBackupTime = 0;
-                backupAppDataToIDB();
-            };
+            const flushOnHide = () => { try { flushCurrentPageNow(); } catch (e) {} };
             window.addEventListener('pagehide', flushOnHide);
             window.addEventListener('beforeunload', flushOnHide);
             document.addEventListener('visibilitychange', () => {
@@ -5238,14 +4655,6 @@
                 } else {
                     // 从后台恢复时，检查 IndexedDB 连接是否还活着
                     ensureFileDB().catch(e => console.warn('恢复前台时 DB 重连失败:', e));
-                    // 验证 localStorage 数据是否还在，如果被清理则从 IndexedDB 恢复
-                    const lsData = localStorage.getItem('mathReader');
-                    if (!lsData) {
-                        console.warn('localStorage 数据丢失，尝试从 IndexedDB 备份恢复');
-                        tryRestoreAppDataFromBackup().then(() => {
-                            refreshAllUIFromAppData();
-                        }).catch(() => {});
-                    }
                 }
             });
         }
@@ -5401,19 +4810,6 @@
         
         async function saveFileData(id, data) {
             if (!await ensureFileDB()) throw new Error('IndexedDB 不可用');
-            try {
-                return await _saveFileDataInner(id, data);
-            } catch (e) {
-                // 连接可能失效，标记重连后重试一次
-                console.warn('[saveFileData] 首次写入失败，尝试重连:', e);
-                fileDB = null;
-                fileDBReady = false;
-                if (!await ensureFileDB()) throw new Error('IndexedDB 重连后不可用');
-                return await _saveFileDataInner(id, data);
-            }
-        }
-
-        function _saveFileDataInner(id, data) {
             return new Promise((resolve, reject) => {
                 try {
                     const tx = fileDB.transaction('files', 'readwrite');
@@ -5422,6 +4818,7 @@
                     tx.onerror = () => reject(tx.error);
                     tx.onabort = () => reject(new Error('事务被中止: ' + (tx.error?.message || '未知原因')));
                 } catch (e) {
+                    // 连接可能已失效，标记重连
                     fileDB = null;
                     fileDBReady = false;
                     reject(e);
@@ -5431,24 +4828,6 @@
         
         async function getFileData(id) {
             if (!await ensureFileDB()) return null;
-            try {
-                return await _getFileDataInner(id);
-            } catch (e) {
-                // 连接可能失效，标记重连后重试一次
-                console.warn('[getFileData] 首次读取失败，尝试重连:', e);
-                fileDB = null;
-                fileDBReady = false;
-                if (!await ensureFileDB()) return null;
-                try {
-                    return await _getFileDataInner(id);
-                } catch (e2) {
-                    console.error('[getFileData] 重连后仍失败:', e2);
-                    return null;
-                }
-            }
-        }
-
-        function _getFileDataInner(id) {
             return new Promise((resolve, reject) => {
                 try {
                     const tx = fileDB.transaction('files', 'readonly');
@@ -5495,7 +4874,6 @@
                     if (!appData.classroom) appData.classroom = { courses: [], seminars: [] };
                     if (!appData.settings) appData.settings = {};
                     if (appData.settings.photoRetentionDays === undefined) appData.settings.photoRetentionDays = 0;
-                    if (!appData.dictHistory) appData.dictHistory = [];
                 } catch(e) {
                     console.error('[loadData] 主数据损坏，尝试从备份恢复:', e);
                     // 尝试从 IndexedDB 备份恢复
@@ -5529,11 +4907,11 @@
             showToast('数据加载异常，请从云端同步恢复');
         }
 
-        // 节流备份到 IndexedDB（每 5 秒最多一次）
+        // 节流备份到 IndexedDB（每 30 秒最多一次）
         let _lastBackupTime = 0;
         function backupAppDataToIDB() {
             const now = Date.now();
-            if (now - _lastBackupTime < 5000) return;
+            if (now - _lastBackupTime < 30000) return;
             _lastBackupTime = now;
             const toBackup = JSON.parse(JSON.stringify(appData));
             toBackup.books.forEach(b => delete b.data);
@@ -5588,8 +4966,8 @@
         }
 
         // ==================== Navigation ====================
-        // Nav item order: [0]=dictionary(page6), [1]=classroom(page5), [2]=bookshelf(page1), [3]=reader(page2), [4]=notes(page3), [5]=settings(page4)
-        const pageToNavIndex = { 6: 0, 5: 1, 1: 2, 2: 3, 3: 4, 4: 5 };
+        // Nav item order: [0]=classroom(page5), [1]=bookshelf(page1), [2]=reader(page2), [3]=notes(page3), [4]=settings(page4)
+        const pageToNavIndex = { 5: 0, 1: 1, 2: 2, 3: 3, 4: 4 };
 
         function switchPage(num) {
             // 分屏切换触发后 600ms 内忽略随之而来的 click，防止两指压下/抬起时触发误点
@@ -6746,43 +6124,23 @@
                 // 从IndexedDB获取文件数据
                 let fileData = doc.data;
                 if (!fileData) {
-                    // 尝试从IndexedDB获取，失败时重连一次再试
-                    try {
-                        fileData = await getFileData(doc.id);
-                    } catch (e) {
-                        console.warn('IndexedDB 读取失败，尝试重连:', e);
-                        fileDB = null;
-                        fileDBReady = false;
-                        try {
-                            await ensureFileDB();
-                            fileData = await getFileData(doc.id);
-                        } catch (e2) {
-                            console.warn('IndexedDB 重连后仍失败:', e2);
-                        }
-                    }
+                    fileData = await getFileData(doc.id);
                 }
                 // IndexedDB 也没有，尝试从 R2 云端拉取恢复
                 if (!fileData) {
                     const r2cfg = appData.settings?.r2Config;
-                    if (r2cfg?.endpoint && r2cfg?.accessKeyId && r2cfg?.secretKey && r2cfg?.bucketName) {
+                    if (r2cfg?.endpoint && r2cfg?.accessKeyId && r2cfg?.secretAccessKey && r2cfg?.bucketName) {
                         showToast('本地文件丢失，正在从云端恢复…');
-                        // 最多重试2次
-                        for (let attempt = 0; attempt < 2 && !fileData; attempt++) {
-                            try {
-                                const cloudData = await r2GetObject('files/' + doc.id + '.pdf');
-                                if (cloudData) {
-                                    fileData = cloudData;
-                                    // 恢复到 IndexedDB
-                                    await saveFileData(doc.id, cloudData);
-                                    showToast('已从云端恢复文件');
-                                }
-                            } catch (e) {
-                                console.error('云端恢复失败 (尝试' + (attempt + 1) + '):', e);
-                                if (attempt === 0) {
-                                    // 等待1秒后重试
-                                    await new Promise(r => setTimeout(r, 1000));
-                                }
+                        try {
+                            const cloudData = await r2GetObject('files/' + doc.id + '.pdf');
+                            if (cloudData) {
+                                fileData = cloudData;
+                                // 恢复到 IndexedDB
+                                await saveFileData(doc.id, cloudData);
+                                showToast('已从云端恢复文件');
                             }
+                        } catch (e) {
+                            console.error('云端恢复失败:', e);
                         }
                     }
                 }
@@ -9363,7 +8721,6 @@
                 lectures: appData.lectures,
                 drafts: appData.drafts,
                 classroom: stripClassroomData(appData.classroom),
-                dictHistory: (appData.dictHistory || []).slice(0, 20),
                 syncedAt: new Date().toISOString()
             };
             
@@ -10081,7 +9438,6 @@
                 appData.drafts = metadata.drafts || {};
                 appData.classroom = metadata.classroom || { courses: [], seminars: [] };
                 appData.lectureDrafts = metadata.lectureDrafts || appData.lectureDrafts || {};
-                appData.dictHistory = metadata.dictHistory || appData.dictHistory || [];
                 // API 设置仅保留本地值，不被云端覆盖
                 appData.settings = { ...metadata.settings, ...localApiSettings, r2Config: localR2Config };
                 saveData();
@@ -10102,24 +9458,6 @@
             }
         }
 
-        // 并行执行任务的辅助函数，限制最大并发数
-        async function parallelLimit(tasks, concurrency) {
-            const results = [];
-            let idx = 0;
-            async function runNext() {
-                while (idx < tasks.length) {
-                    const i = idx++;
-                    results[i] = await tasks[i]().catch(e => ({ __error: e }));
-                }
-            }
-            const workers = [];
-            for (let i = 0; i < Math.min(concurrency, tasks.length); i++) {
-                workers.push(runNext());
-            }
-            await Promise.all(workers);
-            return results;
-        }
-
         async function syncFromR2() {
             const config = appData.settings.r2Config;
             if (!config || !config.accessKeyId) {
@@ -10133,7 +9471,7 @@
                 return;
             }
             
-            showToast('正在下载元数据...');
+            showToast('恢复中...');
             
             try {
                 // 1. 下载元数据
@@ -10169,103 +9507,56 @@
                 appData.lectures = metadata.lectures || {};
                 appData.drafts = metadata.drafts || {};
                 appData.classroom = metadata.classroom || { courses: [], seminars: [] };
-                appData.dictHistory = metadata.dictHistory || [];
                 appData.settings = { ...metadata.settings, ...localApiSettings, r2Config: localR2Config };
                 
                 saveData();
-
-                // 立即渲染UI，让用户先看到书籍列表（文件将按需下载）
-                renderLibrary();
-                renderNotesPage();
-                try { applySettings(); } catch (e) { console.warn('applySettings failed', e); }
-                try { initR2AutoSync(); } catch (e) { console.warn('initR2AutoSync failed', e); }
                 
-                // 2. 并行下载PDF文件（跳过本地已有的，3路并发）
+                // 2. 下载PDF文件
+                let downloadedFiles = 0;
                 const allDocs = [...appData.books, ...appData.papers];
-                // 先检查哪些文件本地已有，跳过不需要下载的
-                const docsToDownload = [];
+                
                 for (const doc of allDocs) {
+                    const fileKey = 'files/' + doc.id + '.pdf';
                     try {
-                        const existing = await getFileData(doc.id);
-                        if (!existing) docsToDownload.push(doc);
+                        const fileData = await r2GetObject(fileKey);
+                        if (fileData) {
+                            await saveFileData(doc.id, fileData);
+                            downloadedFiles++;
+                        }
                     } catch (e) {
-                        docsToDownload.push(doc);
+                        console.warn('Failed to download file:', doc.id, e);
                     }
                 }
 
-                let downloadedFiles = 0;
-                let failedFiles = 0;
-                const totalToDownload = docsToDownload.length;
-                
-                if (totalToDownload > 0) {
-                    showToast(`正在下载 ${totalToDownload} 个文件…`);
-                    
-                    const downloadTasks = docsToDownload.map(doc => async () => {
-                        const fileKey = 'files/' + doc.id + '.pdf';
-                        try {
-                            const fileData = await r2GetObject(fileKey);
-                            if (fileData) {
-                                await saveFileData(doc.id, fileData);
-                                downloadedFiles++;
-                                // 每下载完一个都更新进度提示
-                                if (downloadedFiles % 3 === 0 || downloadedFiles === totalToDownload) {
-                                    showToast(`已下载 ${downloadedFiles}/${totalToDownload} 个文件`);
-                                }
-                                return true;
-                            } else {
-                                failedFiles++;
-                                return false;
-                            }
-                        } catch (e) {
-                            console.warn('Failed to download file:', doc.id, e);
-                            failedFiles++;
-                            return false;
-                        }
-                    });
-                    
-                    await parallelLimit(downloadTasks, 3);
-                }
-
-                // 3. 并行下载课堂素材文件（3路并发，跳过已有）
+                // 3. 下载课堂素材文件
                 let downloadedMaterials = 0;
-                const matTasks = [];
                 for (const listKey of ['courses', 'seminars']) {
                     for (const folder of (appData.classroom?.[listKey] || [])) {
                         for (const session of (folder.sessions || [])) {
                             for (const mat of (session.sourceFolder || [])) {
-                                matTasks.push(async () => {
-                                    // 跳过本地已有的素材
-                                    try {
-                                        const existing = await getFileData('classroom_' + mat.id);
-                                        if (existing) return true;
-                                    } catch (e) {}
-                                    const matKey = 'classroom/' + mat.id;
-                                    try {
-                                        const matData = await r2GetObject(matKey);
-                                        if (matData) {
-                                            await saveFileData('classroom_' + mat.id, matData);
-                                            downloadedMaterials++;
-                                            return true;
-                                        }
-                                    } catch (e) {
-                                        console.warn('Failed to download material:', mat.id, e);
+                                const matKey = 'classroom/' + mat.id;
+                                try {
+                                    const matData = await r2GetObject(matKey);
+                                    if (matData) {
+                                        await saveFileData('classroom_' + mat.id, matData);
+                                        mat.data = matData;
+                                        downloadedMaterials++;
                                     }
-                                    return false;
-                                });
+                                } catch (e) {
+                                    console.warn('Failed to download material:', mat.id, e);
+                                }
                             }
                         }
                     }
                 }
-                if (matTasks.length > 0) {
-                    await parallelLimit(matTasks, 3);
-                }
                 
-                const skippedFiles = allDocs.length - totalToDownload;
-                let msg = `恢复完成! 下载 ${downloadedFiles} 个文件`;
-                if (skippedFiles > 0) msg += `，跳过 ${skippedFiles} 个已有文件`;
-                if (failedFiles > 0) msg += `，${failedFiles} 个失败(打开时将自动重试)`;
-                if (downloadedMaterials > 0) msg += `，${downloadedMaterials} 个素材`;
-                showToast(msg);
+                renderLibrary();
+                renderNotesPage();
+                // Also re-apply settings so avatar / AI name / AI persona / theme
+                // immediately reflect the restored data without needing a refresh.
+                try { applySettings(); } catch (e) { console.warn('applySettings failed', e); }
+                try { initR2AutoSync(); } catch (e) { console.warn('initR2AutoSync failed', e); }
+                showToast(`恢复完成! 下载了 ${downloadedFiles} 个文件`);
             } catch (err) {
                 console.error('Sync from R2 failed:', err);
                 showToast('恢复失败: ' + err.message);
@@ -14030,625 +13321,6 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
 
         // Override the lecture viewer regen button to handle classroom notes
         const origConfirmRegenerateLecture = typeof confirmRegenerateLecture === 'function' ? confirmRegenerateLecture : null;
-
-        // ==================== Dictionary ====================
-        let dictCurrentCourse = null;
-        let dictAttachment = null;
-        let dictIsQuerying = false;
-
-        // ---- Knowledge base: theorem cards with LaTeX, typed, with logical chains ----
-        // Item format: "[type] Name — $LaTeX statement$"
-        const dictKB = {
-            "数学分析": { en:"Mathematical Analysis", hue:220, topics:[
-                {t:"Newton–Leibniz (1680s)",items:[
-                    "[方法] 微积分基本定理 — $\\int_a^b f'(x)\\,dx = f(b) - f(a)$，微分与积分互逆",
-                    "[定义] Leibniz 记号 — $dy/dx$, $\\int y\\,dx$：无穷小量的形式运算"]},
-                {t:"Euler (1730s–70s)",items:[
-                    "[定理] Euler 公式 — $e^{ix} = \\cos x + i\\sin x$，沟通指数与三角",
-                    "[方法] Taylor 展开 — $f(x) = \\sum_{n=0}^{\\infty} \\frac{f^{(n)}(a)}{n!}(x-a)^n$",
-                    "[定义] Gamma 函数 — $\\Gamma(s) = \\int_0^\\infty t^{s-1}e^{-t}\\,dt$，$\\Gamma(n+1)=n!$"]},
-                {t:"Cauchy: 严格化 (1820s)",items:[
-                    "[定义] ε-δ 极限 — $\\lim_{x\\to a}f(x)=L \\;\\Leftrightarrow\\; \\forall\\varepsilon>0,\\,\\exists\\delta>0:\\,|x-a|<\\delta \\Rightarrow |f(x)-L|<\\varepsilon$",
-                    "[定理] Cauchy 准则 — 数列 $\\{a_n\\}$ 收敛 $\\Leftrightarrow$ $\\forall\\varepsilon>0,\\,\\exists N:\\,m,n>N \\Rightarrow |a_m-a_n|<\\varepsilon$",
-                    "[定理] 中间值定理 — $f$ 在 $[a,b]$ 连续, $f(a)<c<f(b)$ $\\Rightarrow$ $\\exists\\xi\\in(a,b):\\,f(\\xi)=c$"]},
-                {t:"Riemann (1850s)",items:[
-                    "[定义] Riemann 积分 — 分割 $P$, $\\int_a^b f = \\lim_{\\|P\\|\\to 0} \\sum f(\\xi_i)\\Delta x_i$",
-                    "[定理] 可积条件 — $f$ 在 $[a,b]$ Riemann 可积 $\\Leftrightarrow$ 不连续点构成零测集"]},
-                {t:"Weierstrass (1860s–80s)",items:[
-                    "[定理] Bolzano–Weierstrass — 有界数列必有收敛子列，等价于实数完备性",
-                    "[定理] 一致收敛与极限交换 — $f_n \\rightrightarrows f$ $\\Rightarrow$ $\\lim\\int f_n = \\int\\lim f_n$",
-                    "[定理] Weierstrass 逼近 — $f\\in C[a,b]$ $\\Rightarrow$ $\\exists$ 多项式列一致逼近 $f$"]},
-                {t:"多元推广",items:[
-                    "[定理] 隐函数定理 — $F(x,y)=0$, $F_y\\neq 0$ $\\Rightarrow$ 局部 $y=\\varphi(x)$, $\\varphi'=-F_x/F_y$",
-                    "[定理] Stokes 公式 — $\\int_M d\\omega = \\int_{\\partial M} \\omega$，统一 Green/Gauss/Stokes"]}
-            ]},
-            "实分析": { en:"Real Analysis", hue:150, topics:[
-                {t:"Borel–Lebesgue (1898–1902)",items:[
-                    "[定义] σ-代数与测度 — $(X,\\mathcal{F},\\mu)$: $\\mathcal{F}$ 对补集和可数并封闭, $\\mu$ 可数可加",
-                    "[定义] Lebesgue 外测度 — $m^*(A) = \\inf\\{\\sum|I_n| : A \\subset \\bigcup I_n\\}$"]},
-                {t:"Lebesgue 积分 (1902)",items:[
-                    "[定理] 单调收敛 (Beppo Levi) — $0\\le f_n\\uparrow f$ $\\Rightarrow$ $\\int f_n \\uparrow \\int f$",
-                    "[引理] Fatou — $\\int \\liminf f_n \\le \\liminf \\int f_n$",
-                    "[定理] 控制收敛 — $f_n\\to f$ a.e., $|f_n|\\le g\\in L^1$ $\\Rightarrow$ $\\int f_n \\to \\int f$"]},
-                {t:"$L^p$ 空间 (Riesz–Fischer 1907)",items:[
-                    "[定理] Hölder — $\\|fg\\|_1 \\le \\|f\\|_p \\|g\\|_q$，$1/p+1/q=1$",
-                    "[定理] Riesz–Fischer — $L^p$ 是完备赋范空间 (Banach 空间)",
-                    "[定理] Riesz 表示 — $(L^p)^* \\cong L^q$，$1<p<\\infty$"]},
-                {t:"Radon–Nikodym (1913–30s)",items:[
-                    "[定理] Radon–Nikodym — $\\nu\\ll\\mu$ $\\Rightarrow$ $\\exists f$: $\\nu(A)=\\int_A f\\,d\\mu$",
-                    "[定理] Fubini — $f\\in L^1(X\\times Y)$ $\\Rightarrow$ $\\int\\int f\\,dxdy = \\int\\int f\\,dydx$"]}
-            ]},
-            "复分析": { en:"Complex Analysis", hue:45, topics:[
-                {t:"Cauchy: 积分基石 (1825)",items:[
-                    "[定理] Cauchy 积分定理 — $f$ 全纯, $\\gamma$ 可缩 $\\Rightarrow$ $\\oint_\\gamma f(z)\\,dz = 0$",
-                    "[定理] Cauchy 积分公式 — $f(z_0) = \\frac{1}{2\\pi i}\\oint_\\gamma \\frac{f(z)}{z-z_0}\\,dz$",
-                    "[推论] Liouville — 有界整函数必为常数 $\\Rightarrow$ 代数基本定理"]},
-                {t:"Riemann: 映射 (1851)",items:[
-                    "[定理] Riemann 映射 — 单连通真子域 $\\Omega\\subsetneq\\mathbb{C}$ $\\cong$ 单位圆盘 $\\mathbb{D}$",
-                    "[定理] 最大模原理 — $f$ 全纯非常数 $\\Rightarrow$ $|f|$ 在内部无最大值"]},
-                {t:"Laurent–留数 (1840s–60s)",items:[
-                    "[方法] Laurent 展开 — $f(z)=\\sum_{n=-\\infty}^{\\infty}c_n(z-z_0)^n$, 奇点分类: 可去/极点/本性",
-                    "[定理] 留数定理 — $\\oint_\\gamma f\\,dz = 2\\pi i\\sum \\mathrm{Res}(f,z_k)$"]},
-                {t:"Weierstrass–Picard (1860s–80s)",items:[
-                    "[定理] Weierstrass 分解 — 整函数由零点决定(至多差 $e^{g(z)}$)",
-                    "[定理] Picard 大定理 — 本性奇点邻域内 $f$ 取遍 $\\mathbb{C}$ 至多除一值"]}
-            ]},
-            "常微分方程": { en:"ODE", hue:340, topics:[
-                {t:"Cauchy–Picard (1830–90s)",items:[
-                    "[定理] Picard–Lindelöf — $f$ Lipschitz $\\Rightarrow$ $y'=f(t,y),\\,y(t_0)=y_0$ 局部唯一解",
-                    "[方法] Picard 迭代 — $y_{n+1}(t)=y_0+\\int_{t_0}^t f(s,y_n(s))\\,ds$"]},
-                {t:"线性方程组",items:[
-                    "[定理] 解空间结构 — $y'=A(t)y$: 解空间 $n$ 维, Wronskian 满足 Abel 公式",
-                    "[方法] 常数变易 — $y'=Ay+g$ $\\Rightarrow$ $y=\\Phi(t)\\int\\Phi^{-1}g\\,dt$"]},
-                {t:"Sturm–Liouville (1836)",items:[
-                    "[定理] Sturm–Liouville — $-(py')'+qy=\\lambda wy$: 特征值实、$\\lambda_n\\to\\infty$, 特征函数正交完备",
-                    "[定理] Sturm 振荡 — $\\lambda_n$ 的特征函数在 $(a,b)$ 内恰有 $n$ 个零点"]},
-                {t:"Poincaré–Lyapunov (1880s–92)",items:[
-                    "[定理] Poincaré–Bendixson — $\\mathbb{R}^2$ 有界 $\\omega$-极限集只能是不动点或极限环",
-                    "[方法] Lyapunov 函数 — $\\exists V>0,\\,\\dot{V}\\le 0$ $\\Rightarrow$ 稳定; $\\dot{V}<0$ $\\Rightarrow$ 渐近稳定",
-                    "[定理] Hartman–Grobman — 双曲不动点附近非线性系统拓扑共轭于线性化"]}
-            ]},
-            "偏微分方程": { en:"PDE", hue:265, topics:[
-                {t:"经典方程 (1747–1822)",items:[
-                    "[方法] d'Alembert 公式 — $u_{tt}=c^2u_{xx}$: $u=\\frac{1}{2}[\\varphi(x{+}ct)+\\varphi(x{-}ct)]+\\frac{1}{2c}\\int_{x-ct}^{x+ct}\\psi$",
-                    "[方法] Fourier 分离变量 — $u_t=ku_{xx}$ $\\Rightarrow$ $u=\\sum a_n e^{-kn^2\\pi^2 t}\\sin n\\pi x$",
-                    "[定理] 最大值原理 — 调和/热方程解在边界取极值"]},
-                {t:"Sobolev–Schwartz (1930–50s)",items:[
-                    "[定义] Sobolev 空间 — $W^{k,p}(\\Omega)=\\{u\\in L^p : D^\\alpha u\\in L^p,\\,|\\alpha|\\le k\\}$",
-                    "[定理] Sobolev 嵌入 — $W^{1,p}\\hookrightarrow L^{p^*}$, $p^*=np/(n-p)$"]},
-                {t:"椭圆正则 (1950s–)",items:[
-                    "[定理] Lax–Milgram — 连续椭圆双线性形式 $\\Rightarrow$ $\\exists!\\,u$: $a(u,v)=F(v)$",
-                    "[定理] de Giorgi–Nash — 散度型椭圆方程弱解 Hölder 连续"]}
-            ]},
-            "泛函分析": { en:"Functional Analysis", hue:155, topics:[
-                {t:"Hilbert (1904–10)",items:[
-                    "[定理] Riesz 表示 — Hilbert 空间 $H^*\\cong H$: $\\varphi(x)=\\langle x,y\\rangle$",
-                    "[定理] 正交分解 — $H=M\\oplus M^\\perp$"]},
-                {t:"Banach (1920–32)",items:[
-                    "[定理] Hahn–Banach — 次线性函数控制下的线性泛函可保范延拓",
-                    "[定理] 一致有界性 — $\\sup_n\\|T_nx\\|<\\infty\\;\\forall x$ $\\Rightarrow$ $\\sup_n\\|T_n\\|<\\infty$",
-                    "[定理] 开映射 — $T:X\\to Y$ 满射 $\\Rightarrow$ $T$ 是开映射"]},
-                {t:"谱理论 (1930s–)",items:[
-                    "[定理] 谱定理 — $T=T^*$ $\\Rightarrow$ $T=\\int\\lambda\\,dE_\\lambda$",
-                    "[定理] Banach–Alaoglu — $X^*$ 的单位球弱*紧"]},
-                {t:"Schwartz 分布 (1950s)",items:[
-                    "[定义] 分布 — $\\mathcal{D}'(\\Omega)$: 试验函数上的连续线性泛函",
-                    "[方法] 基本解 — $E*f$ 解 $Lu=f$, 如 $\\Delta E = \\delta$ $\\Rightarrow$ $E=\\frac{1}{4\\pi|x|}$"]}
-            ]},
-            "动力系统": { en:"Dynamical Systems", hue:50, topics:[
-                {t:"Poincaré (1890s)",items:[
-                    "[定理] Poincaré 回归 — 保测系统中 a.e. 轨道无穷次回到起点附近",
-                    "[定理] Poincaré–Bendixson — $\\mathbb{R}^2$ 有界极限集只有不动点或极限环"]},
-                {t:"Smale: 马蹄与双曲 (1960s)",items:[
-                    "[概念] Smale 马蹄 — 拉伸+折叠: Cantor 集上的符号动力学",
-                    "[定理] 稳定流形 — 双曲不动点: $\\dim W^s+\\dim W^u=n$"]},
-                {t:"混沌与分岔 (1970s–80s)",items:[
-                    "[概念] Lyapunov 指数 — $\\lambda = \\lim \\frac{1}{n}\\ln\\|Df^n v\\|$, $\\lambda>0$ $\\Leftrightarrow$ 混沌",
-                    "[定理] Feigenbaum 普适性 — 倍周期分岔比率 $\\delta\\approx 4.6692$",
-                    "[定理] KAM — 近可积 Hamilton 系统中大多数不变环面保持"]}
-            ]},
-            "遍历论": { en:"Ergodic Theory", hue:0, topics:[
-                {t:"von Neumann–Birkhoff (1931–32)",items:[
-                    "[定理] Birkhoff 逐点遍历 — $\\frac{1}{N}\\sum_{k=0}^{N-1}f(T^k x) \\to \\bar{f}(x)$ a.e.",
-                    "[定理] von Neumann 遍历 — 上式在 $L^2$ 中成立"]},
-                {t:"Kolmogorov–Sinai: 熵 (1958)",items:[
-                    "[定义] 度量熵 — $h(T)=\\sup_\\alpha \\lim\\frac{1}{n}H(\\bigvee_{k=0}^{n-1}T^{-k}\\alpha)$",
-                    "[定理] Ornstein — 等熵 Bernoulli 位移同构"]},
-                {t:"Furstenberg (1977–)",items:[
-                    "[定理] Furstenberg–Szemerédi — 正密度子集含任意长等差列",
-                    "[定理] Weyl 等分布 — $(n\\alpha \\bmod 1)$ 等分布 $\\iff$ $\\alpha$ 无理"]}
-            ]},
-            "多复变函数论": { en:"Several Complex Variables", hue:275, topics:[
-                {t:"Hartogs (1906)",items:[
-                    "[定理] Hartogs 延拓 — $n\\ge 2$ 时全纯函数无孤立奇点",
-                    "[概念] Reinhardt 域 — 多重幂级数 $\\sum a_\\alpha z^\\alpha$ 的收敛域"]},
-                {t:"Oka (1936–53)",items:[
-                    "[定理] Levi 问题 — 伪凸域 $=$ 全纯凸域 $=$ 全纯函数的自然定义域",
-                    "[定理] Oka 原理 — 全纯分类问题可约化为拓扑问题"]},
-                {t:"Cartan–Serre (1950s)",items:[
-                    "[定理] Cartan B — Stein 流形上凝聚层高阶上同调消灭: $H^q(X,\\mathcal{F})=0$, $q\\ge 1$"]},
-                {t:"Hörmander (1965)",items:[
-                    "[定理] $L^2$ 估计 — $\\bar\\partial u = f$ 在伪凸域上可解, $\\|u\\|^2 \\le C\\|f\\|^2$"]}
-            ]},
-            "线性代数": { en:"Linear Algebra", hue:35, topics:[
-                {t:"矩阵代数 (1750–1858)",items:[
-                    "[方法] Gauss 消元 — 行变换化为阶梯形, $O(n^3)$",
-                    "[定理] Cayley–Hamilton — $A$ 满足自身特征多项式: $p_A(A) = 0$"]},
-                {t:"标准形 (1870s)",items:[
-                    "[定理] Jordan 标准形 — 任意 $A$ 相似于 $\\mathrm{diag}(J_{n_i}(\\lambda_i))$",
-                    "[定理] 谱定理 — $A=A^T$ $\\Rightarrow$ $A=Q\\Lambda Q^T$, $Q$ 正交",
-                    "[定理] SVD — $A=U\\Sigma V^T$, $\\sigma_i=\\sqrt{\\lambda_i(A^TA)}$"]},
-                {t:"空间结构",items:[
-                    "[定理] 秩-零化度 — $\\dim\\ker T + \\dim\\mathrm{im}\\,T = \\dim V$",
-                    "[定义] 外代数 — $\\bigwedge^k V$, $v\\wedge w = -w\\wedge v$, $\\dim = \\binom{n}{k}$"]}
-            ]},
-            "抽象代数": { en:"Abstract Algebra", hue:300, topics:[
-                {t:"Galois (1832)",items:[
-                    "[定理] Galois 对应 — 中间域 $\\longleftrightarrow$ $\\mathrm{Gal}(K/F)$ 的子群",
-                    "[定理] Abel–Galois — $n\\ge 5$ 一般方程无根式解 $\\Leftrightarrow$ $S_n$ 不可解"]},
-                {t:"Hilbert (1890s)",items:[
-                    "[定理] 基定理 — $R$ Noether $\\Rightarrow$ $R[x]$ Noether",
-                    "[定理] 零点定理 — $I(V(J))=\\sqrt{J}$, 理想 $\\longleftrightarrow$ 代数簇"]},
-                {t:"Noether (1921)",items:[
-                    "[定理] PID 上模分类 — $M \\cong R^r \\oplus \\bigoplus R/(p_i^{e_i})$ $\\Rightarrow$ Jordan 标准形",
-                    "[概念] Noether 环 — ACC: 理想升链必稳定 $\\iff$ 每个理想有限生成"]},
-                {t:"Artin–Wedderburn (1930s)",items:[
-                    "[定理] Wedderburn — 半单环 $\\cong \\prod M_{n_i}(D_i)$, $D_i$ 除环",
-                    "[定理] Maschke — $\\mathrm{char}(k)\\nmid |G|$ $\\Rightarrow$ $k[G]$-模完全可约"]}
-            ]},
-            "基础数论": { en:"Number Theory", hue:185, topics:[
-                {t:"Euclid–Fermat (前300–1640s)",items:[
-                    "[定理] 算术基本定理 — $n = p_1^{a_1}\\cdots p_k^{a_k}$ 唯一分解",
-                    "[定理] Fermat 小定理 — $a^{p-1} \\equiv 1 \\pmod{p}$, $(a,p)=1$"]},
-                {t:"Euler (1730s)",items:[
-                    "[定理] Euler 定理 — $a^{\\varphi(n)}\\equiv 1\\pmod{n}$",
-                    "[方法] Euler 乘积 — $\\zeta(s)=\\prod_p(1-p^{-s})^{-1}$"]},
-                {t:"Gauss: 二次互反 (1801)",items:[
-                    "[定理] 二次互反律 — $(\\frac{p}{q})(\\frac{q}{p})=(-1)^{\\frac{p-1}{2}\\frac{q-1}{2}}$"]},
-                {t:"Dirichlet–Riemann (1837–59)",items:[
-                    "[定理] Dirichlet — $\\gcd(a,n)=1$ $\\Rightarrow$ $\\{a+kn\\}$ 中素数无穷",
-                    "[概念] Riemann 猜想 — $\\zeta(s)$ 非平凡零点满足 $\\mathrm{Re}(s)=1/2$"]}
-            ]},
-            "群与表示": { en:"Groups & Representations", hue:100, topics:[
-                {t:"Sylow (1872)",items:[
-                    "[定理] Sylow I — $|G|=p^n m$ $\\Rightarrow$ $\\exists$ 阶 $p^n$ 子群",
-                    "[定理] Sylow III — $n_p \\equiv 1\\pmod{p}$, $n_p \\mid m$"]},
-                {t:"Frobenius–Schur (1896–1905)",items:[
-                    "[定理] Maschke — 有限群在 $\\mathbb{C}$ 上表示完全可约",
-                    "[引理] Schur — 不可约表示间态射: 同构或零",
-                    "[定理] 正交关系 — $\\frac{1}{|G|}\\sum_g \\chi_i(g)\\overline{\\chi_j(g)} = \\delta_{ij}$"]},
-                {t:"特征标表",items:[
-                    "[定理] 不可约表示个数 $=$ 共轭类个数",
-                    "[定理] Burnside — 阶 $p^aq^b$ 群可解"]}
-            ]},
-            "拓扑学": { en:"Topology", hue:20, topics:[
-                {t:"点集拓扑",items:[
-                    "[定理] Tychonoff — $\\prod X_\\alpha$ 紧 $\\iff$ 每个 $X_\\alpha$ 紧",
-                    "[引理] Urysohn — 正规空间中不交闭集可用连续函数分离"]},
-                {t:"Poincaré: 代数拓扑 (1895)",items:[
-                    "[定义] 基本群 — $\\pi_1(X,x_0)$: 环路同伦类, 群运算=路径连接",
-                    "[定理] Van Kampen — $\\pi_1(U_1\\cup U_2)\\cong \\pi_1(U_1)*_{\\pi_1(U_1\\cap U_2)}\\pi_1(U_2)$",
-                    "[定理] 覆叠对应 — 连通覆叠 $\\longleftrightarrow$ $\\pi_1$ 的子群"]},
-                {t:"Brouwer (1911)",items:[
-                    "[定理] Brouwer 不动点 — $f:\\overline{B}^n\\to\\overline{B}^n$ 连续 $\\Rightarrow$ $\\exists x: f(x)=x$"]},
-                {t:"同调 (1930s–50s)",items:[
-                    "[方法] Mayer–Vietoris — $\\cdots\\to H_n(A\\cap B)\\to H_n(A)\\oplus H_n(B)\\to H_n(X)\\to\\cdots$",
-                    "[定理] Poincaré 对偶 — 闭定向 $n$-流形: $H_k(M)\\cong H^{n-k}(M)$"]}
-            ]},
-            "基础代数几何": { en:"Algebraic Geometry", hue:320, topics:[
-                {t:"Hilbert (1890s)",items:[
-                    "[定理] 零点定理 — $I(V(J))=\\sqrt{J}$, 几何↔代数",
-                    "[定理] Bézout — $\\deg C_1 \\cdot \\deg C_2$ $=$ 交点数 (射影, 含重数)"]},
-                {t:"经典几何",items:[
-                    "[概念] 亏格 — 光滑曲线 $C$: Riemann–Roch $\\ell(D)-\\ell(K{-}D)=\\deg D -g+1$"]},
-                {t:"Grothendieck (1960s)",items:[
-                    "[概念] 概形 — $\\mathrm{Spec}\\,R$ + 结构层: 统一数论与几何",
-                    "[定理] Grothendieck–RR — $\\mathrm{ch}(f_!\\mathcal{F})\\cdot\\mathrm{td}(Y) = f_*(\\mathrm{ch}(\\mathcal{F})\\cdot\\mathrm{td}(X))$"]}
-            ]},
-            "微分几何": { en:"Differential Geometry", hue:210, topics:[
-                {t:"Gauss (1827)",items:[
-                    "[定理] Gauss 绝妙定理 — $K$ 只依赖第一基本形式(内蕴量)",
-                    "[定理] Gauss–Bonnet — $\\int_M K\\,dA + \\int_{\\partial M}\\kappa_g\\,ds = 2\\pi\\chi(M)$"]},
-                {t:"Riemann (1854)",items:[
-                    "[定义] Riemann 度量 — $ds^2=g_{ij}dx^i dx^j$",
-                    "[定义] 曲率张量 — $R^i_{\\;jkl}$: 平行移动的路径依赖性"]},
-                {t:"Levi-Civita–Cartan (1917–20s)",items:[
-                    "[定义] Levi-Civita 联络 — 唯一无挠保度量: $\\nabla g=0$, $\\nabla_XY-\\nabla_YX=[X,Y]$",
-                    "[概念] 测地线 — $\\nabla_{\\dot\\gamma}\\dot\\gamma=0$"]},
-                {t:"Chern (1944–)",items:[
-                    "[定理] Chern–Gauss–Bonnet — $\\int_M \\mathrm{Pf}(\\Omega) = (2\\pi)^n\\chi(M)$",
-                    "[定理] Atiyah–Singer (1963) — $\\mathrm{ind}(D) = \\int_M \\mathrm{ch}(\\sigma(D))\\cdot\\mathrm{td}(TM_\\mathbb{C})$"]}
-            ]},
-            "微分流形": { en:"Differentiable Manifolds", hue:130, topics:[
-                {t:"基本概念",items:[
-                    "[定义] 光滑流形 — 局部 $\\cong\\mathbb{R}^n$, 转换映射光滑; $T_pM$: 方向导数空间",
-                    "[定理] Whitney 嵌入 — $M^n$ 可嵌入 $\\mathbb{R}^{2n+1}$"]},
-                {t:"de Rham (1931)",items:[
-                    "[定义] 微分形式 — $\\omega\\in\\Omega^k(M)$, 外微分 $d$, $d^2=0$",
-                    "[定理] Stokes — $\\int_M d\\omega = \\int_{\\partial M}\\omega$",
-                    "[定理] de Rham — $H^k_{dR}(M)\\cong H^k_{sing}(M;\\mathbb{R})$"]},
-                {t:"Hodge (1941)",items:[
-                    "[定理] Hodge 分解 — $\\Omega^k = \\mathrm{im}\\,d \\oplus \\mathrm{im}\\,d^* \\oplus \\mathcal{H}^k$",
-                    "[引理] Poincaré — 星形域: $d\\omega=0$ $\\Rightarrow$ $\\omega=d\\eta$"]},
-                {t:"Milnor (1956–)",items:[
-                    "[定理] 奇异球面 — $S^7$ 上存在 28 种不同的光滑结构",
-                    "[方法] Morse 理论 — 临界点指标决定拓扑: 胞腔数=临界点数"]}
-            ]}
-        };
-
-        // Build hex grid
-        function renderDictHexGrid() {
-            const leftKeys = ["数学分析","实分析","复分析","常微分方程","偏微分方程","泛函分析","动力系统","遍历论","多复变函数论"];
-            const rightKeys = ["线性代数","抽象代数","基础数论","群与表示","拓扑学","基础代数几何","微分几何","微分流形"];
-            const makeHex = (key) => {
-                const kb = dictKB[key];
-                const shortZh = key.length > 4 ? key.substring(0,4) : key;
-                const shortEn = kb.en.length > 16 ? kb.en.substring(0,14)+'.' : kb.en;
-                return `<div class="dict-hex-cell" style="--hex-hue:${kb.hue}" onclick="openDictCourse('${key}')">
-                    <div class="hex-outer"></div>
-                    <div class="hex-inner">
-                        <span class="hex-label-zh">${shortZh}</span>
-                        <span class="hex-label-en">${shortEn}</span>
-                    </div>
-                </div>`;
-            };
-            document.getElementById('dictLeftCol').innerHTML = leftKeys.map(makeHex).join('');
-            document.getElementById('dictRightCol').innerHTML = rightKeys.map(makeHex).join('');
-        }
-
-        // Type → CSS class
-        const tmTypeMap = {'定义':'def','定理':'thm','引理':'lem','推论':'cor','方法':'tech','概念':'tech'};
-        const eraColors = ['#2563eb','#d97706','#059669','#7c3aed','#dc2626','#0891b2','#b45309','#4f46e5'];
-
-        // Parse "[type] Name — tex" format
-        function parseThmItem(raw) {
-            const m = raw.match(/^\[(.+?)\]\s*(.+?)\s*—\s*(.+)$/);
-            if (m) return { type:m[1], name:m[2], tex:m[3] };
-            const m2 = raw.match(/^\[(.+?)\]\s*(.+)$/);
-            if (m2) return { type:m2[1], name:m2[2], tex:'' };
-            return { type:'', name:raw, tex:'' };
-        }
-
-        function parseEraTitle(t) {
-            const m = t.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
-            if (m) return { label:m[1], year:m[2] };
-            return { label:t, year:'' };
-        }
-
-        // Open course → render theorem-flow map with LaTeX
-        let _gmCurrentItem = null;
-
-        function openDictCourse(key) {
-            const kb = dictKB[key];
-            if (!kb) return;
-            dictCurrentCourse = key;
-            document.getElementById('dictCourseName').textContent = key;
-            document.getElementById('dictCourseNameEn').textContent = kb.en;
-            closeGmDetail();
-
-            // Parse all items into flat array with positions
-            const nodes = [];
-            const edges = [];
-            const rowH = 105;
-            const colPositions = {
-                1: [280],
-                2: [100, 420],
-                3: [50, 260, 470],
-                4: [30, 200, 370, 540]
-            };
-            const nodeW = 160, nodeH = 50;
-            let prevRowLastId = -1;
-
-            kb.topics.forEach((sec, si) => {
-                const era = parseEraTitle(sec.t);
-                const n = Math.min(sec.items.length, 4);
-                const xs = colPositions[n] || colPositions[3];
-                const baseY = 28 + si * rowH;
-
-                // Era label
-                nodes.push({ isLabel: true, text: era.label + (era.year ? ' ' + era.year : ''), x: 2, y: baseY + 8 });
-
-                const rowFirstId = nodes.length;
-                sec.items.forEach((raw, ii) => {
-                    const it = parseThmItem(raw);
-                    const cls = tmTypeMap[it.type] || 'tech';
-                    const cc = cls==='def'?'#2563eb':cls==='thm'?'#d97706':cls==='lem'?'#059669':cls==='cor'?'#7c3aed':'#4f46e5';
-                    const x = (xs[ii] || xs[xs.length-1]) + (ii % 2 === 1 ? 10 : 0);
-                    const y = baseY + (ii >= 2 ? 52 : 0);
-                    nodes.push({ id: nodes.length, x, y, it, cls, cc, raw });
-                });
-
-                // Edges within same era
-                for (let ii = 0; ii < sec.items.length - 1; ii++) {
-                    edges.push([rowFirstId + ii, rowFirstId + ii + 1]);
-                }
-                // Edge from prev era
-                if (prevRowLastId >= 0) {
-                    edges.push([prevRowLastId, rowFirstId]);
-                }
-                prevRowLastId = rowFirstId + sec.items.length - 1;
-            });
-
-            // Compute total height
-            const totalH = 28 + kb.topics.length * rowH + 40;
-            const totalW = 680;
-
-            // Build HTML
-            let svgLines = '';
-            edges.forEach(([fromId, toId]) => {
-                const a = nodes[fromId], b = nodes[toId];
-                if (!a || !b || a.isLabel || b.isLabel) return;
-                const ax = a.x + nodeW/2, ay = a.y + nodeH/2;
-                const bx = b.x + nodeW/2, by = b.y + nodeH/2;
-                // Arrow direction
-                const dx = bx-ax, dy = by-ay;
-                const len = Math.sqrt(dx*dx+dy*dy) || 1;
-                const ux = dx/len, uy = dy/len;
-                const endX = bx - ux*12, endY = by - uy*12;
-                const arrowX = bx - ux*6, arrowY = by - uy*6;
-                svgLines += `<line x1="${ax}" y1="${ay}" x2="${endX}" y2="${endY}"/>`;
-                // Arrowhead
-                const perpX = -uy*4, perpY = ux*4;
-                svgLines += `<polygon class="arrow-head" points="${bx},${by} ${endX+perpX},${endY+perpY} ${endX-perpX},${endY-perpY}"/>`;
-            });
-
-            let nodesHtml = '';
-            nodes.forEach((n, idx) => {
-                if (n.isLabel) {
-                    nodesHtml += `<div class="gm-era-label" style="left:${n.x}px;top:${n.y}px">${escapeHtml(n.text)}</div>`;
-                    return;
-                }
-                nodesHtml += `<div class="gm-node" style="left:${n.x}px;top:${n.y}px;--node-c:${n.cc}" data-idx="${idx}" onclick="showGmDetail(${idx})">`;
-                nodesHtml += `<div class="gm-node-top">`;
-                if (n.it.type) nodesHtml += `<span class="gm-badge gm-badge-${n.cls}">${escapeHtml(n.it.type)}</span>`;
-                nodesHtml += `<span class="gm-name">${escapeHtml(n.it.name)}</span></div>`;
-                if (n.it.tex) nodesHtml += `<div class="gm-tex">${n.it.tex}</div>`;
-                nodesHtml += `</div>`;
-            });
-
-            const scroll = document.getElementById('dictKBScroll');
-            scroll.innerHTML = `<div class="graph-map" style="height:${totalH}px;width:${totalW}px">
-                <svg class="graph-lines" viewBox="0 0 ${totalW} ${totalH}">
-                    <defs><marker id="ah" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="var(--text-muted)"/></marker></defs>
-                    ${svgLines}
-                </svg>
-                ${nodesHtml}
-            </div>`;
-
-            // Store nodes for detail popup
-            window._gmNodes = nodes;
-
-            // KaTeX
-            if (typeof renderMathInElement === 'function') {
-                scroll.querySelectorAll('.gm-tex').forEach(el => {
-                    renderMathInElement(el, {
-                        delimiters:[{left:'$',right:'$',display:false}],
-                        throwOnError:false
-                    });
-                });
-            }
-
-            document.getElementById('dictCourseView').classList.add('show');
-            closeDictResult();
-            removeDictCSAttach();
-        }
-
-        function showGmDetail(idx) {
-            const n = window._gmNodes && window._gmNodes[idx];
-            if (!n || n.isLabel) return;
-            _gmCurrentItem = n;
-            const d = document.getElementById('gmDetail');
-            const cls = n.cls || '';
-            document.getElementById('gmDetailType').textContent = n.it.type || '';
-            document.getElementById('gmDetailType').className = 'gm-detail-type gm-badge-' + cls;
-            document.getElementById('gmDetailName').textContent = n.it.name;
-            const texEl = document.getElementById('gmDetailTex');
-            texEl.textContent = n.it.tex || '';
-            if (n.it.tex && typeof renderMathInElement === 'function') {
-                texEl.innerHTML = n.it.tex;
-                renderMathInElement(texEl, {
-                    delimiters:[{left:'$',right:'$',display:false},{left:'$$',right:'$$',display:true}],
-                    throwOnError:false
-                });
-            }
-            d.classList.add('show');
-        }
-
-        function closeGmDetail() {
-            document.getElementById('gmDetail')?.classList.remove('show');
-            _gmCurrentItem = null;
-        }
-
-        function askGmDetail() {
-            if (!_gmCurrentItem) return;
-            const q = _gmCurrentItem.it.name + (_gmCurrentItem.it.tex ? ' ' + _gmCurrentItem.it.tex : '');
-            document.getElementById('dictCSInput').value = q;
-            closeGmDetail();
-            dictCSSend();
-        }
-
-        function closeDictCourse() {
-            document.getElementById('dictCourseView').classList.remove('show');
-            dictCurrentCourse = null;
-            closeGmDetail();
-            closeDictResult();
-        }
-
-        function dictQueryTopic(topic) {
-            document.getElementById('dictCSInput').value = topic;
-            dictCSSend();
-        }
-
-        // Course search send
-        async function dictCSSend() {
-            if (dictIsQuerying) return;
-            const query = document.getElementById('dictCSInput').value.trim();
-            if (!query && !dictAttachment) { showToast('请输入查询内容'); return; }
-            dictIsQuerying = true;
-            document.getElementById('dictCSSendBtn').disabled = true;
-
-            const course = dictCurrentCourse || '数学';
-            const kb = dictKB[course];
-            const queryText = query || '请分析附件内容';
-
-            // Show result overlay
-            const overlay = document.getElementById('dictResultOverlay');
-            overlay.classList.add('show');
-            document.getElementById('dictResultTitle').textContent = queryText;
-            document.getElementById('dictResultBody').innerHTML = '<div class="dict-result-loading"><div class="spinner"></div>正在查询…</div>';
-
-            const systemPrompt = `你是一位北京大学数学科学学院的资深教授，专精${course}${kb ? ' ('+kb.en+')' : ''}方向。
-
-要求：
-1. 给出严格的数学定义，使用LaTeX（$...$行内，$$...$$行间）
-2. 解释直觉与几何意义
-3. 给出关键定理及其条件
-4. 说明与其他概念的联系
-5. 给出典型例子或反例
-6. 中文为主，术语附英文
-
-当前学科: ${course}
-请用Markdown格式回答。`;
-
-            const messages = [];
-            let userContent = queryText;
-            if (dictAttachment) {
-                if (dictAttachment.type.startsWith('image/')) {
-                    messages.push({ role:'user', content:[
-                        { type:'image_url', image_url:{ url:dictAttachment.data } },
-                        { type:'text', text:userContent }
-                    ]});
-                } else {
-                    userContent = `[附件: ${dictAttachment.name}]\n\n${userContent}`;
-                    messages.push({ role:'user', content:userContent });
-                }
-            } else {
-                messages.push({ role:'user', content:userContent });
-            }
-
-            try {
-                const result = await callAI(systemPrompt, messages, { maxTokens:4096, temperature:0.5 });
-                const html = renderChatMarkdownLatex(result);
-                document.getElementById('dictResultBody').innerHTML = html;
-                if (typeof renderMathInElement === 'function') {
-                    renderMathInElement(document.getElementById('dictResultBody'), {
-                        delimiters:[
-                            {left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false},
-                            {left:'\\[',right:'\\]',display:true},{left:'\\(',right:'\\)',display:false}
-                        ], throwOnError:false
-                    });
-                }
-                saveDictHistory(queryText, course, result);
-            } catch(e) {
-                console.error('字典查询失败:', e);
-                document.getElementById('dictResultBody').innerHTML = `<div class="dict-result-loading" style="color:#ef4444;">查询失败: ${escapeHtml(e.message)}<br><br>请在设置中配置API</div>`;
-            } finally {
-                dictIsQuerying = false;
-                document.getElementById('dictCSSendBtn').disabled = false;
-            }
-        }
-
-        function closeDictResult() {
-            document.getElementById('dictResultOverlay').classList.remove('show');
-        }
-
-        // Attachment handling
-        function dictCSAttachFile() {
-            const input = document.getElementById('dictCSFileInput');
-            input.value = '';
-            input.click();
-        }
-        function onDictCSFileSelected(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = function(ev) {
-                dictAttachment = { name:file.name, data:ev.target.result, type:file.type };
-                document.getElementById('dictCSAttachBtn').classList.add('has-file');
-                document.getElementById('dictCSAttachBar').classList.add('show');
-                document.getElementById('dictCSAttachName').textContent = file.name;
-            };
-            reader.readAsDataURL(file);
-        }
-        function removeDictCSAttach() {
-            dictAttachment = null;
-            document.getElementById('dictCSAttachBtn').classList.remove('has-file');
-            document.getElementById('dictCSAttachBar').classList.remove('show');
-        }
-
-        // History
-        function saveDictHistory(query, subject, answer) {
-            if (!appData.dictHistory) appData.dictHistory = [];
-            appData.dictHistory.unshift({ id:Date.now().toString(), query, subject:subject||'', answer, time:new Date().toISOString() });
-            if (appData.dictHistory.length > 20) appData.dictHistory = appData.dictHistory.slice(0,20);
-            saveData();
-            debouncedChatSync();
-        }
-
-        function showDictHistory() {
-            const list = document.getElementById('dictHistoryList');
-            const history = appData.dictHistory || [];
-            if (!history.length) {
-                list.innerHTML = '<div class="dict-history-empty">暂无搜索历史</div>';
-            } else {
-                list.innerHTML = history.map((item,idx) => `
-                    <div class="dict-history-item" onclick="openDictHistoryItem(${idx})" data-idx="${idx}">
-                        <div class="dict-history-item-query">${escapeHtml(item.query)}</div>
-                        <div class="dict-history-item-meta">
-                            ${item.subject ? '<span>'+escapeHtml(item.subject)+'</span>' : ''}
-                            <span>${new Date(item.time).toLocaleString('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}</span>
-                        </div>
-                    </div>
-                `).join('');
-                list.querySelectorAll('.dict-history-item').forEach(el => {
-                    let timer = null;
-                    const start = () => { timer = setTimeout(() => {
-                        timer = null;
-                        const idx = parseInt(el.dataset.idx);
-                        if (confirm('删除此条搜索记录？')) { appData.dictHistory.splice(idx,1); saveData(); showDictHistory(); }
-                    }, 600); };
-                    const cancel = () => { if(timer){clearTimeout(timer);timer=null;} };
-                    el.addEventListener('touchstart',start,{passive:true});
-                    el.addEventListener('touchend',cancel);
-                    el.addEventListener('touchcancel',cancel);
-                    el.addEventListener('touchmove',cancel);
-                    el.addEventListener('mousedown',start);
-                    el.addEventListener('mouseup',cancel);
-                    el.addEventListener('mouseleave',cancel);
-                });
-            }
-            showModal('dictHistoryModal');
-        }
-
-        function openDictHistoryItem(idx) {
-            const item = (appData.dictHistory||[])[idx];
-            if (!item) return;
-            hideModal('dictHistoryModal');
-            // Open the course if we have one
-            if (item.subject && dictKB[item.subject]) {
-                openDictCourse(item.subject);
-            } else if (!document.getElementById('dictCourseView').classList.contains('show')) {
-                // Open a generic view
-                openDictCourse(Object.keys(dictKB)[0]);
-            }
-            // Show result
-            const overlay = document.getElementById('dictResultOverlay');
-            overlay.classList.add('show');
-            document.getElementById('dictResultTitle').textContent = item.query;
-            const html = renderChatMarkdownLatex(item.answer);
-            document.getElementById('dictResultBody').innerHTML = html;
-            if (typeof renderMathInElement === 'function') {
-                renderMathInElement(document.getElementById('dictResultBody'), {
-                    delimiters:[
-                        {left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false},
-                        {left:'\\[',right:'\\]',display:true},{left:'\\(',right:'\\)',display:false}
-                    ], throwOnError:false
-                });
-            }
-        }
-
-        // Init hex grid on load
-        renderDictHexGrid();
 
         // ==================== Service Worker ====================
         if ('serviceWorker' in navigator) {
