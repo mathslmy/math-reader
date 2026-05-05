@@ -10349,7 +10349,7 @@
                 const notes = getDocAnnotations(currentDoc.id, currentPage, 'note');
                 const notesSummary = notes.map(n => n.text).filter(Boolean).join('; ');
 
-                const greeting = `你好! 我是你的 AI 数学助手。当前文档: ${currentDoc.title}，。${notesSummary ? '你在这里记了一些笔记: ' + notesSummary + '。' : ''}有什么我可以帮你的?`;
+                const greeting = `你好! 我是你的 AI 数学助手。${notesSummary ? '你在这里记了一些笔记: ' + notesSummary + '。' : ''}有什么我可以帮你的?`;
                 history = [{ role: 'assistant', content: greeting }];
                 if (screenshot) {
                     history[0].screenshot = screenshot;
