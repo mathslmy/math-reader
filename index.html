@@ -1805,8 +1805,6 @@
             font-size: 13px;
             cursor: pointer;
             color: var(--text-secondary);
-            margin-left: auto;
-            margin-right: 8px;
             transition: all 0.2s;
         }
 
@@ -1965,12 +1963,26 @@
 
         .chat-modal .modal-title {
             font-size: 15px;
+            flex: 1;
+            min-width: 0;
         }
 
         .chat-modal .modal-close {
             width: 36px;
             height: 36px;
             font-size: 22px;
+        }
+
+        .chat-modal .modal-header {
+            margin-bottom: 12px;
+            gap: 8px;
+        }
+
+        .chat-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-shrink: 0;
         }
 
         .chat-container {
@@ -4311,8 +4323,10 @@
         <div class="modal-content chat-modal" onclick="event.stopPropagation()">
             <div class="modal-header">
                 <span class="modal-title" id="readerChatTitle">AI 助手</span>
-                <button class="focus-chat-export-btn" onclick="exportReaderChatHistory()" title="导出聊天记录">导出</button>
-                <button class="modal-close" onclick="hideModal('readerChatModal')">&times;</button>
+                <div class="chat-header-actions">
+                    <button class="focus-chat-export-btn" onclick="exportReaderChatHistory()" title="导出聊天记录">导出</button>
+                    <button class="modal-close" onclick="hideModal('readerChatModal')">&times;</button>
+                </div>
             </div>
             <div class="chat-container" id="readerChatContainer">
                 <!-- 动态生成聊天消息 -->
