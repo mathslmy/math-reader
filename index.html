@@ -2007,6 +2007,9 @@
             flex-shrink: 0;
             overflow: hidden;
             margin-top: 4px;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
         }
 
         .chat-avatar img {
@@ -2025,6 +2028,9 @@
             min-width: 0;
             max-width: 100%;
             overflow: hidden;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
         }
 
         .chat-message.user .chat-bubble {
@@ -10330,38 +10336,55 @@
             const avatar = element.querySelector('.chat-avatar');
             const isUser = element.classList.contains('user');
 
+            // Suppress native long-press callout on the whole message
+            element.style.webkitTouchCallout = 'none';
+            element.style.webkitUserSelect = 'none';
+            element.style.userSelect = 'none';
+
             // Long press on bubble: redo (AI = regenerate, User = edit)
             if (bubble) {
                 let bubbleTimer = null;
+                let bubbleFired = false;
                 bubble.addEventListener('touchstart', (e) => {
+                    bubbleFired = false;
                     bubbleTimer = setTimeout(() => {
                         bubbleTimer = null;
+                        bubbleFired = true;
                         if (isUser) {
                             editReaderChatMessage(msgIndex);
                         } else {
                             regenerateReaderChatMessage(msgIndex);
                         }
                     }, 500);
-                }, { passive: true });
-                bubble.addEventListener('touchend', () => { if (bubbleTimer) clearTimeout(bubbleTimer); bubbleTimer = null; });
+                }, { passive: false });
+                bubble.addEventListener('touchend', (e) => {
+                    if (bubbleTimer) { clearTimeout(bubbleTimer); bubbleTimer = null; }
+                    if (bubbleFired) { e.preventDefault(); }
+                });
                 bubble.addEventListener('touchmove', () => { if (bubbleTimer) clearTimeout(bubbleTimer); bubbleTimer = null; });
-                bubble.addEventListener('contextmenu', (e) => { e.preventDefault(); e.stopPropagation(); });
+                bubble.addEventListener('contextmenu', (e) => { e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); return false; });
             }
 
             // Long press on avatar: delete
             if (avatar) {
                 let avatarTimer = null;
+                let avatarFired = false;
                 avatar.addEventListener('touchstart', (e) => {
+                    avatarFired = false;
                     avatarTimer = setTimeout(() => {
                         avatarTimer = null;
+                        avatarFired = true;
                         if (confirm('删除这条消息?')) {
                             deleteReaderChatMessage(msgIndex);
                         }
                     }, 500);
-                }, { passive: true });
-                avatar.addEventListener('touchend', () => { if (avatarTimer) clearTimeout(avatarTimer); avatarTimer = null; });
+                }, { passive: false });
+                avatar.addEventListener('touchend', (e) => {
+                    if (avatarTimer) { clearTimeout(avatarTimer); avatarTimer = null; }
+                    if (avatarFired) { e.preventDefault(); }
+                });
                 avatar.addEventListener('touchmove', () => { if (avatarTimer) clearTimeout(avatarTimer); avatarTimer = null; });
-                avatar.addEventListener('contextmenu', (e) => { e.preventDefault(); e.stopPropagation(); });
+                avatar.addEventListener('contextmenu', (e) => { e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); return false; });
             }
         }
 
