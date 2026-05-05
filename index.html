@@ -4895,20 +4895,13 @@
                 handwritingPrompt: '你是一个手写识别助手。识别图中手写内容，数学公式用LaTeX，只输出结果。',
                 recognizeFail: '识别失败',
                 // System prompts for AI
-                readerAIPrompt: `你是一个数学助手。用户正在阅读一本数学书。`,
+                readerAIPrompt: '你是一个数学阅读AI助手。',
                 readerAIDocLabel: '当前文档: ',
                 readerAIPageLabel: '当前页码: ',
                 readerAIProgressLabel: '阅读进度: ',
                 readerAINoteLabel: '该页笔记: ',
                 readerAINone: '无',
-                readerAISuffix: `附件是用户当前正在阅读的页面，请仔细阅读附件内容。
-
-【回答规则——必须严格遵守】
-- 判断用户的问题是否在问附件页面上的内容。判断依据：用户使用了"这个"、"这里"、"公式(N)"、"上面的"等指示词，或者问题的对象恰好出现在附件页面上。
-  → 如果是：基于附件内容回答，只解释用户问的那个东西。
-  → 如果不是（用户在问一个通用数学概念、定义、定理）：直接回答该概念本身。不要提及附件页面、不要提及书中其他公式、不要写"与本页的联系/应用"。
-- 只回答用户问的问题。禁止主动拓展、禁止补充用户没问的相关知识、禁止写"接下来"或"此外"引出新话题。
-- 直接给出答案，不要复述用户的问题。`,
+                readerAISuffix: '附件是当前页的PDF，请根据用户问题（高权重），上下文（中权重），附件内容（低权重）给出帮助。用户引申问题不一定来自附件，不要被附件内容局限，利用你自己的知识库#针对用户问题#给出回答。准确、数学专业。',
                 outlineSystemPrompt: `你是一个专业的数学教育专家。下面附件是一本完整的书（PDF）。
 请你通读附件，为这本书生成一份结构化大纲（每节大约 1 小时学习量），并给出每一节对应的 PDF 页码范围。
 
@@ -5310,20 +5303,13 @@
                 dateFormat_lecture: 'Lecture $n',
                 handwritingPrompt: 'You are a handwriting recognition assistant. Recognize handwritten content in the image, use LaTeX for math formulas, output results only.',
                 recognizeFail: 'Recognition failed',
-                readerAIPrompt: `You are a math assistant. The user is reading a math textbook.`,
+                readerAIPrompt: 'You are a math reading AI assistant.',
                 readerAIDocLabel: 'Current document: ',
                 readerAIPageLabel: 'Current page: ',
                 readerAIProgressLabel: 'Reading progress: ',
                 readerAINoteLabel: 'Page notes: ',
                 readerAINone: 'None',
-                readerAISuffix: `The attachment is the page the user is currently reading. Read the attachment carefully.
-
-[RESPONSE RULES — MUST BE STRICTLY FOLLOWED]
-- Determine whether the user is asking about content on the attached page. Indicators: the user uses deictic words like "this", "here", "formula (N)", "the above", or the subject of the question happens to appear on the attached page.
-  → If YES: answer based on the attachment, explaining only the specific thing the user asked about.
-  → If NO (user is asking about a general math concept, definition, or theorem): answer the concept directly. Do NOT mention the attached page, do NOT mention other formulas from the book, do NOT write "connection to this page" or "application here".
-- Answer ONLY what the user asked. Do NOT proactively extend, do NOT add related knowledge the user did not request, do NOT use "furthermore" or "additionally" to introduce new topics.
-- Give the answer directly. Do not restate the user's question.`,
+                readerAISuffix: 'The attachment is the current PDF page. Respond based on: the user question (high priority), conversation context (medium priority), attachment content (low priority). The user may ask questions beyond the attachment — do not be limited by the attachment content. Use your own knowledge base to #answer the user question directly#. Accurate, mathematically rigorous.',
                 outlineSystemPrompt: `You are a professional mathematics education expert. The attachment is a complete book (PDF).
 Please read the attachment and generate a structured outline (each section ~1 hour of study), with PDF page ranges for each section.
 
