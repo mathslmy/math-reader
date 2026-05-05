@@ -3527,17 +3527,17 @@
     <div class="page active" id="page1">
         <div class="pull-to-refresh-indicator" id="ptrPage1">
             <div class="ptr-spinner"></div>
-            <span class="ptr-text" data-i18n="pullToRefresh">下拉刷新</span>
+            <span class="ptr-text">下拉刷新</span>
         </div>
         <div class="page1-header">
             <button class="ai-btn" onclick="showAIModal()">AI</button>
-            <button class="archive-btn" onclick="toggleArchive()" data-i18n="archive">存档</button>
+            <button class="archive-btn" onclick="toggleArchive()">存档</button>
         </div>
 
         <div class="library-grid" id="libraryGrid">
             <div class="library-column" onclick="onColumnClick(event, 'book')">
                 <div class="column-header">
-                    <span class="column-title" data-i18n="books">书籍</span>
+                    <span class="column-title">书籍</span>
                     <span class="column-count" id="bookCount">0</span>
                 </div>
                 <div class="item-list" id="bookList">
@@ -3549,7 +3549,7 @@
             </div>
             <div class="library-column" onclick="onColumnClick(event, 'paper')">
                 <div class="column-header">
-                    <span class="column-title" data-i18n="papers">论文</span>
+                    <span class="column-title">论文</span>
                     <span class="column-count" id="paperCount">0</span>
                 </div>
                 <div class="item-list" id="paperList">
@@ -3564,11 +3564,11 @@
         <!-- Archive view (hidden by default) -->
         <div id="archiveView" style="display:none;">
             <div class="column-header" style="margin-top:12px;">
-                <span class="column-title" data-i18n="archiveTitle">存档</span>
-                <button class="archive-btn" onclick="toggleArchive()" data-i18n="back">返回</button>
+                <span class="column-title">存档</span>
+                <button class="archive-btn" onclick="toggleArchive()">返回</button>
             </div>
             <div class="item-list" id="archiveList">
-                <div class="empty-state"><p data-i18n="emptyArchive">暂无存档</p></div>
+                <div class="empty-state"><p>暂无存档</p></div>
             </div>
         </div>
     </div>
@@ -3625,7 +3625,7 @@
         <div class="search-panel" id="searchPanel">
             <div class="search-input-row">
                 <div class="search-input-wrapper">
-                    <input type="text" class="search-input" id="searchInput" placeholder="搜索文档内容..." data-i18n-placeholder="searchDocContent">
+                    <input type="text" class="search-input" id="searchInput" placeholder="搜索文档内容...">
                     <button class="search-clear-btn" id="searchClearBtn" onclick="clearSearch()">x</button>
                 </div>
                 <button class="search-close-btn" onclick="closeSearchPanel()">
@@ -3673,7 +3673,7 @@
             </div>
             <!-- Page jump popup -->
             <div class="page-jump-popup" id="pageJumpPopup">
-                <input type="number" id="pageJumpInput" placeholder="输入页码" data-i18n-placeholder="enterPageNum" min="1">
+                <input type="number" id="pageJumpInput" placeholder="输入页码" min="1">
                 <div class="page-jump-popup-btns">
                     <button class="cancel-btn" onclick="closePageJumpPopup()">取消</button>
                     <button class="confirm-btn" onclick="confirmPageJump()">跳转</button>
@@ -3744,7 +3744,7 @@
             </button>
         </div>
         <div class="draft-content">
-            <div class="draft-editor" id="draftTextarea" contenteditable="true" data-placeholder="在这里写草稿..." data-i18n-dataplaceholder="draftPlaceholder" oninput="saveDraft()"></div>
+            <div class="draft-editor" id="draftTextarea" contenteditable="true" data-placeholder="在这里写草稿..." oninput="saveDraft()"></div>
             <div class="draft-canvas-wrapper" id="draftCanvasWrapper">
                 <canvas class="draft-canvas" id="draftCanvas"></canvas>
             </div>
@@ -3755,7 +3755,7 @@
     <!-- Note Popup (long press to add) -->
     <div class="note-popup" id="notePopup">
         <div class="note-popup-header">
-            <span class="note-popup-title" data-i18n="note">笔记</span>
+            <span class="note-popup-title">笔记</span>
             <button class="reader-back" onclick="closeNotePopup()">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
@@ -3770,17 +3770,17 @@
             <button class="note-eraser-btn" id="noteEraserBtn" onclick="toggleNoteEraser()" title="橡皮擦">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 20H7L3 16c-.6-.6-.6-1.5 0-2.1l10-10c.6-.6 1.5-.6 2.1 0l6 6c.6.6.6 1.5 0 2.1L13 20"/><path d="M6 11l6 6"/></svg>
             </button>
-            <button class="note-clear-btn" onclick="clearNoteCanvas()" data-i18n="clear">清空</button>
+            <button class="note-clear-btn" onclick="clearNoteCanvas()">清空</button>
         </div>
         <div class="note-canvas-container">
             <canvas id="noteCanvas"></canvas>
         </div>
         <div class="note-result" id="noteResult"></div>
-        <textarea class="note-text-input" id="noteTextInput" placeholder="输入文字笔记或手写识别结果..." data-i18n-placeholder="inputNoteOrRecognize"></textarea>
+        <textarea class="note-text-input" id="noteTextInput" placeholder="输入文字笔记或手写识别结果..."></textarea>
         <div class="note-actions">
-            <button class="note-btn danger" id="noteDeleteBtn" onclick="deleteCurrentNote()" style="display:none;" data-i18n="deleteBtn">删除</button>
-            <button class="note-btn recognize" onclick="recognizeHandwriting()" data-i18n="recognize">识别</button>
-            <button class="note-btn primary" onclick="saveNote()" data-i18n="save">保存</button>
+            <button class="note-btn danger" id="noteDeleteBtn" onclick="deleteCurrentNote()" style="display:none;">删除</button>
+            <button class="note-btn recognize" onclick="recognizeHandwriting()">识别</button>
+            <button class="note-btn primary" onclick="saveNote()">保存</button>
         </div>
     </div>
 
@@ -3788,23 +3788,23 @@
     <div class="page" id="page3">
         <div class="pull-to-refresh-indicator" id="ptrPage3">
             <div class="ptr-spinner"></div>
-            <span class="ptr-text" data-i18n="pullToRefresh">下拉刷新</span>
+            <span class="ptr-text">下拉刷新</span>
         </div>
         <div class="notes-grid" id="notesGrid">
             <div class="notes-column">
                 <div class="notes-column-header">
-                    <span class="notes-column-title" data-i18n="lectures">讲义</span>
+                    <span class="notes-column-title">讲义</span>
                 </div>
                 <div class="notes-list" id="notesListBooks">
-                    <div class="empty-state"><p data-i18n="emptyLectures">暂无讲义</p></div>
+                    <div class="empty-state"><p>暂无讲义</p></div>
                 </div>
             </div>
             <div class="notes-column">
                 <div class="notes-column-header">
-                    <span class="notes-column-title" data-i18n="abstracts">摘要</span>
+                    <span class="notes-column-title">摘要</span>
                 </div>
                 <div class="notes-list" id="notesListPapers">
-                    <div class="empty-state"><p data-i18n="emptyAbstracts">暂无摘要</p></div>
+                    <div class="empty-state"><p>暂无摘要</p></div>
                 </div>
             </div>
         </div>
@@ -3819,20 +3819,20 @@
         <div class="classroom-grid" id="classroomGrid">
             <div class="classroom-column" onclick="onClassroomColumnClick(event, 'course')">
                 <div class="classroom-column-header">
-                    <span class="classroom-column-title" data-i18n="courses">课程</span>
+                    <span class="classroom-column-title">课程</span>
                     <span class="column-count" id="courseCount">0</span>
                 </div>
                 <div class="classroom-list" id="courseList">
-                    <div class="empty-state"><p data-i18n="clickToCreateCourse">点击空白处新建课程</p></div>
+                    <div class="empty-state"><p>点击空白处新建课程</p></div>
                 </div>
             </div>
             <div class="classroom-column" onclick="onClassroomColumnClick(event, 'seminar')">
                 <div class="classroom-column-header">
-                    <span class="classroom-column-title" data-i18n="seminars">讲座</span>
+                    <span class="classroom-column-title">讲座</span>
                     <span class="column-count" id="seminarCount">0</span>
                 </div>
                 <div class="classroom-list" id="seminarList">
-                    <div class="empty-state"><p data-i18n="clickToCreateSeminar">点击空白处新建讲座</p></div>
+                    <div class="empty-state"><p>点击空白处新建讲座</p></div>
                 </div>
             </div>
         </div>
@@ -3857,36 +3857,21 @@
     <!-- ==================== Page 4: Settings ==================== -->
     <div class="page" id="page4">
         <div style="margin-bottom:16px;">
-            <span style="font-size:20px;font-weight:700;" data-i18n="settings">设置</span>
+            <span style="font-size:20px;font-weight:700;">设置</span>
         </div>
 
         <!-- User Profile -->
         <div class="user-profile">
             <div class="user-avatar" id="userAvatar" onclick="showAvatarOptions()">U</div>
             <div class="user-name-edit">
-                <input type="text" id="userName" value="" placeholder="你的名字" data-i18n-placeholder="yourName" class="user-name-input" oninput="saveUserName()">
-                <span class="edit-hint" data-i18n="clickToEdit">点击编辑</span>
+                <input type="text" id="userName" value="" placeholder="你的名字" class="user-name-input" oninput="saveUserName()">
+                <span class="edit-hint">点击编辑</span>
             </div>
         </div>
 
         <!-- User Settings -->
         <div class="settings-section">
-            <div class="settings-section-title" data-i18n="userSettings">用户设置</div>
-
-            <div class="setting-item">
-                <div class="setting-item-left">
-                    <div class="setting-item-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-                    </div>
-                    <div>
-                        <div class="setting-item-label" data-i18n="language">语言</div>
-                    </div>
-                </div>
-                <div class="setting-item-right" style="display:flex;gap:4px;">
-                    <button id="langBtnZh" onclick="setLanguage('zh')" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border-color);background:var(--accent);color:white;font-size:13px;cursor:pointer;font-weight:600;">中文</button>
-                    <button id="langBtnEn" onclick="setLanguage('en')" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);font-size:13px;cursor:pointer;">EN</button>
-                </div>
-            </div>
+            <div class="settings-section-title">用户设置</div>
 
             <div class="setting-item" onclick="showAPIModal()">
                 <div class="setting-item-left">
@@ -3894,8 +3879,8 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
                     </div>
                     <div>
-                        <div class="setting-item-label" data-i18n="apiSetting">API Setting</div>
-                        <div class="setting-item-desc" data-i18n="configAI">配置 AI 和同步服务</div>
+                        <div class="setting-item-label">API Setting</div>
+                        <div class="setting-item-desc">配置 AI 和同步服务</div>
                     </div>
                 </div>
                 <div class="setting-item-right">
@@ -3909,7 +3894,7 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
                     </div>
                     <div>
-                        <div class="setting-item-label" data-i18n="notification">通知推送</div>
+                        <div class="setting-item-label">通知推送</div>
                         <div class="setting-item-desc">Web Push Notification</div>
                     </div>
                 </div>
@@ -3926,8 +3911,8 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
                     </div>
                     <div>
-                        <div class="setting-item-label" data-i18n="photoRetention">照片储存天数</div>
-                        <div class="setting-item-desc" data-i18n="photoRetentionDesc">0 = 永不删除</div>
+                        <div class="setting-item-label">照片储存天数</div>
+                        <div class="setting-item-desc">0 = 永不删除</div>
                     </div>
                 </div>
                 <input type="number" id="photoRetentionDays" value="0" min="0" class="settings-input" style="width:80px;" onblur="savePhotoRetentionDays()">
@@ -3939,24 +3924,24 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                     </div>
                     <div>
-                        <div class="setting-item-label" data-i18n="storagePersist">存储持久化</div>
+                        <div class="setting-item-label">存储持久化</div>
                         <div class="setting-item-desc" id="storageStatusDesc">检测中…</div>
                     </div>
                 </div>
                 <div class="setting-item-right">
-                    <button id="storagePersistBtn" style="padding:6px 14px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);font-size:13px;cursor:pointer;"data-i18n="requestAuth">请求授权</button>
+                    <button id="storagePersistBtn" style="padding:6px 14px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);font-size:13px;cursor:pointer;">请求授权</button>
                 </div>
             </div>
         </div>
 
         <!-- AI Settings -->
         <div class="settings-section">
-            <div class="settings-section-title" data-i18n="aiSettings">AI 设置</div>
+            <div class="settings-section-title">AI 设置</div>
             <div class="setting-item" onclick="showAIAvatarModal()">
                 <div class="setting-item-left">
                     <div class="ai-avatar-small" id="aiAvatarSmall">AI</div>
                     <div>
-                        <div class="setting-item-label" data-i18n="aiAvatar">AI 头像</div>
+                        <div class="setting-item-label">AI 头像</div>
                     </div>
                 </div>
                 <div class="setting-item-right">
@@ -3969,7 +3954,7 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 016-6h4a6 6 0 016 6v1"/></svg>
                     </div>
                     <div>
-                        <div class="setting-item-label" data-i18n="aiName">AI 名称</div>
+                        <div class="setting-item-label">AI 名称</div>
                     </div>
                 </div>
                 <input type="text" id="aiName" value="AI助手" class="settings-input" onblur="saveAIName()">
@@ -3980,51 +3965,51 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
                     </div>
                     <div>
-                        <div class="setting-item-label" data-i18n="aiPersona">AI 人设</div>
-                        <div class="setting-item-desc" data-i18n="aiPersonaDesc">仅在"不知道，给我建议"时生效</div>
+                        <div class="setting-item-label">AI 人设</div>
+                        <div class="setting-item-desc">仅在"不知道，给我建议"时生效</div>
                     </div>
                 </div>
                 <span class="settings-item-arrow" id="aiPersonaArrow">›</span>
             </div>
             <div class="ai-persona-edit" id="aiPersonaEdit" style="display: none;">
-                <textarea id="aiPersonaText" placeholder="描述你希望AI具有的性格特点..." data-i18n-placeholder="aiPersonaPlaceholder" onblur="saveAIPersona()">你是一个温柔且有耐心的助手，善于鼓励用户完成任务。</textarea>
+                <textarea id="aiPersonaText" placeholder="描述你希望AI具有的性格特点..." onblur="saveAIPersona()">你是一个温柔且有耐心的助手，善于鼓励用户完成任务。</textarea>
             </div>
         </div>
 
         <!-- Theme Settings (faithful to original) -->
         <div class="settings-section">
             <div style="padding:16px 20px 12px;display:flex;justify-content:space-between;align-items:center;">
-                <span class="settings-section-title" style="padding:0;margin:0;" data-i18n="themeSettings">主题设置</span>
+                <span class="settings-section-title" style="padding:0;margin:0;">主题设置</span>
                 <div class="theme-toggle" id="themeToggle" onclick="toggleTheme()">
-                    <span class="theme-toggle-label theme-toggle-day" data-i18n="themeDay">日</span>
-                    <span class="theme-toggle-label theme-toggle-night" data-i18n="themeNight">夜</span>
+                    <span class="theme-toggle-label theme-toggle-day">日</span>
+                    <span class="theme-toggle-label theme-toggle-night">夜</span>
                     <div class="theme-toggle-thumb"></div>
                 </div>
             </div>
             <div class="theme-options">
                 <div class="theme-option active" data-color="default" onclick="setColorTheme('default')">
                     <div class="theme-preview light"></div>
-                    <span data-i18n="themeLight">日间模式</span>
+                    <span>日间模式</span>
                 </div>
                 <div class="theme-option" data-color="blue" onclick="setColorTheme('blue')">
                     <div class="theme-preview" id="themePreviewBlue"></div>
-                    <span data-i18n="themeBlue">蓝调</span>
+                    <span>蓝调</span>
                 </div>
                 <div class="theme-option" data-color="green" onclick="setColorTheme('green')">
                     <div class="theme-preview" id="themePreviewGreen"></div>
-                    <span data-i18n="themeGreen">森绿</span>
+                    <span>森绿</span>
                 </div>
                 <div class="theme-option" data-color="orange" onclick="setColorTheme('orange')">
                     <div class="theme-preview" id="themePreviewOrange"></div>
-                    <span data-i18n="themeOrange">暖橙</span>
+                    <span>暖橙</span>
                 </div>
                 <div class="theme-option" data-color="pink" onclick="setColorTheme('pink')">
                     <div class="theme-preview" id="themePreviewPink"></div>
-                    <span data-i18n="themePink">樱粉</span>
+                    <span>樱粉</span>
                 </div>
                 <div class="theme-option" data-color="purple" onclick="setColorTheme('purple')">
                     <div class="theme-preview" id="themePreviewPurple"></div>
-                    <span data-i18n="themePurple">靛紫</span>
+                    <span>靛紫</span>
                 </div>
             </div>
             <div class="setting-item" onclick="showBgModal()">
@@ -4032,7 +4017,7 @@
                     <div class="setting-item-icon">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
                     </div>
-                    <div><div class="setting-item-label" data-i18n="bgImage">背景图</div></div>
+                    <div><div class="setting-item-label">背景图</div></div>
                 </div>
                 <div class="setting-item-right">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
@@ -4044,7 +4029,7 @@
         <div class="modal-overlay" id="avatarModal" onclick="hideModal('avatarModal')">
             <div class="modal-content" onclick="event.stopPropagation()">
                 <div class="modal-header">
-                    <span class="modal-title" data-i18n="setUserAvatar">设置用户头像</span>
+                    <span class="modal-title">设置用户头像</span>
                     <button class="modal-close" onclick="hideModal('avatarModal')">&times;</button>
                 </div>
                 <div class="upload-options">
@@ -4053,8 +4038,8 @@
                         <input type="file" id="avatarFile" accept="image/*" onchange="uploadAvatar(event)" style="display: none;">
                     </label>
                     <div class="upload-url-group">
-                        <input type="text" id="avatarUrl" placeholder="或输入图片链接" data-i18n-placeholder="orImageUrl" class="form-input">
-                        <button onclick="setAvatarUrl()" class="url-confirm-btn" data-i18n="confirm">确定</button>
+                        <input type="text" id="avatarUrl" placeholder="或输入图片链接" class="form-input">
+                        <button onclick="setAvatarUrl()" class="url-confirm-btn">确定</button>
                     </div>
                 </div>
             </div>
@@ -4064,7 +4049,7 @@
         <div class="modal-overlay" id="aiAvatarModal" onclick="hideModal('aiAvatarModal')">
             <div class="modal-content" onclick="event.stopPropagation()">
                 <div class="modal-header">
-                    <span class="modal-title" data-i18n="setAIAvatar">设置AI头像</span>
+                    <span class="modal-title">设置AI头像</span>
                     <button class="modal-close" onclick="hideModal('aiAvatarModal')">&times;</button>
                 </div>
                 <div class="upload-options">
@@ -4073,8 +4058,8 @@
                         <input type="file" id="aiAvatarFile" accept="image/*" onchange="uploadAIAvatar(event)" style="display: none;">
                     </label>
                     <div class="upload-url-group">
-                        <input type="text" id="aiAvatarUrl" placeholder="或输入图片链接" data-i18n-placeholder="orImageUrl" class="form-input">
-                        <button onclick="setAIAvatarUrl()" class="url-confirm-btn" data-i18n="confirm">确定</button>
+                        <input type="text" id="aiAvatarUrl" placeholder="或输入图片链接" class="form-input">
+                        <button onclick="setAIAvatarUrl()" class="url-confirm-btn">确定</button>
                     </div>
                 </div>
             </div>
@@ -4084,18 +4069,18 @@
         <div class="modal-overlay" id="bgModal" onclick="hideModal('bgModal')">
             <div class="modal-content" onclick="event.stopPropagation()">
                 <div class="modal-header">
-                    <span class="modal-title" data-i18n="setBgImage">设置背景图</span>
+                    <span class="modal-title">设置背景图</span>
                     <button class="modal-close" onclick="hideModal('bgModal')">&times;</button>
                 </div>
                 <div style="text-align:center;margin-bottom:16px;">
-                    <button class="ai-action-btn" onclick="document.getElementById('bgFileInput').click()" style="text-align:center;" data-i18n="uploadImage">上传图片</button>
+                    <button class="ai-action-btn" onclick="document.getElementById('bgFileInput').click()" style="text-align:center;">上传图片</button>
                     <input type="file" id="bgFileInput" accept="image/*" style="display:none;" onchange="handleBgUpload(event)">
                 </div>
-                <button class="ai-action-btn" onclick="clearBgImage()" style="text-align:center;color:#ef4444;" data-i18n="clearBgImage">清空背景图</button>
+                <button class="ai-action-btn" onclick="clearBgImage()" style="text-align:center;color:#ef4444;">清空背景图</button>
                 <div style="padding:16px 0;">
-                    <div class="section-label" style="margin-bottom:8px;" data-i18n="bgOpacity">背景透明度</div>
+                    <div class="section-label" style="margin-bottom:8px;">背景透明度</div>
                     <input type="range" min="50" max="100" value="90" id="bgOpacity" oninput="updateBgOpacity(this.value)" style="width:100%;">
-                    <div class="section-label" style="margin-top:12px;margin-bottom:8px;" data-i18n="bgBlur">背景模糊</div>
+                    <div class="section-label" style="margin-top:12px;margin-bottom:8px;">背景模糊</div>
                     <input type="range" min="0" max="30" value="10" id="bgBlur" oninput="updateBgBlur(this.value)" style="width:100%;">
                 </div>
             </div>
@@ -4105,7 +4090,7 @@
         <div class="modal-overlay" id="r2ConfigModal" onclick="hideModal('r2ConfigModal')">
             <div class="modal-content" onclick="event.stopPropagation()">
                 <div class="modal-header">
-                    <span class="modal-title" data-i18n="r2ModalTitle">R2 云同步配置</span>
+                    <span class="modal-title">R2 云同步配置</span>
                     <button class="modal-close" onclick="hideModal('r2ConfigModal')">&times;</button>
                 </div>
                 <div style="padding:8px 0;">
@@ -4118,29 +4103,29 @@
                     <div class="section-label" style="margin-top:12px;margin-bottom:6px;">Endpoint URL</div>
                     <input type="text" id="r2Endpoint" placeholder="https://xxx.r2.cloudflarestorage.com" style="width:100%;padding:10px;border:1px solid var(--border-color);border-radius:8px;background:var(--bg-secondary);color:var(--text-primary);font-size:13px;box-sizing:border-box;">
                     
-                    <div class="section-label" style="margin-top:12px;margin-bottom:6px;" data-i18n="bucketName">存储桶名称</div>
+                    <div class="section-label" style="margin-top:12px;margin-bottom:6px;">存储桶名称</div>
                     <input type="text" id="r2BucketName" placeholder="math-reader-sync" style="width:100%;padding:10px;border:1px solid var(--border-color);border-radius:8px;background:var(--bg-secondary);color:var(--text-primary);font-size:13px;box-sizing:border-box;">
                     
-                    <div class="section-label" style="margin-top:12px;margin-bottom:6px;" data-i18n="customDomain">自定义域名 (可选，用于下载)</div>
+                    <div class="section-label" style="margin-top:12px;margin-bottom:6px;">自定义域名 (可选，用于下载)</div>
                     <input type="text" id="r2CustomDomain" placeholder="r2.math-reader-sync.top" style="width:100%;padding:10px;border:1px solid var(--border-color);border-radius:8px;background:var(--bg-secondary);color:var(--text-primary);font-size:13px;box-sizing:border-box;">
                     
                     <hr style="border:none;border-top:1px solid var(--border-color);margin:16px 0;">
                     
-                    <div class="section-label" style="margin-bottom:6px;" data-i18n="autoSyncSettings">自动同步设置</div>
+                    <div class="section-label" style="margin-bottom:6px;">自动同步设置</div>
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-                        <span style="font-size:13px;color:var(--text-secondary);" data-i18n="enableAutoSync">启用自动同步</span>
+                        <span style="font-size:13px;color:var(--text-secondary);">启用自动同步</span>
                         <div class="toggle-switch" id="r2AutoSyncToggle" onclick="toggleR2AutoSync()">
                             <div class="toggle-thumb"></div>
                         </div>
                     </div>
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-                        <span style="font-size:13px;color:var(--text-secondary);white-space:nowrap;" data-i18n="syncInterval">同步间隔</span>
+                        <span style="font-size:13px;color:var(--text-secondary);white-space:nowrap;">同步间隔</span>
                         <select id="r2SyncInterval" style="flex:1;padding:8px;border:1px solid var(--border-color);border-radius:8px;background:var(--bg-secondary);color:var(--text-primary);font-size:13px;">
-                            <option value="5" data-i18n="min5">5 分钟</option>
-                            <option value="10" data-i18n="min10">10 分钟</option>
-                            <option value="15" selected data-i18n="min15">15 分钟</option>
-                            <option value="30" data-i18n="min30">30 分钟</option>
-                            <option value="60" data-i18n="min60">60 分钟</option>
+                            <option value="5">5 分钟</option>
+                            <option value="10">10 分钟</option>
+                            <option value="15" selected>15 分钟</option>
+                            <option value="30">30 分钟</option>
+                            <option value="60">60 分钟</option>
                         </select>
                     </div>
                     <div style="font-size:11px;color:var(--text-muted);margin-bottom:12px;">
@@ -4148,7 +4133,7 @@
                         建议间隔 15 分钟，每月约消耗 4320 次操作，远低于免费额度。
                     </div>
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-                        <span style="font-size:13px;color:var(--text-secondary);" data-i18n="autoSyncOnChange">文件变更时自动同步</span>
+                        <span style="font-size:13px;color:var(--text-secondary);">文件变更时自动同步</span>
                         <div class="toggle-switch" id="r2AutoSyncOnChangeToggle" onclick="toggleR2AutoSyncOnChange()">
                             <div class="toggle-thumb"></div>
                         </div>
@@ -4160,23 +4145,23 @@
                         上次同步: --
                     </div>
                     
-                    <button onclick="saveR2Config()" style="width:100%;margin-top:16px;padding:12px;background:var(--accent);color:white;border:none;border-radius:8px;font-size:14px;cursor:pointer;" data-i18n="saveConfig">保存配置</button>
-                    <button onclick="testR2Connection()" style="width:100%;margin-top:8px;padding:12px;background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:8px;font-size:14px;cursor:pointer;" data-i18n="testConnection">测试连接</button>
+                    <button onclick="saveR2Config()" style="width:100%;margin-top:16px;padding:12px;background:var(--accent);color:white;border:none;border-radius:8px;font-size:14px;cursor:pointer;">保存配置</button>
+                    <button onclick="testR2Connection()" style="width:100%;margin-top:8px;padding:12px;background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:8px;font-size:14px;cursor:pointer;">测试连接</button>
                 </div>
             </div>
         </div>
 
         <!-- Data Management -->
         <div class="settings-section">
-            <div class="settings-section-title" data-i18n="dataManagement">数据管理</div>
+            <div class="settings-section-title">数据管理</div>
             <div class="setting-item" onclick="showModal('r2ConfigModal');loadR2Config()">
                 <div class="setting-item-left">
                     <div class="setting-item-icon">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
                     </div>
                     <div>
-                        <div class="setting-item-label" data-i18n="r2Config">R2 云同步配置</div>
-                        <div class="setting-item-desc" data-i18n="r2ConfigDesc">配置 Cloudflare R2 存储</div>
+                        <div class="setting-item-label">R2 云同步配置</div>
+                        <div class="setting-item-desc">配置 Cloudflare R2 存储</div>
                     </div>
                 </div>
                 <div class="setting-item-right">
@@ -4189,8 +4174,8 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3"/></svg>
                     </div>
                     <div>
-                        <div class="setting-item-label" data-i18n="syncToCloud">同步到云端</div>
-                        <div class="setting-item-desc" data-i18n="syncToCloudDesc">上传数据至 R2</div>
+                        <div class="setting-item-label">同步到云端</div>
+                        <div class="setting-item-desc">上传数据至 R2</div>
                     </div>
                 </div>
                 <div class="setting-item-right">
@@ -4203,8 +4188,8 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.88 18.09A5 5 0 0018 9h-1.26A8 8 0 103 16.29"/></svg>
                     </div>
                     <div>
-                        <div class="setting-item-label" data-i18n="syncFromCloud">从云端恢复</div>
-                        <div class="setting-item-desc" data-i18n="syncFromCloudDesc">从 R2 下载数据</div>
+                        <div class="setting-item-label">从云端恢复</div>
+                        <div class="setting-item-desc">从 R2 下载数据</div>
                     </div>
                 </div>
                 <div class="setting-item-right">
@@ -4217,8 +4202,8 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     </div>
                     <div>
-                        <div class="setting-item-label" data-i18n="exportData">导出数据</div>
-                        <div class="setting-item-desc" data-i18n="exportDataDesc">导出为 JSON 文件</div>
+                        <div class="setting-item-label">导出数据</div>
+                        <div class="setting-item-desc">导出为 JSON 文件</div>
                     </div>
                 </div>
                 <div class="setting-item-right">
@@ -4231,14 +4216,14 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
                     </div>
                     <div>
-                        <div class="setting-item-label" style="color:#ef4444;" data-i18n="clearAllData">清除所有数据</div>
+                        <div class="setting-item-label" style="color:#ef4444;">清除所有数据</div>
                     </div>
                 </div>
             </div>
         </div>
 
         <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:12px;">
-            <span data-i18n="appVersion">数学阅读 PWA v1.0</span>
+            数学阅读 PWA v1.0
         </div>
     </div>
 
@@ -4246,14 +4231,14 @@
     <div class="modal-overlay" id="aiModal" onclick="hideModal('aiModal')">
         <div class="modal-content" onclick="event.stopPropagation()">
             <div class="modal-header">
-                <span class="modal-title" data-i18n="aiAssistant">AI 助手</span>
+                <span class="modal-title">AI 助手</span>
                 <button class="modal-close" onclick="hideModal('aiModal')">&times;</button>
             </div>
             <div class="ai-modal-greeting" id="aiGreeting">Hi, User! 你需要我做什么?</div>
-            <button class="ai-action-btn" onclick="aiAction('outline')" data-i18n="generateOutline">生成大纲</button>
-            <button class="ai-action-btn" onclick="aiAction('lecture')" data-i18n="generateLecture">生成讲义</button>
-            <button class="ai-action-btn" onclick="aiAction('abstract')" data-i18n="generateAbstract">生成摘要</button>
-            <button class="ai-action-btn" onclick="aiAction('chat')" data-i18n="dontKnowSuggest">不知道，给我建议</button>
+            <button class="ai-action-btn" onclick="aiAction('outline')">生成大纲</button>
+            <button class="ai-action-btn" onclick="aiAction('lecture')">生成讲义</button>
+            <button class="ai-action-btn" onclick="aiAction('abstract')">生成摘要</button>
+            <button class="ai-action-btn" onclick="aiAction('chat')">不知道，给我建议</button>
         </div>
     </div>
 
@@ -4261,15 +4246,15 @@
     <div class="modal-overlay" id="aiChatModal" onclick="hideModal('aiChatModal')">
         <div class="modal-content chat-modal" onclick="event.stopPropagation()">
             <div class="modal-header">
-                <span class="modal-title" data-i18n="aiAssistant">AI 助手</span>
+                <span class="modal-title">AI 助手</span>
                 <button class="modal-close" onclick="hideModal('aiChatModal')">&times;</button>
             </div>
             <div class="chat-container" id="chatContainer">
                 <!-- 动态生成聊天消息 -->
             </div>
             <div class="chat-input-area">
-                <input type="text" id="chatInput" class="chat-input" placeholder="说点什么..." data-i18n-placeholder="chatPlaceholder" onkeypress="if(event.key==='Enter')sendAIChat()">
-                <button class="chat-send-btn" onclick="sendAIChat()" data-i18n="send">发送</button>
+                <input type="text" id="chatInput" class="chat-input" placeholder="说点什么..." onkeypress="if(event.key==='Enter')sendAIChat()">
+                <button class="chat-send-btn" onclick="sendAIChat()">发送</button>
             </div>
         </div>
     </div>
@@ -4279,15 +4264,15 @@
         <div class="modal-content chat-modal" onclick="event.stopPropagation()">
             <div class="modal-header">
                 <span class="modal-title" id="readerChatTitle">AI 助手</span>
-                <button class="focus-chat-export-btn" onclick="exportReaderChatHistory()" data-i18n="exportChat">导出</button>
+                <button class="focus-chat-export-btn" onclick="exportReaderChatHistory()" title="导出聊天记录">导出</button>
                 <button class="modal-close" onclick="hideModal('readerChatModal')">&times;</button>
             </div>
             <div class="chat-container" id="readerChatContainer">
                 <!-- 动态生成聊天消息 -->
             </div>
             <div class="chat-input-area">
-                <input type="text" id="readerChatInput" class="chat-input" placeholder="说点什么..." data-i18n-placeholder="chatPlaceholder" onkeypress="if(event.key==='Enter')sendReaderChatMessage()">
-                <button class="chat-send-btn" onclick="sendReaderChatMessage()" data-i18n="send">发送</button>
+                <input type="text" id="readerChatInput" class="chat-input" placeholder="说点什么..." onkeypress="if(event.key==='Enter')sendReaderChatMessage()">
+                <button class="chat-send-btn" onclick="sendReaderChatMessage()">发送</button>
             </div>
         </div>
     </div>
@@ -4296,7 +4281,7 @@
     <div class="modal-overlay" id="taskSelectModal" onclick="hideModal('taskSelectModal')">
         <div class="modal-content" onclick="event.stopPropagation()">
             <div class="modal-header">
-                <span class="modal-title" id="taskSelectTitle" data-i18n="selectBook">选择书籍</span>
+                <span class="modal-title" id="taskSelectTitle">选择书籍</span>
                 <button class="modal-close" onclick="hideModal('taskSelectModal')">&times;</button>
             </div>
             <div class="task-select-list" id="taskSelectList">
@@ -4309,20 +4294,20 @@
     <div class="modal-overlay" id="uploadModal" onclick="hideModal('uploadModal')">
         <div class="modal-content" onclick="event.stopPropagation()">
             <div class="modal-header">
-                <span class="modal-title" id="uploadModalTitle" data-i18n="uploadBooks">上传书籍</span>
+                <span class="modal-title" id="uploadModalTitle">上传书籍</span>
                 <button class="modal-close" onclick="hideModal('uploadModal')">&times;</button>
             </div>
             <div style="margin-bottom:16px;">
                 <div class="drop-zone" id="dropZone">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:40px;height:40px;color:var(--text-muted);margin-bottom:8px;"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3"/></svg>
-                    <p data-i18n="clickToUpload">点击或拖拽文件</p>
-                    <p class="hint" data-i18n="supportedFormats">支持 PDF, ePub, LaTeX</p>
+                    <p>点击或拖拽文件</p>
+                    <p class="hint">支持 PDF, ePub, LaTeX</p>
                 </div>
                 <input type="file" id="fileInput" accept=".pdf,.epub,.tex,.latex" style="display:none" onchange="handleFileSelect(event)">
-                <input class="setting-input" id="uploadTitle" type="text" placeholder="标题（可选，默认使用文件名）" data-i18n-placeholder="titleOptional" style="margin-bottom:12px;">
-                <textarea class="note-text-input" id="uploadAbstract" placeholder="摘要（可选）" data-i18n-placeholder="abstractOptional" style="height:60px;"></textarea>
+                <input class="setting-input" id="uploadTitle" type="text" placeholder="标题（可选，默认使用文件名）" style="margin-bottom:12px;">
+                <textarea class="note-text-input" id="uploadAbstract" placeholder="摘要（可选）" style="height:60px;"></textarea>
             </div>
-            <button class="ai-action-btn" onclick="confirmUpload()" style="text-align:center;background:var(--accent);color:white;" data-i18n="add">添加</button>
+            <button class="ai-action-btn" onclick="confirmUpload()" style="text-align:center;background:var(--accent);color:white;">添加</button>
         </div>
     </div>
 
@@ -4334,15 +4319,15 @@
                 <button class="modal-close" onclick="hideModal('apiModal')">&times;</button>
             </div>
             
-            <div class="api-section-title" data-i18n="primaryAPI">主要 API</div>
+            <div class="api-section-title">主要 API</div>
             <div class="form-group">
-                <label class="form-label" data-i18n="channel">渠道</label>
+                <label class="form-label">渠道</label>
                 <select class="form-select" id="apiProvider" onchange="updateDefaultUrl('primary')">
                     <option value="deepseek">deepseek</option>
                     <option value="openai">openai</option>
                     <option value="google">google</option>
                     <option value="claude">claude</option>
-                    <option value="custom" data-i18n="custom">自定义</option>
+                    <option value="custom">自定义</option>
                 </select>
             </div>
             <div class="form-group">
@@ -4350,14 +4335,14 @@
                 <input type="text" class="form-input" id="modalAiApiUrl" placeholder="https://api.deepseek.com/v1/chat/completions">
             </div>
             <div class="form-group">
-                <label class="form-label" data-i18n="apiKey">密钥</label>
+                <label class="form-label">密钥</label>
                 <input type="password" class="form-input" id="modalAiApiKey" placeholder="sk-...">
             </div>
             <div class="form-group">
-                <label class="form-label" data-i18n="modelName">模型名称</label>
+                <label class="form-label">模型名称</label>
                 <div class="model-input-row">
                     <input type="text" class="form-input" id="modalAiModel" placeholder="deepseek-chat">
-                    <button class="fetch-models-btn" onclick="fetchModels('primary')" data-i18n="fetchModels">拉取模型</button>
+                    <button class="fetch-models-btn" onclick="fetchModels('primary')">拉取模型</button>
                 </div>
                 <select class="form-select model-select" id="apiModelSelect" style="display:none;margin-top:8px;" onchange="selectModel('primary')">
                 </select>
@@ -4365,16 +4350,16 @@
             
             <hr style="border: none; border-top: 1px solid var(--border-color); margin: 20px 0;">
             
-            <div class="api-section-title"><span data-i18n="backupAPI">备用 API</span> <span style="font-size:12px;color:var(--text-muted);" data-i18n="backupAPIDesc">(主API失败时使用)</span></div>
+            <div class="api-section-title">备用 API <span style="font-size:12px;color:var(--text-muted);">(主API失败时使用)</span></div>
             <div class="form-group">
-                <label class="form-label" data-i18n="channel">渠道</label>
+                <label class="form-label">渠道</label>
                 <select class="form-select" id="backupProvider" onchange="updateDefaultUrl('backup')">
-                    <option value="" data-i18n="noBackup">不使用备用</option>
+                    <option value="">不使用备用</option>
                     <option value="deepseek">deepseek</option>
                     <option value="openai">openai</option>
                     <option value="google">google</option>
                     <option value="claude">claude</option>
-                    <option value="custom" data-i18n="custom">自定义</option>
+                    <option value="custom">自定义</option>
                 </select>
             </div>
             <div class="form-group">
@@ -4382,14 +4367,14 @@
                 <input type="text" class="form-input" id="backupUrl" placeholder="https://api.openai.com/v1/chat/completions">
             </div>
             <div class="form-group">
-                <label class="form-label" data-i18n="apiKey">密钥</label>
+                <label class="form-label">密钥</label>
                 <input type="password" class="form-input" id="backupKey" placeholder="sk-...">
             </div>
             <div class="form-group">
-                <label class="form-label" data-i18n="modelName">模型名称</label>
+                <label class="form-label">模型名称</label>
                 <div class="model-input-row">
                     <input type="text" class="form-input" id="backupModel" placeholder="gpt-3.5-turbo">
-                    <button class="fetch-models-btn" onclick="fetchModels('backup')" data-i18n="fetchModels">拉取模型</button>
+                    <button class="fetch-models-btn" onclick="fetchModels('backup')">拉取模型</button>
                 </div>
                 <select class="form-select model-select" id="backupModelSelect" style="display:none;margin-top:8px;" onchange="selectModel('backup')">
                 </select>
@@ -4397,7 +4382,7 @@
             
             <hr style="border: none; border-top: 1px solid var(--border-color); margin: 20px 0;">
             
-            <div class="api-section-title" data-i18n="otherServices">其他服务</div>
+            <div class="api-section-title">其他服务</div>
             <div class="form-group">
                 <label class="form-label">Supabase URL</label>
                 <input type="text" class="form-input" id="modalSupabaseUrl" placeholder="https://xxx.supabase.co">
@@ -4415,7 +4400,7 @@
                 <input type="password" class="form-input" id="modalMathpixAppKey" placeholder="App Key">
             </div>
             
-            <button class="form-btn" onclick="saveAPISettings()" data-i18n="saveSettings">保存设置</button>
+            <button class="form-btn" onclick="saveAPISettings()">保存设置</button>
         </div>
     </div>
 
@@ -4425,7 +4410,7 @@
             <button class="lecture-back-btn" onclick="closeLectureViewer()">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
             </button>
-            <span class="lecture-title" id="lectureViewerTitle" data-i18n="lectureTitle">讲义</span>
+            <span class="lecture-title" id="lectureViewerTitle">讲义</span>
             <button class="lecture-regen-btn" onclick="confirmRegenerateLecture()" title="重新生成">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
             </button>
@@ -4438,11 +4423,11 @@
 
     <!-- 讲义底部导航 -->
     <div class="lecture-footer" id="lectureFooter">
-        <button class="lecture-nav-btn" id="lecturePrevBtn" onclick="prevLecture()" data-i18n="prevSection">上一节</button>
+        <button class="lecture-nav-btn" id="lecturePrevBtn" onclick="prevLecture()">上一节</button>
         <button class="lecture-nav-btn book-link" id="lectureToBookBtn" onclick="openBookFromLecture()" title="查看书籍">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
         </button>
-        <button class="lecture-nav-btn primary" id="lectureNextBtn" onclick="nextLecture()" data-i18n="nextSection">下一节</button>
+        <button class="lecture-nav-btn primary" id="lectureNextBtn" onclick="nextLecture()">下一节</button>
     </div>
 
     <!-- 讲义字号按钮 -->
@@ -4488,7 +4473,7 @@
     <!-- 讲义选择弹出菜单：输入框+发送 -->
     <div class="lecture-selection-menu" id="lectureSelectionMenu">
         <div class="lecture-ask-input-wrap">
-            <input type="text" id="lectureAskInput" class="lecture-ask-input" placeholder="补充描述（可为空）" data-i18n-placeholder="supplementDesc" autocomplete="off" />
+            <input type="text" id="lectureAskInput" class="lecture-ask-input" placeholder="补充描述（可为空）" autocomplete="off" />
             <button class="lecture-ask-send-btn" onclick="askAIAboutSelection()">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
             </button>
@@ -4498,7 +4483,7 @@
     <!-- 讲义草稿面板 -->
     <div class="draft-panel" id="lectureDraftPanel">
         <div class="draft-panel-header">
-            <span class="draft-panel-title" id="lectureDraftPanelTitle" data-i18n="draft">草稿</span>
+            <span class="draft-panel-title" id="lectureDraftPanelTitle">草稿</span>
             <button class="draft-collapse-btn" onclick="collapseLectureDraftPanel()">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/>
@@ -4553,7 +4538,7 @@
             </button>
         </div>
         <div class="draft-content">
-            <div class="draft-editor" id="lectureDraftTextarea" contenteditable="true" data-placeholder="在这里写草稿..." data-i18n-dataplaceholder="draftPlaceholder" oninput="saveLectureDraft()"></div>
+            <div class="draft-editor" id="lectureDraftTextarea" contenteditable="true" data-placeholder="在这里写草稿..." oninput="saveLectureDraft()"></div>
             <div class="draft-canvas-wrapper" id="lectureDraftCanvasWrapper">
                 <canvas class="draft-canvas" id="lectureDraftCanvas"></canvas>
             </div>
@@ -4564,7 +4549,7 @@
     <!-- 书签侧边栏 -->
     <div class="bookmark-sidebar" id="bookmarkSidebar">
         <div class="bookmark-header">
-            <span class="bookmark-title" data-i18n="chapterBookmarks">章节书签</span>
+            <span class="bookmark-title">章节书签</span>
             <button class="bookmark-close" onclick="closeBookmarkSidebar()">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
@@ -4609,895 +4594,6 @@
     </div>
 
     <script>
-        // ==================== i18n 国际化 ====================
-        const I18N = {
-            zh: {
-                // App title
-                appTitle: '数学阅读',
-                appVersion: '<span data-i18n="appVersion">数学阅读 PWA v1.0</span>',
-                // Bottom nav
-                navClassroom: '课堂',
-                navBookshelf: '书架',
-                navReader: '阅读',
-                navNotes: '笔记',
-                navSettings: '设置',
-                // Page 1: Library
-                books: '书籍',
-                papers: '论文',
-                uploadBook: '上传书籍',
-                uploadPaper: '上传论文',
-                archive: '存档',
-                archived: '已存档',
-                emptyBooks: '暂无书籍',
-                emptyPapers: '暂无论文',
-                clickToUpload: '点击或拖拽文件',
-                supportedFormats: '支持 PDF, ePub, LaTeX',
-                titleOptional: '标题（可选，默认使用文件名）',
-                abstractOptional: '摘要（可选）',
-                add: '添加',
-                selectFile: '请先选择文件',
-                processing: '正在处理...',
-                fileReadFail: '文件读取失败',
-                added: '已添加: ',
-                saveFail: '保存失败: ',
-                restored: '已恢复',
-                archivedMsg: '已存档',
-                deleted: '已删除',
-                rename: '重命名',
-                delete: '删除',
-                restore: '恢复',
-                // Page 2: Reader
-                splitMode: '分屏模式',
-                openDocFirst: '请先打开文档',
-                penOn: '画笔已开启',
-                penOff: '画笔已关闭',
-                enablePenFirst: '请先开启画笔',
-                pageNotRendered: '当前页尚未渲染，请滚动到目标页再试',
-                pageNotRenderedShort: '当前页尚未渲染',
-                imageLoadFail: '图片加载失败',
-                fileReadError: '读取文件失败',
-                invalidPage: '请输入有效页码 (1-',
-                jumpedToPage: '已跳转到第 ',
-                page: ' 页',
-                enterKeyword: '请先输入搜索关键词',
-                ocrInProgress: '正在进行OCR识别...',
-                ocrDone: 'OCR完成，正在搜索...',
-                ocrFail: 'OCR识别失败: ',
-                drawingCleared: '已清除绘制',
-                searchPlaceholder: '搜索...',
-                goToPage: '跳转',
-                // Page 3: Notes
-                lectures: '讲义',
-                abstracts: '摘要',
-                emptyLectures: '暂无讲义',
-                emptyAbstracts: '暂无摘要',
-                lectureTitle: '讲义',
-                prevSection: '上一节',
-                nextSection: '下一节',
-                draft: '草稿',
-                draftPlaceholder: '在这里写草稿...',
-                // Page 4: Settings
-                settings: '设置',
-                yourName: '你的名字',
-                clickToEdit: '点击编辑',
-                userSettings: '用户设置',
-                apiSetting: 'API Setting',
-                configAI: '配置 AI 和同步服务',
-                notification: '通知推送',
-                photoRetention: '照片储存天数',
-                photoRetentionDesc: '0 = 永不删除',
-                storagePersist: '存储持久化',
-                checkingStatus: '检测中…',
-                requestAuth: '请求授权',
-                aiSettings: 'AI 设置',
-                aiAvatar: 'AI 头像',
-                aiName: 'AI 名称',
-                aiPersona: 'AI 人设',
-                aiPersonaDesc: '仅在"不知道，给我建议"时生效',
-                aiPersonaPlaceholder: '描述你希望AI具有的性格特点...',
-                aiPersonaDefault: '你是一个温柔且有耐心的助手，善于鼓励用户完成任务。',
-                themeSettings: '主题设置',
-                themeDay: '日',
-                themeNight: '夜',
-                themeLight: '日间模式',
-                themeBlue: '蓝调',
-                themeGreen: '森绿',
-                themeOrange: '暖橙',
-                themePink: '樱粉',
-                themePurple: '靛紫',
-                bgImage: '背景图',
-                setBgImage: '设置背景图',
-                uploadImage: '上传图片',
-                clearBgImage: '清空背景图',
-                bgOpacity: '背景透明度',
-                bgBlur: '背景模糊',
-                dataManagement: '数据管理',
-                r2Config: 'R2 云同步配置',
-                r2ConfigDesc: '配置 Cloudflare R2 存储',
-                syncToCloud: '同步到云端',
-                syncToCloudDesc: '上传数据至 R2',
-                syncFromCloud: '从云端恢复',
-                syncFromCloudDesc: '从 R2 下载数据',
-                exportData: '导出数据',
-                exportDataDesc: '导出为 JSON 文件',
-                clearAllData: '清除所有数据',
-                language: '语言',
-                langZh: '中文',
-                langEn: 'English',
-                // R2 Config Modal
-                r2ModalTitle: 'R2 云同步配置',
-                bucketName: '存储桶名称',
-                customDomain: '自定义域名 (可选，用于下载)',
-                autoSyncSettings: '自动同步设置',
-                enableAutoSync: '启用自动同步',
-                syncInterval: '同步间隔',
-                min5: '5 分钟',
-                min10: '10 分钟',
-                min15: '15 分钟',
-                min30: '30 分钟',
-                min60: '60 分钟',
-                r2FreeNote: 'Cloudflare R2 免费版每月 1000万次写入操作。',
-                r2IntervalNote: '建议间隔 15 分钟，每月约消耗 4320 次操作，远低于免费额度。',
-                autoSyncOnChange: '文件变更时自动同步',
-                autoSyncOnChangeDesc: '上传或删除文件后立即同步到云端',
-                lastSync: '上次同步: ',
-                saveConfig: '保存配置',
-                testConnection: '测试连接',
-                // Avatar Modals
-                setUserAvatar: '设置用户头像',
-                setAIAvatar: '设置AI头像',
-                orImageUrl: '或输入图片链接',
-                confirm: '确定',
-                // Upload Modal
-                uploadBooks: '上传书籍',
-                // AI Modal
-                aiAssistant: 'AI 助手',
-                aiGreeting: '你需要我做什么?',
-                generateOutline: '生成大纲',
-                generateLecture: '生成讲义',
-                generateAbstract: '生成摘要',
-                dontKnowSuggest: '不知道，给我建议',
-                // AI Chat
-                chatPlaceholder: '说点什么...',
-                send: '发送',
-                selectBook: '选择书籍',
-                exportChat: '导出',
-                // Notes
-                note: '笔记',
-                noteDeleted: '笔记已删除',
-                clear: '清空',
-                recognize: '识别',
-                save: '保存',
-                noteSaved: '笔记已保存',
-                inputNoteOrRecognize: '输入文字笔记或手写识别结果...',
-                recognizing: '识别中...',
-                saved: '已保存',
-                failPrefix: '失败: ',
-                // Bookmarks
-                chapterBookmarks: '章节书签',
-                // Page 5: Classroom
-                courses: '课程',
-                seminars: '讲座',
-                clickToCreateCourse: '点击空白处新建课程',
-                clickToCreateSeminar: '点击空白处新建讲座',
-                clickToCreateSession: '点击空白处新建子文件夹',
-                sessionTitle: '子文件夹标题：',
-                lecture: '讲',
-                sourceFolder: '源素材',
-                uploadFile: '上传文件',
-                takePhoto: '拍照',
-                materialDeleted: '素材已删除',
-                noteDeletedClass: '笔记已删除',
-                openSubfolderFirst: '请先打开子文件夹',
-                sourceNotFound: '未找到源素材: ',
-                fileRef: '文件引用: ',
-                noteGenFail: '笔记生成失败: ',
-                regenerateNote: '重新生成此笔记？',
-                // Sync messages
-                syncing: '同步中...',
-                restoring: '恢复中...',
-                syncSuccess: '同步成功',
-                syncComplete: '同步完成',
-                syncFail: '同步失败: ',
-                restoreSuccess: '恢复成功',
-                restoreFail: '恢复失败: ',
-                noCloudData: '云端无数据',
-                restoredFromCloud: '已从云端恢复 ',
-                syncUploadComplete: '同步完成! 上传了 ',
-                files: ' 个文件',
-                lecturesCount: ' 篇讲义',
-                abstractsCount: ' 篇摘要',
-                materialsCount: ' 个课堂素材',
-                downloadComplete: '恢复完成! 下载了 ',
-                autoSynced: '已自动同步到云端',
-                lectureSynced: '讲义已同步到云端',
-                abstractSynced: '摘要已同步到云端',
-                r2NotConfigured: '未配置 R2 云同步',
-                syncInProgress: '同步进行中，请稍后',
-                configR2First: '请先配置 R2',
-                configSupabaseFirst: '请先配置 Supabase',
-                confirmRestoreFromCloud: '从云端恢复将覆盖本地数据，确定继续？',
-                exportSuccess: '导出成功',
-                confirmClearAll: '确定清除所有数据？此操作不可恢复。',
-                dataCleared: '数据已清除',
-                storageFull: '存储空间不足，数据可能未保存',
-                restoredFromBackup: '已从备份恢复数据',
-                dataLoadError: '数据加载异常，请从云端同步恢复',
-                localFileLost: '本地文件丢失，正在从云端恢复…',
-                restoredFileFromCloud: '已从云端恢复文件',
-                fileDataLost: '文件数据丢失，请重新导入或从云端同步',
-                // AI prompts
-                primaryAPIFailed: '主API失败，尝试备用API...',
-                noChatHistory: '暂无聊天记录',
-                onlyPdfOutline: '当前仅支持 PDF 书籍生成大纲',
-                readingBook: '正在读取书籍...',
-                readFail: '读取失败: ',
-                aiGeneratingOutline: 'AI 正在生成大纲...',
-                outlineParseFail: 'AI 返回格式解析失败',
-                outlineEmpty: 'AI 未返回有效大纲',
-                outlineGenerated: '大纲已生成（',
-                sections: ' 节）',
-                genFail: '生成失败: ',
-                noOutlineFirst: '请先点击"生成大纲"',
-                outlineLoaded: '已加载 ',
-                outlineChapters: ' 节大纲',
-                lectureGenerated: '讲义已生成，正在同步到云端...',
-                generatingAbstract: '正在生成摘要...',
-                abstractGenerated: '摘要已生成，正在同步到云端...',
-                noAbstract: '该论文暂无摘要',
-                cloudAbstractRestore: '从云端恢复摘要...',
-                askingAI: '正在询问AI...',
-                noteAdded: '已添加笔记',
-                aiRequestFail: 'AI请求失败: ',
-                aiCallFail: '调用失败: ',
-                aiNoAnswer: '抱歉，我暂时无法回答这个问题。',
-                chatGreeting: '你好! 有什么我可以帮你的吗? 可以问我关于数学学习的任何问题。',
-                // Settings actions
-                settingsSaved: '设置已保存',
-                enterApiKey: '请先输入API密钥',
-                noModelsFound: '未找到可用模型',
-                fetchModelsFail: '拉取模型失败: ',
-                bgImageSet: '背景图已设置',
-                bgImageCleared: '背景图已清除',
-                notifyOn: '通知已开启',
-                notifyDenied: '通知权限被拒绝',
-                notifyOff: '通知已关闭',
-                persistNotSupported: '此浏览器不支持持久化存储',
-                persistGranted: '已获得持久化存储授权',
-                persistDenied: '授权未通过，请将此页加入书签或添加到主屏幕后重试',
-                // API Modal
-                primaryAPI: '主要 API',
-                channel: '渠道',
-                url: 'URL',
-                apiKey: '密钥',
-                modelName: '模型名称',
-                fetchModels: '拉取模型',
-                backupAPI: '备用 API',
-                backupAPIDesc: '主API失败时使用',
-                noBackup: '不使用备用',
-                custom: '自定义',
-                otherServices: '其他服务',
-                saveSettings: '保存设置',
-                // Lecture viewer
-                lectureNotifTitle: '讲义生成完成',
-                abstractNotifTitle: '摘要生成完成',
-                lectureSyncNotif: '讲义云同步完成',
-                lectureSyncNotifDesc: '讲义内容已安全同步到云端',
-                abstractSyncNotif: '摘要云同步完成',
-                abstractSyncNotifDesc: '论文摘要已安全同步到云端',
-                supplementDesc: '补充描述（可为空）',
-                confirmDeleteFolder: '确定删除此文件夹及所有内容？此操作不可撤销。',
-                renamePlaceholder: '重命名：',
-                newCourse: '新建课程名称：',
-                newSeminar: '新建讲座名称：',
-                dateFormat_lecture: '第$n讲',
-                // Handwriting recognition prompt
-                handwritingPrompt: '你是一个手写识别助手。识别图中手写内容，数学公式用LaTeX，只输出结果。',
-                recognizeFail: '识别失败',
-                // System prompts for AI
-                readerAIPrompt: '你是一个数学助手。附件是用户正在阅读的页面。',
-                readerAINoteLabel: '用户在此页的笔记: ',
-                readerAINone: '无',
-                readerAISuffix: '用户的提问可能与附件内容相关，也可能无关。如果相关，结合附件回答；如果无关，直接用你的知识回答。准确、专业、简洁。',
-                outlineSystemPrompt: `你是一个专业的数学教育专家。下面附件是一本完整的书（PDF）。
-请你通读附件，为这本书生成一份结构化大纲（每节大约 1 小时学习量），并给出每一节对应的 PDF 页码范围。
-
-【页码准确性要求——极其重要】
-- startPage 和 endPage 必须是 PDF 文件内的实际页码（从 1 开始计数），对照附件 PDF 真实页面。
-- 禁止按固定间隔机械填写（例如 1、3、5、7、9 或 1、10、20、30 这种等差分布是明显错误，严禁出现）。页码必须来自附件实际内容的章节边界判断。
-- 相邻节允许在同一页重叠 1 页：如果某页上半部分是上一节的结尾、下半部分是下一节的开头，则上一节 endPage 和下一节 startPage 可以是同一个页码。除此之外页码应连续，不得跳过或大段重复。
-- 覆盖全书，最后一节的 endPage 必须接近书籍总页数，不得只分到前面几页就停止。
-
-严格以 JSON 返回，不要有任何额外说明：
-{
-  "chapters": [
-    {"title": "第1节: 标题", "topics": ["主题1", "主题2"], "startPage": 1, "endPage": 20},
-    ...
-  ]
-}`,
-                outlineUserPrefix: '书名：',
-                outlineUserAuthor: '作者：',
-                outlineUserSubject: '学科：',
-                outlineUserPages: '书籍总页数：',
-                outlineUserUnknown: '未知',
-                outlineUserHasBookmarks: 'PDF 已有书签（供参考，页码以附件实际内容为准）：\n',
-                outlineUserNoBookmarks: 'PDF 无内置书签。',
-                outlineUserSuffix: '\n请基于附件 PDF 实际内容生成大纲 JSON。',
-                sectionDefault: '第$n节',
-                lectureSystemPrompt: `你是一个专业的数学讲师。附件是这一节对应的 PDF 页，请基于附件实际内容，为数学基础一般（仅学过基础数学分析和线性代数）的学生准备讲义。讲义应当与附件 PDF 内容一致，不要凭空发挥。
-
-请严格按以下三个部分组织，每节按 1 小时学习效率把握总量：
-
-## 一、预习
-
-前置概念讲解。假设读者只有基础数学分析和线性代数水平，所有涉及的非初等概念（如线性泛函、流形、测度、分布等）都需要：
-1. 给出严格的数学定义
-2. 简明解释其数学含义
-3. 给出具体例子
-4. 介绍所有需要的数学记号
-
-## 二、大纲
-
-本节主要内容：
-1. 核心定理的完整陈述
-2. 重要引理
-3. 完整的证明过程（不省略任何关键步骤）
-4. 定理之间的逻辑关系
-
-## 三、习题
-
-5道涉及核心概念的习题，难度递进：
-- 第1-2题：基础概念理解
-- 第3-4题：定理应用
-- 第5题：综合应用或证明
-
-在文末给出所有习题的详细解答。
-
-要求：
-- 使用严谨的数学语言，不要口语化表达
-- 不要使用"大家好"、"我们将"、"让我们"等口语
-- 直接陈述数学内容
-- 使用LaTeX格式：行内公式用 $...$ ，独立公式用 $$...$$`,
-                lectureUserBook: '书籍：',
-                lectureUserChapter: '章节：',
-                lectureUserPages: '对应页码：第 ',
-                lectureUserPagesTo: ' - ',
-                lectureUserPagesSuffix: ' 页',
-                lectureUserTopics: '涉及主题：',
-                lectureUserSuffix: '\n请根据附件 PDF 内容生成这一节完整讲义。',
-                contentGenFail: '内容生成失败',
-                abstractSystemPrompt: `你是一个学术论文分析专家。请根据提供的论文信息，生成一份结构化的摘要，包括：
-1. 研究背景和目的
-2. 研究方法
-3. 主要发现和结论
-4. 研究意义和贡献
-
-请使用学术性的语言，简洁清晰。`,
-                abstractUserPrefix: '请为以下论文生成摘要：\n标题：',
-                abstractUserAuthor: '作者：',
-                abstractUserAbstract: '原摘要：',
-                abstractGenFail: '摘要生成失败',
-                chatSystemPrompt: `你是一个友好、专业的数学学习助手。你的任务是帮助用户理解数学概念、解决数学问题、提供学习建议。
-请用清晰易懂的语言回答，必要时使用LaTeX格式的数学公式（用$...$包裹行内公式）。
-保持回答简洁但完整，如果问题复杂，可以分步骤解释。`,
-                selectionAIPrompt: '你是数学助手，简洁解释数学内容。',
-                selectionWithDesc: '以下是选中的数学内容：\n\n"$text"\n\n用户的问题/补充说明：$desc\n\n请针对用户的问题简洁回答，不要重复问题。',
-                selectionNoDesc: '请简洁解释以下数学内容，直接给出解释，不要重复问题：\n\n"$text"',
-                classroomNotePrompt_image: '照片/截图',
-                classroomNotePrompt_file: '文件',
-                classroomNoteSystemPrefix: '你是一个专业的学术笔记整理助手。请将上传的',
-                classroomNoteSystemSuffix: `内容转换成清晰易读的笔记。
-
-笔记格式要求：
-1. 主标题：笔记内容总览（一句话概括）
-2. 使用多个次级标题组织内容，每个次级标题格式为：## [标题内容] {ref:$ref}
-3. 内容要条理清晰，补充必要的解释
-4. 使用LaTeX格式：行内公式用 $...$ ，独立公式用 $$...$$
-5. 保持学术严谨性`,
-                classroomNoteSeminarSuffix: '\n\n注意：这是一个讲座的内容。请额外补充介绍该领域的相关基础知识，帮助读者理解讲座涉及的专业概念和背景。在笔记开头增加一个"背景知识"部分。',
-                classroomNoteUserMsg: '请整理以下内容为笔记。来源：$folder - $session，引用编号：$ref',
-                noteSuffix: ' 笔记',
-                pullToRefresh: '下拉刷新',
-                confirmClearCanvas: '确定清空画布？',
-                confirmDeleteItem: '确定删除此项目？此操作不可恢复。',
-                confirmDeleteMessage: '删除这条消息?',
-                confirmRegenerateLecture: '确定要重新生成此讲义吗？当前内容将被覆盖。',
-                confirmDeleteMaterial: '删除此素材？',
-                confirmDeleteNote: '删除此笔记？',
-                // Archive view
-                archiveTitle: '存档',
-                back: '返回',
-                emptyArchive: '暂无存档',
-                archivedType: '已存档',
-                // Storage persistence
-                persistedStatus: '✅ 已持久化',
-                notPersistedStatus: '⚠️ 未持久化（可能被清理）',
-                usageLabel: '已用 ',
-                authorized: '已授权',
-                // Dynamic rendering
-                materialsLabel: '素材',
-                notesLabel: '笔记',
-                aiNotes: 'AI 笔记',
-                emptyMaterials: '暂无素材，点击右下角上传',
-                noteContentEmpty: '笔记内容为空',
-                handwrittenNote: '(手写笔记)',
-                readerChatGreeting: '你好! 我是你的 AI 阅读助手。当前文档: $title，第 $current/$total 页。$notes有什么我可以帮你的?',
-                readerChatNotesPrefix: '你在这里记了一些笔记: ',
-                deleteBtn: '删除',
-                archiveBtn: '存档',
-                renameBtn: '重命名',
-                generatingStatus: '生成中...',
-                planningChapters: '正在规划讲义章节...',
-                generatingLectureContent: '正在生成讲义内容...',
-                searchDocContent: '搜索文档内容...',
-                enterPageNum: '输入页码',
-                readerFallbackConfigAPI: '请先在设置中配置 API 以获得 AI 回答。',
-                selectPaper: '选择论文',
-                emptyBooksImport: '暂无书籍，请先导入',
-                emptyPapersImport: '暂无论文，请先导入',
-                progressLabel: '进度',
-            },
-            en: {
-                appTitle: 'Math Reader',
-                appVersion: 'Math Reader PWA v1.0',
-                navClassroom: 'Class',
-                navBookshelf: 'Shelf',
-                navReader: 'Read',
-                navNotes: 'Notes',
-                navSettings: 'Settings',
-                books: 'Books',
-                papers: 'Papers',
-                uploadBook: 'Upload Book',
-                uploadPaper: 'Upload Paper',
-                archive: 'Archive',
-                archived: 'Archived',
-                emptyBooks: 'No books yet',
-                emptyPapers: 'No papers yet',
-                clickToUpload: 'Click or drag files',
-                supportedFormats: 'Supports PDF, ePub, LaTeX',
-                titleOptional: 'Title (optional, defaults to filename)',
-                abstractOptional: 'Abstract (optional)',
-                add: 'Add',
-                selectFile: 'Please select a file first',
-                processing: 'Processing...',
-                fileReadFail: 'File read failed',
-                added: 'Added: ',
-                saveFail: 'Save failed: ',
-                restored: 'Restored',
-                archivedMsg: 'Archived',
-                deleted: 'Deleted',
-                rename: 'Rename',
-                delete: 'Delete',
-                restore: 'Restore',
-                splitMode: 'Split mode',
-                openDocFirst: 'Please open a document first',
-                penOn: 'Pen enabled',
-                penOff: 'Pen disabled',
-                enablePenFirst: 'Enable pen first',
-                pageNotRendered: 'Page not rendered yet, scroll to target page',
-                pageNotRenderedShort: 'Page not rendered',
-                imageLoadFail: 'Image load failed',
-                fileReadError: 'File read error',
-                invalidPage: 'Enter valid page (1-',
-                jumpedToPage: 'Jumped to page ',
-                page: '',
-                enterKeyword: 'Enter a search keyword first',
-                ocrInProgress: 'OCR in progress...',
-                ocrDone: 'OCR done, searching...',
-                ocrFail: 'OCR failed: ',
-                drawingCleared: 'Drawing cleared',
-                searchPlaceholder: 'Search...',
-                goToPage: 'Go',
-                lectures: 'Lectures',
-                abstracts: 'Abstracts',
-                emptyLectures: 'No lectures yet',
-                emptyAbstracts: 'No abstracts yet',
-                lectureTitle: 'Lecture',
-                prevSection: 'Previous',
-                nextSection: 'Next',
-                draft: 'Draft',
-                draftPlaceholder: 'Write your draft here...',
-                settings: 'Settings',
-                yourName: 'Your name',
-                clickToEdit: 'Click to edit',
-                userSettings: 'User Settings',
-                apiSetting: 'API Setting',
-                configAI: 'Configure AI & sync services',
-                notification: 'Notifications',
-                photoRetention: 'Photo retention (days)',
-                photoRetentionDesc: '0 = never delete',
-                storagePersist: 'Storage Persistence',
-                checkingStatus: 'Checking…',
-                requestAuth: 'Request',
-                aiSettings: 'AI Settings',
-                aiAvatar: 'AI Avatar',
-                aiName: 'AI Name',
-                aiPersona: 'AI Persona',
-                aiPersonaDesc: 'Only active in "Give me suggestions"',
-                aiPersonaPlaceholder: 'Describe the personality you want AI to have...',
-                aiPersonaDefault: 'You are a gentle and patient assistant who is good at encouraging users.',
-                themeSettings: 'Theme',
-                themeDay: 'Day',
-                themeNight: 'Night',
-                themeLight: 'Light',
-                themeBlue: 'Blue',
-                themeGreen: 'Green',
-                themeOrange: 'Orange',
-                themePink: 'Pink',
-                themePurple: 'Purple',
-                bgImage: 'Background',
-                setBgImage: 'Set Background Image',
-                uploadImage: 'Upload Image',
-                clearBgImage: 'Clear Background',
-                bgOpacity: 'Background Opacity',
-                bgBlur: 'Background Blur',
-                dataManagement: 'Data Management',
-                r2Config: 'R2 Cloud Sync Config',
-                r2ConfigDesc: 'Configure Cloudflare R2 Storage',
-                syncToCloud: 'Sync to Cloud',
-                syncToCloudDesc: 'Upload data to R2',
-                syncFromCloud: 'Restore from Cloud',
-                syncFromCloudDesc: 'Download data from R2',
-                exportData: 'Export Data',
-                exportDataDesc: 'Export as JSON file',
-                clearAllData: 'Clear All Data',
-                language: 'Language',
-                langZh: '中文',
-                langEn: 'English',
-                r2ModalTitle: 'R2 Cloud Sync Config',
-                bucketName: 'Bucket Name',
-                customDomain: 'Custom Domain (optional, for download)',
-                autoSyncSettings: 'Auto Sync Settings',
-                enableAutoSync: 'Enable auto sync',
-                syncInterval: 'Sync interval',
-                min5: '5 min',
-                min10: '10 min',
-                min15: '15 min',
-                min30: '30 min',
-                min60: '60 min',
-                r2FreeNote: 'Cloudflare R2 free tier: 10M write ops/month.',
-                r2IntervalNote: 'Suggested: 15 min interval, ~4320 ops/month, well within free tier.',
-                autoSyncOnChange: 'Sync on file change',
-                autoSyncOnChangeDesc: 'Sync immediately after upload or delete',
-                lastSync: 'Last sync: ',
-                saveConfig: 'Save Config',
-                testConnection: 'Test Connection',
-                setUserAvatar: 'Set User Avatar',
-                setAIAvatar: 'Set AI Avatar',
-                orImageUrl: 'Or enter image URL',
-                confirm: 'OK',
-                uploadBooks: 'Upload Book',
-                aiAssistant: 'AI Assistant',
-                aiGreeting: 'What can I do for you?',
-                generateOutline: 'Generate Outline',
-                generateLecture: 'Generate Lecture',
-                generateAbstract: 'Generate Abstract',
-                dontKnowSuggest: "I don't know, give me suggestions",
-                chatPlaceholder: 'Type something...',
-                send: 'Send',
-                selectBook: 'Select Book',
-                exportChat: 'Export',
-                note: 'Note',
-                noteDeleted: 'Note deleted',
-                clear: 'Clear',
-                recognize: 'Recognize',
-                save: 'Save',
-                noteSaved: 'Note saved',
-                inputNoteOrRecognize: 'Type note or handwriting recognition...',
-                recognizing: 'Recognizing...',
-                saved: 'Saved',
-                failPrefix: 'Failed: ',
-                chapterBookmarks: 'Chapter Bookmarks',
-                courses: 'Courses',
-                seminars: 'Seminars',
-                clickToCreateCourse: 'Click to create course',
-                clickToCreateSeminar: 'Click to create seminar',
-                clickToCreateSession: 'Click to create subfolder',
-                sessionTitle: 'Subfolder title:',
-                lecture: ' Lecture',
-                sourceFolder: 'Source Materials',
-                uploadFile: 'Upload File',
-                takePhoto: 'Take Photo',
-                materialDeleted: 'Material deleted',
-                noteDeletedClass: 'Note deleted',
-                openSubfolderFirst: 'Open a subfolder first',
-                sourceNotFound: 'Source not found: ',
-                fileRef: 'File ref: ',
-                noteGenFail: 'Note generation failed: ',
-                regenerateNote: 'Regenerate this note?',
-                syncing: 'Syncing...',
-                restoring: 'Restoring...',
-                syncSuccess: 'Sync successful',
-                syncComplete: 'Sync complete',
-                syncFail: 'Sync failed: ',
-                restoreSuccess: 'Restore successful',
-                restoreFail: 'Restore failed: ',
-                noCloudData: 'No cloud data',
-                restoredFromCloud: 'Restored from cloud: ',
-                syncUploadComplete: 'Sync complete! Uploaded ',
-                files: ' files',
-                lecturesCount: ' lectures',
-                abstractsCount: ' abstracts',
-                materialsCount: ' materials',
-                downloadComplete: 'Restore complete! Downloaded ',
-                autoSynced: 'Auto synced to cloud',
-                lectureSynced: 'Lecture synced to cloud',
-                abstractSynced: 'Abstract synced to cloud',
-                r2NotConfigured: 'R2 cloud sync not configured',
-                syncInProgress: 'Sync in progress, please wait',
-                configR2First: 'Please configure R2 first',
-                configSupabaseFirst: 'Please configure Supabase first',
-                confirmRestoreFromCloud: 'Restoring from cloud will overwrite local data. Continue?',
-                exportSuccess: 'Export successful',
-                confirmClearAll: 'Clear all data? This cannot be undone.',
-                dataCleared: 'Data cleared',
-                storageFull: 'Storage full, data may not be saved',
-                restoredFromBackup: 'Restored from backup',
-                dataLoadError: 'Data load error, please restore from cloud',
-                localFileLost: 'Local file lost, restoring from cloud…',
-                restoredFileFromCloud: 'File restored from cloud',
-                fileDataLost: 'File data lost, please re-import or sync from cloud',
-                primaryAPIFailed: 'Primary API failed, trying backup...',
-                noChatHistory: 'No chat history',
-                onlyPdfOutline: 'Outline generation only supports PDF books',
-                readingBook: 'Reading book...',
-                readFail: 'Read failed: ',
-                aiGeneratingOutline: 'AI generating outline...',
-                outlineParseFail: 'AI response format parse failed',
-                outlineEmpty: 'AI returned no valid outline',
-                outlineGenerated: 'Outline generated (',
-                sections: ' sections)',
-                genFail: 'Generation failed: ',
-                noOutlineFirst: 'Please click "Generate Outline" first',
-                outlineLoaded: 'Loaded ',
-                outlineChapters: ' outline chapters',
-                lectureGenerated: 'Lecture generated, syncing to cloud...',
-                generatingAbstract: 'Generating abstract...',
-                abstractGenerated: 'Abstract generated, syncing to cloud...',
-                noAbstract: 'No abstract for this paper',
-                cloudAbstractRestore: 'Restoring abstract from cloud...',
-                askingAI: 'Asking AI...',
-                noteAdded: 'Note added',
-                aiRequestFail: 'AI request failed: ',
-                aiCallFail: 'Call failed: ',
-                aiNoAnswer: 'Sorry, I cannot answer this question right now.',
-                chatGreeting: 'Hello! How can I help? Feel free to ask any math question.',
-                settingsSaved: 'Settings saved',
-                enterApiKey: 'Please enter API key first',
-                noModelsFound: 'No models found',
-                fetchModelsFail: 'Fetch models failed: ',
-                bgImageSet: 'Background image set',
-                bgImageCleared: 'Background image cleared',
-                notifyOn: 'Notifications enabled',
-                notifyDenied: 'Notification permission denied',
-                notifyOff: 'Notifications disabled',
-                persistNotSupported: 'This browser does not support storage persistence',
-                persistGranted: 'Storage persistence granted',
-                persistDenied: 'Permission denied. Try adding to bookmarks or home screen.',
-                primaryAPI: 'Primary API',
-                channel: 'Provider',
-                url: 'URL',
-                apiKey: 'Key',
-                modelName: 'Model',
-                fetchModels: 'Fetch Models',
-                backupAPI: 'Backup API',
-                backupAPIDesc: 'Used when primary fails',
-                noBackup: 'No backup',
-                custom: 'Custom',
-                otherServices: 'Other Services',
-                saveSettings: 'Save Settings',
-                lectureNotifTitle: 'Lecture generation complete',
-                abstractNotifTitle: 'Abstract generation complete',
-                lectureSyncNotif: 'Lecture cloud sync complete',
-                lectureSyncNotifDesc: 'Lecture content synced to cloud',
-                abstractSyncNotif: 'Abstract cloud sync complete',
-                abstractSyncNotifDesc: 'Paper abstract synced to cloud',
-                supplementDesc: 'Additional description (optional)',
-                confirmDeleteFolder: 'Delete this folder and all contents? Cannot be undone.',
-                renamePlaceholder: 'Rename:',
-                newCourse: 'New course name:',
-                newSeminar: 'New seminar name:',
-                dateFormat_lecture: 'Lecture $n',
-                handwritingPrompt: 'You are a handwriting recognition assistant. Recognize handwritten content in the image, use LaTeX for math formulas, output results only.',
-                recognizeFail: 'Recognition failed',
-                readerAIPrompt: 'You are a math assistant. The attachment is the page the user is currently reading.',
-                readerAINoteLabel: "User's notes on this page: ",
-                readerAINone: 'None',
-                readerAISuffix: "The user's question may or may not relate to the attachment. If related, use the attachment to help answer; if not, answer directly from your own knowledge. Accurate, professional, concise.",
-                outlineSystemPrompt: `You are a professional mathematics education expert. The attachment is a complete book (PDF).
-Please read the attachment and generate a structured outline (each section ~1 hour of study), with PDF page ranges for each section.
-
-[Page accuracy requirements - CRITICAL]
-- startPage and endPage must be actual PDF page numbers (starting from 1).
-- Do not fill in mechanically spaced intervals.
-- Adjacent sections may overlap by 1 page at boundaries.
-- Cover the entire book; the last section's endPage must be near the total page count.
-
-Return strictly as JSON with no extra text:
-{
-  "chapters": [
-    {"title": "Section 1: Title", "topics": ["Topic1", "Topic2"], "startPage": 1, "endPage": 20},
-    ...
-  ]
-}`,
-                outlineUserPrefix: 'Book title: ',
-                outlineUserAuthor: 'Author: ',
-                outlineUserSubject: 'Subject: ',
-                outlineUserPages: 'Total pages: ',
-                outlineUserUnknown: 'Unknown',
-                outlineUserHasBookmarks: 'PDF has bookmarks (for reference, use attachment content for pages):\n',
-                outlineUserNoBookmarks: 'PDF has no built-in bookmarks.',
-                outlineUserSuffix: '\nPlease generate the outline JSON based on the attachment PDF content.',
-                sectionDefault: 'Section $n',
-                lectureSystemPrompt: `You are a professional mathematics lecturer. The attachment contains the PDF pages for this section. Based on the attachment content, prepare lecture notes for students with basic math background (basic calculus and linear algebra only). The notes must match the PDF content.
-
-Organize strictly into three parts, targeting ~1 hour study per section:
-
-## I. Prerequisites
-
-Explain prerequisite concepts. Assume the reader only knows basic calculus and linear algebra. All non-elementary concepts need:
-1. Rigorous mathematical definition
-2. Clear explanation of meaning
-3. Concrete examples
-4. All required mathematical notation
-
-## II. Outline
-
-Main content of this section:
-1. Complete statement of core theorems
-2. Important lemmas
-3. Complete proofs (no key steps omitted)
-4. Logical relationships between theorems
-
-## III. Exercises
-
-5 exercises covering core concepts, progressive difficulty:
-- Q1-2: Basic concept understanding
-- Q3-4: Theorem application
-- Q5: Comprehensive application or proof
-
-Provide detailed solutions for all exercises at the end.
-
-Requirements:
-- Use rigorous mathematical language
-- Use LaTeX format: inline formulas with $...$, display formulas with $$...$$`,
-                lectureUserBook: 'Book: ',
-                lectureUserChapter: 'Chapter: ',
-                lectureUserPages: 'Pages: ',
-                lectureUserPagesTo: ' - ',
-                lectureUserPagesSuffix: '',
-                lectureUserTopics: 'Topics: ',
-                lectureUserSuffix: '\nPlease generate complete lecture notes for this section based on the PDF content.',
-                contentGenFail: 'Content generation failed',
-                abstractSystemPrompt: `You are an academic paper analysis expert. Based on the provided paper information, generate a structured abstract including:
-1. Research background and objectives
-2. Research methods
-3. Key findings and conclusions
-4. Significance and contributions
-
-Use academic language, clear and concise.`,
-                abstractUserPrefix: 'Please generate an abstract for this paper:\nTitle: ',
-                abstractUserAuthor: 'Authors: ',
-                abstractUserAbstract: 'Original abstract: ',
-                abstractGenFail: 'Abstract generation failed',
-                chatSystemPrompt: `You are a friendly, professional math learning assistant. Help users understand math concepts, solve math problems, and provide study advice.
-Use clear language, with LaTeX math formulas ($...$) when needed.
-Keep answers concise but complete; explain step by step if complex.`,
-                selectionAIPrompt: 'You are a math assistant. Explain math content concisely.',
-                selectionWithDesc: 'Selected math content:\n\n"$text"\n\nUser question: $desc\n\nAnswer concisely, do not repeat the question.',
-                selectionNoDesc: 'Please concisely explain the following math content:\n\n"$text"',
-                classroomNotePrompt_image: 'photo/screenshot',
-                classroomNotePrompt_file: 'file',
-                classroomNoteSystemPrefix: 'You are a professional academic note-taking assistant. Convert the uploaded ',
-                classroomNoteSystemSuffix: ` content into clear, readable notes.
-
-Note format requirements:
-1. Main title: One-sentence summary of the note content
-2. Use multiple sub-headings, each formatted as: ## [Title] {ref:$ref}
-3. Organize content clearly with necessary explanations
-4. Use LaTeX format: inline formulas with $...$, display formulas with $$...$$
-5. Maintain academic rigor`,
-                classroomNoteSeminarSuffix: '\n\nNote: This is lecture content. Please additionally introduce relevant background knowledge to help readers understand the professional concepts and context involved. Add a "Background Knowledge" section at the beginning.',
-                classroomNoteUserMsg: 'Please organize the following into notes. Source: $folder - $session, Reference: $ref',
-                noteSuffix: ' Notes',
-                pullToRefresh: 'Pull to refresh',
-                confirmClearCanvas: 'Clear canvas?',
-                confirmDeleteItem: 'Delete this item? Cannot be undone.',
-                confirmDeleteMessage: 'Delete this message?',
-                confirmRegenerateLecture: 'Regenerate this lecture? Current content will be overwritten.',
-                confirmDeleteMaterial: 'Delete this material?',
-                confirmDeleteNote: 'Delete this note?',
-                archiveTitle: 'Archive',
-                back: 'Back',
-                emptyArchive: 'No archived items',
-                archivedType: 'Archived',
-                persistedStatus: '✅ Persisted',
-                notPersistedStatus: '⚠️ Not persisted (may be cleared)',
-                usageLabel: 'Used ',
-                authorized: 'Authorized',
-                materialsLabel: 'materials',
-                notesLabel: 'notes',
-                aiNotes: 'AI Notes',
-                emptyMaterials: 'No materials, tap bottom-right to upload',
-                noteContentEmpty: 'Note content is empty',
-                handwrittenNote: '(handwritten note)',
-                readerChatGreeting: "Hi! I'm your AI reading assistant. Current document: $title, page $current/$total. $notesHow can I help?",
-                readerChatNotesPrefix: 'Your notes here: ',
-                deleteBtn: 'Delete',
-                archiveBtn: 'Archive',
-                renameBtn: 'Rename',
-                generatingStatus: 'Generating...',
-                planningChapters: 'Planning lecture chapters...',
-                generatingLectureContent: 'Generating lecture content...',
-                searchDocContent: 'Search document...',
-                enterPageNum: 'Page number',
-                readerFallbackConfigAPI: 'Please configure API in Settings for AI responses.',
-                selectPaper: 'Select Paper',
-                emptyBooksImport: 'No books yet, please import first',
-                emptyPapersImport: 'No papers yet, please import first',
-                progressLabel: 'Progress',
-            }
-        };
-
-        let currentLang = 'zh';
-
-        function t(key) {
-            return (I18N[currentLang] && I18N[currentLang][key]) || (I18N.zh[key]) || key;
-        }
-
-        function setLanguage(lang) {
-            currentLang = lang;
-            appData.settings.lang = lang;
-            saveData();
-            document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
-            document.title = t('appTitle');
-            applyI18nToDOM();
-            // Update lang button styles
-            const zhBtn = document.getElementById('langBtnZh');
-            const enBtn = document.getElementById('langBtnEn');
-            if (zhBtn && enBtn) {
-                if (lang === 'zh') {
-                    zhBtn.style.background = 'var(--accent)'; zhBtn.style.color = 'white'; zhBtn.style.fontWeight = '600';
-                    enBtn.style.background = 'var(--bg-secondary)'; enBtn.style.color = 'var(--text-primary)'; enBtn.style.fontWeight = 'normal';
-                } else {
-                    enBtn.style.background = 'var(--accent)'; enBtn.style.color = 'white'; enBtn.style.fontWeight = '600';
-                    zhBtn.style.background = 'var(--bg-secondary)'; zhBtn.style.color = 'var(--text-primary)'; zhBtn.style.fontWeight = 'normal';
-                }
-            }
-            // Re-render dynamic pages
-            renderLibrary();
-            renderNotesPage();
-            renderClassroomPage();
-            // Update settings page static elements
-            applySettingsI18n();
-        }
-
-        function applyI18nToDOM() {
-            document.querySelectorAll('[data-i18n]').forEach(el => {
-                const key = el.getAttribute('data-i18n');
-                const val = t(key);
-                if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
-                    el.placeholder = val;
-                } else {
-                    el.textContent = val;
-                }
-            });
-            document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
-                el.placeholder = t(el.getAttribute('data-i18n-placeholder'));
-            });
-        }
-
-        function applySettingsI18n() {
-            // Update nav items
-            const navSpans = document.querySelectorAll('.bottom-nav .nav-item span');
-            const navKeys = ['navClassroom', 'navBookshelf', 'navReader', 'navNotes', 'navSettings'];
-            navSpans.forEach((span, i) => { if (navKeys[i]) span.textContent = t(navKeys[i]); });
-
-            // Update language toggle display
-            const langToggle = document.getElementById('langToggleLabel');
-            if (langToggle) langToggle.textContent = currentLang === 'zh' ? t('langZh') : t('langEn');
-        }
-
         // ==================== Data Store ====================
         let appData = {
             books: [],
@@ -5521,8 +4617,7 @@ Note format requirements:
                 aiName: 'AI助手',
                 aiAvatar: '',
                 aiPersona: '你是一个温柔且有耐心的助手，善于鼓励用户完成任务。',
-                photoRetentionDays: 0,
-                lang: 'zh'
+                photoRetentionDays: 0
             }
         };
 
@@ -5559,21 +4654,6 @@ Note format requirements:
                 }
             }
             applySettings();
-            // Initialize language
-            currentLang = appData.settings.lang || 'zh';
-            document.documentElement.lang = currentLang === 'zh' ? 'zh-CN' : 'en';
-            document.title = t('appTitle');
-            applyI18nToDOM();
-            applySettingsI18n();
-            // Apply language button style
-            const _zhBtn = document.getElementById('langBtnZh');
-            const _enBtn = document.getElementById('langBtnEn');
-            if (_zhBtn && _enBtn) {
-                if (currentLang === 'en') {
-                    _enBtn.style.background = 'var(--accent)'; _enBtn.style.color = 'white'; _enBtn.style.fontWeight = '600';
-                    _zhBtn.style.background = 'var(--bg-secondary)'; _zhBtn.style.color = 'var(--text-primary)'; _zhBtn.style.fontWeight = 'normal';
-                }
-            }
             renderLibrary();
             renderNotesPage();
             renderClassroomPage();
@@ -5674,17 +4754,17 @@ Note format requirements:
             if (!el) return;
             const usedMB = (info.usage / 1024 / 1024).toFixed(1);
             const totalMB = (info.quota / 1024 / 1024 / 1024).toFixed(1);
-            const statusText = info.persisted ? t('persistedStatus') : t('notPersistedStatus');
-            el.textContent = `${statusText} · ${t('usageLabel')}${usedMB} MB / ${totalMB} GB`;
+            const statusText = info.persisted ? '✅ 已持久化' : '⚠️ 未持久化（可能被清理）';
+            el.textContent = `${statusText} · 已用 ${usedMB} MB / ${totalMB} GB`;
 
             const btn = document.getElementById('storagePersistBtn');
             if (btn) {
                 if (info.persisted) {
-                    btn.textContent = t('authorized');
+                    btn.textContent = '已授权';
                     btn.disabled = true;
                     btn.style.opacity = '0.5';
                 } else {
-                    btn.textContent = t('requestAuth');
+                    btn.textContent = '请求授权';
                     btn.disabled = false;
                     btn.style.opacity = '1';
                 }
@@ -5693,14 +4773,14 @@ Note format requirements:
 
         async function manualRequestPersist() {
             if (!navigator.storage || !navigator.storage.persist) {
-                showToast(t('persistNotSupported'));
+                showToast('此浏览器不支持持久化存储');
                 return;
             }
             const granted = await navigator.storage.persist();
             if (granted) {
-                showToast(t('persistGranted'));
+                showToast('已获得持久化存储授权');
             } else {
-                showToast(t('persistDenied'));
+                showToast('授权未通过，请将此页加入书签或添加到主屏幕后重试');
             }
             updateStorageStatusUI();
         }
@@ -5956,14 +5036,14 @@ Note format requirements:
                         // 写回 localStorage
                         try { localStorage.setItem('mathReader', JSON.stringify(appData)); } catch(e2) {}
                         console.log('[loadData] 已从 IndexedDB 备份恢复数据');
-                        showToast(t('restoredFromBackup'));
+                        showToast('已从备份恢复数据');
                         return;
                     }
                 }
             } catch(e) {
                 console.error('[loadData] IndexedDB 备份恢复也失败:', e);
             }
-            showToast(t('dataLoadError'));
+            showToast('数据加载异常，请从云端同步恢复');
         }
 
         // 节流备份到 IndexedDB（每 30 秒最多一次）
@@ -6042,7 +5122,7 @@ Note format requirements:
                     console.log('[saveData] 清理 screenshot 后重试成功');
                 } catch (e2) {
                     console.error('[saveData] 重试仍失败:', e2);
-                    showToast(t('storageFull'));
+                    showToast('存储空间不足，数据可能未保存');
                 }
             }
             // 异步备份到 IndexedDB（双保险）
@@ -6152,7 +5232,7 @@ Note format requirements:
                 }
                 resizeLectureDrawCanvas();
             }, 50);
-            showToast(t('splitMode'));
+            showToast('分屏模式');
         }
 
         function exitSplitMode() {
@@ -6253,7 +5333,7 @@ Note format requirements:
 
         function expandDraftPanel() {
             if (!currentDoc) {
-                showToast(t('openDocFirst'));
+                showToast('请先打开文档');
                 return;
             }
             document.getElementById('draftPanel').classList.add('show');
@@ -6669,7 +5749,7 @@ Note format requirements:
 
         function clearDraftCanvas() {
             if (!draftCanvas || !draftCtx) return;
-            if (!confirm(t('confirmClearCanvas'))) return;
+            if (!confirm('确定清空画布？')) return;
             draftCtx.clearRect(0, 0, draftCanvas.width, draftCanvas.height);
             saveDraftCanvasState();
             debouncedSaveDraft();
@@ -6854,7 +5934,7 @@ Note format requirements:
             pendingFile = null;
 
             const dz = document.getElementById('dropZone');
-            dz.querySelector('p').textContent = t('clickToUpload');
+            dz.querySelector('p').textContent = '点击或拖拽文件';
             dz.onclick = () => document.getElementById('fileInput').click();
             dz.ondragover = (e) => { e.preventDefault(); dz.classList.add('drag-over'); };
             dz.ondragleave = () => dz.classList.remove('drag-over');
@@ -6884,13 +5964,13 @@ Note format requirements:
         }
 
         function confirmUpload() {
-            if (!pendingFile) { showToast(t('selectFile')); return; }
+            if (!pendingFile) { showToast('请先选择文件'); return; }
 
-            showToast(t('processing'));
+            showToast('正在处理...');
             
             const reader = new FileReader();
             reader.onerror = function() {
-                showToast(t('fileReadFail'));
+                showToast('文件读取失败');
             };
             reader.onload = async function(e) {
                 try {
@@ -6926,12 +6006,12 @@ Note format requirements:
                     saveData();
                     renderLibrary();
                     hideModal('uploadModal');
-                    showToast(t('added') + doc.title);
+                    showToast('已添加: ' + doc.title);
                     
                     // 触发文件变更自动同步
                     triggerSyncOnFileChange(docId, 'upload');
                 } catch(err) {
-                    showToast(t('saveFail') + err.message);
+                    showToast('保存失败: ' + err.message);
                 }
             };
             reader.readAsDataURL(pendingFile);
@@ -7032,14 +6112,14 @@ Note format requirements:
         function renderArchive() {
             const list = document.getElementById('archiveList');
             if (appData.archived.length === 0) {
-                list.innerHTML = '<div class="empty-state"><p>' + t('emptyArchive') + '</p></div>';
+                list.innerHTML = '<div class="empty-state"><p>暂无存档</p></div>';
                 return;
             }
             list.innerHTML = appData.archived.map(item => `
                 <div class="item-card" onclick="restoreFromArchive('${item.id}')">
                     <div class="item-card-title">${escapeHtml(item.title)}</div>
                     <div class="item-card-meta">
-                        <span class="item-card-type">${item.type.toUpperCase()} · ${t('archivedType')}</span>
+                        <span class="item-card-type">${item.type.toUpperCase()} · 已存档</span>
                     </div>
                 </div>
             `).join('');
@@ -7056,7 +6136,7 @@ Note format requirements:
             saveData();
             renderArchive();
             renderLibrary();
-            showToast(t('restored'));
+            showToast('已恢复');
         }
 
         // ==================== 长按菜单 ====================
@@ -7074,11 +6154,11 @@ Note format requirements:
             menu.innerHTML = `
                 <button class="longpress-menu-item" onclick="archiveItem('${id}', '${category}')">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
-                    ${t('archiveBtn')}
+                    存档
                 </button>
                 <button class="longpress-menu-item danger" onclick="deleteItem('${id}', '${category}')">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
-                    ${t('deleteBtn')}
+                    删除
                 </button>
             `;
             
@@ -7127,13 +6207,13 @@ Note format requirements:
             
             saveData();
             renderLibrary();
-            showToast(t('archivedMsg'));
+            showToast('已存档');
         }
 
         function deleteItem(id, category) {
             closeLongPressMenu();
             
-            if (!confirm(t('confirmDeleteItem'))) return;
+            if (!confirm('确定删除此项目？此操作不可恢复。')) return;
             
             let list;
             if (category === 'book') {
@@ -7163,7 +6243,7 @@ Note format requirements:
             
             saveData();
             renderLibrary();
-            showToast(t('deleted'));
+            showToast('已删除');
             
             // 触发文件变更自动同步
             triggerSyncOnFileChange(id, 'delete');
@@ -7220,14 +6300,14 @@ Note format requirements:
                 if (!fileData) {
                     const r2cfg = appData.settings?.r2Config;
                     if (r2cfg?.endpoint && r2cfg?.accessKeyId && r2cfg?.secretAccessKey && r2cfg?.bucketName) {
-                        showToast(t('localFileLost'));
+                        showToast('本地文件丢失，正在从云端恢复…');
                         try {
                             const cloudData = await r2GetObject('files/' + doc.id + '.pdf');
                             if (cloudData) {
                                 fileData = cloudData;
                                 // 恢复到 IndexedDB
                                 await saveFileData(doc.id, cloudData);
-                                showToast(t('restoredFileFromCloud'));
+                                showToast('已从云端恢复文件');
                             }
                         } catch (e) {
                             console.error('云端恢复失败:', e);
@@ -7235,7 +6315,7 @@ Note format requirements:
                     }
                 }
                 if (!fileData) {
-                    showToast(t('fileDataLost'));
+                    showToast('文件数据丢失，请重新导入或从云端同步');
                     return;
                 }
                 
@@ -7627,7 +6707,7 @@ Note format requirements:
                 marker.style.position = 'relative';
                 marker.style.transform = 'translate(-50%, -50%)';
                 marker.textContent = (i + 1);
-                marker.title = n.text || t('note');
+                marker.title = n.text || '笔记';
 
                 // 长按编辑
                 let pressTimer = null;
@@ -7657,7 +6737,7 @@ Note format requirements:
                     
                     const textDiv = document.createElement('div');
                     textDiv.className = 'note-bubble-text';
-                    textDiv.textContent = n.text || t('handwrittenNote');
+                    textDiv.textContent = n.text || '(手写笔记)';
                     
                     bubble.appendChild(closeBtn);
                     bubble.appendChild(textDiv);
@@ -7878,7 +6958,7 @@ Note format requirements:
             
             saveData();
             closeNotePopup();
-            showToast(t('noteDeleted'));
+            showToast('笔记已删除');
             
             if (pdfDoc && currentPage === currentNotePosition.page) {
                 refreshPageMarkers(currentPage);
@@ -8031,13 +7111,13 @@ Note format requirements:
         // ---- Reader image insert ----
         function insertReaderImage() {
             if (!penMode) {
-                showToast(t('enablePenFirst'));
+                showToast('请先开启画笔');
                 return;
             }
             // 使用当前页的 annoCanvas
             const pageData = pageElements[currentPage];
             if (!pageData || !pageData.annoCanvas) {
-                showToast(t('pageNotRendered'));
+                showToast('当前页尚未渲染，请滚动到目标页再试');
                 return;
             }
             const input = document.getElementById('readerImageInput');
@@ -8053,7 +7133,7 @@ Note format requirements:
             const pageNum = currentPage;
             const pageData = pageElements[pageNum];
             if (!pageData || !pageData.annoCanvas) {
-                showToast(t('pageNotRenderedShort'));
+                showToast('当前页尚未渲染');
                 return;
             }
             const annoCanvas = pageData.annoCanvas;
@@ -8084,12 +7164,12 @@ Note format requirements:
                     saveDrawingForPage(pageNum, annoCanvas);
                 };
                 img.onerror = function() {
-                    showToast(t('imageLoadFail'));
+                    showToast('图片加载失败');
                 };
                 img.src = ev.target.result;
             };
             reader.onerror = function() {
-                showToast(t('fileReadError'));
+                showToast('读取文件失败');
             };
             reader.readAsDataURL(file);
         }
@@ -8165,13 +7245,13 @@ Note format requirements:
             const input = document.getElementById('pageJumpInput');
             const page = parseInt(input.value);
             if (isNaN(page) || page < 1 || page > totalPages) {
-                showToast(t('invalidPage') + totalPages + ')');
+                showToast('请输入有效页码 (1-' + totalPages + ')');
                 return;
             }
             currentPage = page;
             scrollToPage(currentPage);
             closePageJumpPopup();
-            showToast(t('jumpedToPage') + page + t('page'));
+            showToast('已跳转到第 ' + page + ' 页');
         }
 
         // Handle Enter key in page jump input
@@ -8510,13 +7590,13 @@ Note format requirements:
         // ==================== OCR Search ====================
         async function performOCRSearch() {
             if (!pdfDoc || !currentDoc) {
-                showToast(t('openDocFirst'));
+                showToast('请先打开文档');
                 return;
             }
             
             const query = document.getElementById('searchInput').value.trim();
             if (!query) {
-                showToast(t('enterKeyword'));
+                showToast('请先输入搜索关键词');
                 return;
             }
             
@@ -8525,7 +7605,7 @@ Note format requirements:
             ocrBtn.textContent = 'OCR识别中...';
             
             try {
-                showToast(t('ocrInProgress'));
+                showToast('正在进行OCR识别...');
                 
                 // OCR current page (or visible pages in continuous mode)
                 const pagesToOCR = penMode ? [currentPage] : getVisiblePageNumbers();
@@ -8564,14 +7644,14 @@ Note format requirements:
                     };
                 }
                 
-                showToast(t('ocrDone'));
+                showToast('OCR完成，正在搜索...');
                 
                 // Re-run search with OCR data
                 await performSearch(query);
                 
             } catch (err) {
                 console.error('OCR error:', err);
-                showToast(t('ocrFail') + err.message);
+                showToast('OCR识别失败: ' + err.message);
             } finally {
                 ocrBtn.classList.remove('loading');
                 ocrBtn.textContent = 'OCR识别搜索';
@@ -8622,7 +7702,7 @@ Note format requirements:
             applyPenModeUI();
             appData.settings.penMode = penMode;
             saveData();
-            showToast(penMode ? t('penOn') : t('penOff'));
+            showToast(penMode ? '画笔已开启' : '画笔已关闭');
             // 无需重新渲染：两种模式都使用连续滚动，只是 annotation-canvas 的 pointer-events 切换
         }
         
@@ -8778,15 +7858,15 @@ Note format requirements:
         }
 
         async function recognizeHandwriting() {
-            if (!currentDoc) { showToast(t('openDocFirst')); return; }
+            if (!currentDoc) { showToast('请先打开文档'); return; }
             
             const canvas = document.getElementById('noteCanvas');
             const dataUrl = canvas.toDataURL('image/png');
 
-            showToast(t('recognizing'));
+            showToast('识别中...');
 
             try {
-                const systemPrompt = t('handwritingPrompt');
+                const systemPrompt = '你是一个手写识别助手。识别图中手写内容，数学公式用LaTeX，只输出结果。';
                 const messages = [{
                     role: 'user',
                     content: [
@@ -8795,23 +7875,23 @@ Note format requirements:
                     ]
                 }];
 
-                const text = await callAI(systemPrompt, messages) || t('recognizeFail');
+                const text = await callAI(systemPrompt, messages) || '识别失败';
                 
                 // 直接保存
                 addDocNote(currentDoc.id, currentNotePosition.page, currentNotePosition.x, currentNotePosition.y, text, dataUrl);
                 saveData();
                 closeNotePopup();
-                showToast(t('saved'));
+                showToast('已保存');
                 if (currentPage === currentNotePosition.page) {
                     refreshPageMarkers(currentNotePosition.page);
                 }
             } catch(err) {
-                showToast(t('failPrefix') + err.message);
+                showToast('失败: ' + err.message);
             }
         }
 
         function saveNote() {
-            if (!currentDoc) { showToast(t('openDocFirst')); return; }
+            if (!currentDoc) { showToast('请先打开文档'); return; }
 
             const text = document.getElementById('noteTextInput').value;
             const canvas = document.getElementById('noteCanvas');
@@ -8834,7 +7914,7 @@ Note format requirements:
             
             saveData();
             closeNotePopup();
-            showToast(t('noteSaved'));
+            showToast('笔记已保存');
 
             if (pdfDoc && currentPage === currentNotePosition.page) {
                 refreshPageMarkers(currentNotePosition.page);
@@ -8867,7 +7947,7 @@ Note format requirements:
 
                 let statusText = '';
                 if (status === 'generating') {
-                    statusText = '<span style="color:var(--accent);font-size:11px;margin-left:6px;">' + t('generatingStatus') + '</span>';
+                    statusText = '<span style="color:var(--accent);font-size:11px;margin-left:6px;">生成中...</span>';
                 }
 
                 booksHtml += `<div class="note-folder" onclick="enterNotesFolder('book', '${book.id}')">
@@ -8880,7 +7960,7 @@ Note format requirements:
                     </div>
                 </div>`;
             });
-            booksContainer.innerHTML = booksHtml || '<div class="empty-state"><p data-i18n="emptyLectures">暂无讲义</p></div>';
+            booksContainer.innerHTML = booksHtml || '<div class="empty-state"><p>暂无讲义</p></div>';
 
             // Papers abstracts
             const papersContainer = document.getElementById('notesListPapers');
@@ -8919,7 +7999,7 @@ Note format requirements:
                     if (!abstractText) {
                         const config = appData.settings && appData.settings.r2Config;
                         if (config && config.accessKeyId) {
-                            showToast(t('cloudAbstractRestore'));
+                            showToast('从云端恢复摘要...');
                             try {
                                 const aKey = abstractKey(paperId);
                                 const cloudData = await r2GetObject('abstracts/' + aKey);
@@ -8939,7 +8019,7 @@ Note format requirements:
             // 回退到原始摘要
             if (!abstractText) abstractText = paper.abstract;
             if (!abstractText) {
-                showToast(t('noAbstract'));
+                showToast('该论文暂无摘要');
                 return;
             }
             
@@ -9031,7 +8111,7 @@ Note format requirements:
             let html = `<div class="note-folder" onclick="renderNotesPage()">
                 <div class="note-folder-header">
                     <svg class="note-folder-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
-                    <span class="note-folder-name">${t('back')}</span>
+                    <span class="note-folder-name">返回</span>
                 </div>
             </div>`;
             
@@ -9039,7 +8119,7 @@ Note format requirements:
                 if (lectureData?.status === 'generating') {
                     html += `<div class="generating-indicator">
                         <div class="generating-spinner"></div>
-                        <span>${t('planningChapters')}</span>
+                        <span>正在规划讲义章节...</span>
                     </div>`;
                 } else {
                     html += '<div class="empty-state"><p>暂无讲义</p><p style="font-size:12px;color:var(--text-muted);margin-top:8px;">在书架长按书籍可生成AI讲义</p></div>';
@@ -9260,7 +8340,7 @@ Note format requirements:
             return appData.settings.aiAvatar || '';
         }
         function getAIPersona() {
-            return (document.getElementById('aiPersonaText')?.value) || appData.settings.aiPersona || t('aiPersonaDefault');
+            return (document.getElementById('aiPersonaText')?.value) || appData.settings.aiPersona || '你是一个温柔且有耐心的助手，善于鼓励用户完成任务。';
         }
         
         // ==================== API Modal (照抄index.html) ====================
@@ -9298,7 +8378,7 @@ Note format requirements:
             saveData();
             backupApiSettingsToIDB();
             hideModal('apiModal');
-            showToast(t('settingsSaved'));
+            showToast('设置已保存');
         }
 
         // API设置备份到IndexedDB，防止iOS清理localStorage后丢失
@@ -9357,7 +8437,7 @@ Note format requirements:
             const key = keyEl.value;
             
             if (!key) {
-                showToast(t('enterApiKey'));
+                showToast('请先输入API密钥');
                 return;
             }
             
@@ -9399,7 +8479,7 @@ Note format requirements:
                 }
 
                 if (!models || models.length === 0) {
-                    showToast(t('noModelsFound'));
+                    showToast('未找到可用模型');
                     return;
                 }
                 
@@ -9412,7 +8492,7 @@ Note format requirements:
                 
             } catch (error) {
                 console.error('拉取模型失败:', error);
-                showToast(t('fetchModelsFail') + error.message);
+                showToast('拉取模型失败: ' + error.message);
             }
         }
         
@@ -9529,7 +8609,7 @@ Note format requirements:
                 appData.settings.bgImage = ev.target.result;
                 saveData();
                 hideModal('bgModal');
-                showToast(t('bgImageSet'));
+                showToast('背景图已设置');
             };
             reader.readAsDataURL(file);
         }
@@ -9542,7 +8622,7 @@ Note format requirements:
             appData.settings.bgImage = '';
             saveData();
             hideModal('bgModal');
-            showToast(t('bgImageCleared'));
+            showToast('背景图已清除');
         }
 
         function updateBgOpacity(val) {
@@ -9569,17 +8649,17 @@ Note format requirements:
             if (appData.settings.notify && 'Notification' in window) {
                 Notification.requestPermission().then(perm => {
                     if (perm === 'granted') {
-                        showToast(t('notifyOn'));
+                        showToast('通知已开启');
                         new Notification('数学阅读', { body: '通知已成功开启！' });
                     } else {
-                        showToast(t('notifyDenied'));
+                        showToast('通知权限被拒绝');
                         appData.settings.notify = false;
                         toggle.classList.remove('on');
                         saveData();
                     }
                 });
             } else if (!appData.settings.notify) {
-                showToast(t('notifyOff'));
+                showToast('通知已关闭');
             }
         }
 
@@ -9595,11 +8675,11 @@ Note format requirements:
 
         async function syncToSupabase() {
             if (!appData.settings.supabaseUrl || !appData.settings.supabaseKey) {
-                showToast(t('configSupabaseFirst'));
+                showToast('请先配置 Supabase');
                 return;
             }
 
-            showToast(t('syncing'));
+            showToast('同步中...');
             try {
                 const url = appData.settings.supabaseUrl + '/rest/v1/math_reader';
                 // Upsert with id='main'
@@ -9620,19 +8700,19 @@ Note format requirements:
                     body: JSON.stringify(payload)
                 });
 
-                showToast(t('syncSuccess'));
+                showToast('同步成功');
             } catch(err) {
-                showToast(t('syncFail') + err.message);
+                showToast('同步失败: ' + err.message);
             }
         }
 
         async function syncFromSupabase() {
             if (!appData.settings.supabaseUrl || !appData.settings.supabaseKey) {
-                showToast(t('configSupabaseFirst'));
+                showToast('请先配置 Supabase');
                 return;
             }
 
-            showToast(t('restoring'));
+            showToast('恢复中...');
             try {
                 const url = appData.settings.supabaseUrl + '/rest/v1/math_reader?id=eq.main&select=data';
                 const resp = await fetch(url, { headers: getSupabaseHeaders() });
@@ -9645,12 +8725,12 @@ Note format requirements:
                     // Merge books/papers metadata (keep local file data)
                     saveData();
                     renderLibrary();
-                    showToast(t('restoreSuccess'));
+                    showToast('恢复成功');
                 } else {
-                    showToast(t('noCloudData'));
+                    showToast('云端无数据');
                 }
             } catch(err) {
-                showToast(t('restoreFail') + err.message);
+                showToast('恢复失败: ' + err.message);
             }
         }
 
@@ -9883,7 +8963,6 @@ Note format requirements:
             // API 相关设置仅保存本地，不上传
             const settingsToSync = stripApiSettingsFrom(appData.settings);
             delete settingsToSync.r2Config;
-                delete settingsToSync.lang;
             const metadata = {
                 books: appData.books.map(b => cleanDocForSync(b)),
                 papers: appData.papers.map(p => cleanDocForSync(p)),
@@ -10007,13 +9086,13 @@ Note format requirements:
                 
                 // 显示具体的同步通知
                 if (action === 'lecture_upload') {
-                    showToast(t('lectureSynced'));
-                    sendNotification(t('lectureSyncNotif'), t('lectureSyncNotifDesc'));
+                    showToast('讲义已同步到云端');
+                    sendNotification('讲义云同步完成', '讲义内容已安全同步到云端');
                 } else if (action === 'abstract_upload') {
-                    showToast(t('abstractSynced'));
-                    sendNotification(t('abstractSyncNotif'), t('abstractSyncNotifDesc'));
+                    showToast('摘要已同步到云端');
+                    sendNotification('摘要云同步完成', '论文摘要已安全同步到云端');
                 } else {
-                    showToast(t('autoSynced'));
+                    showToast('已自动同步到云端');
                 }
             } catch (err) {
                 console.error('文件变更同步失败:', err);
@@ -10464,20 +9543,19 @@ Note format requirements:
         async function syncToR2() {
             const config = appData.settings.r2Config;
             if (!config || !config.accessKeyId) {
-                showToast(t('configR2First'));
+                showToast('请先配置 R2');
                 showModal('r2ConfigModal');
                 loadR2Config();
                 return;
             }
             
-            showToast(t('syncing'));
+            showToast('同步中...');
             
             try {
                 // 1. 上传元数据 (不包含PDF数据，但保留annotations)
                 // API 相关设置仅保存本地，不上传
                 const settingsToSync = stripApiSettingsFrom(appData.settings);
                 delete settingsToSync.r2Config;
-                delete settingsToSync.lang;
                 const metadata = {
                     books: appData.books.map(b => cleanDocForSync(b)),
                     papers: appData.papers.map(p => cleanDocForSync(p)),
@@ -10553,10 +9631,10 @@ Note format requirements:
                     }
                 }
                 
-                showToast(t('syncUploadComplete') + uploadedFiles + t('files') + ', ' + uploadedLectures + t('lecturesCount') + ', ' + uploadedAbstracts + t('abstractsCount'));
+                showToast(`同步完成! 上传了 ${uploadedFiles} 个文件, ${uploadedLectures} 篇讲义, ${uploadedAbstracts} 篇摘要`);
             } catch (err) {
                 console.error('Sync to R2 failed:', err);
-                showToast(t('syncFail') + err.message);
+                showToast('同步失败: ' + err.message);
             }
         }
 
@@ -10799,7 +9877,7 @@ Note format requirements:
                 );
                 appData.lectureDrafts = metadata.lectureDrafts || appData.lectureDrafts || {};
                 // API 设置仅保留本地值，不被云端覆盖
-                appData.settings = { ...metadata.settings, ...localApiSettings, r2Config: localR2Config, lang: appData.settings.lang };
+                appData.settings = { ...metadata.settings, ...localApiSettings, r2Config: localR2Config };
                 saveData();
                 refreshAllUIFromAppData();
                 if (config.lastSyncTime || metadata.syncedAt) {
@@ -10878,10 +9956,10 @@ Note format requirements:
 
                 if (pulledLectures > 0 || pulledAbstracts > 0 || pulledMaterials > 0) {
                     const parts = [];
-                    if (pulledLectures > 0) parts.push(pulledLectures + t('lecturesCount'));
-                    if (pulledAbstracts > 0) parts.push(pulledAbstracts + t('abstractsCount'));
-                    if (pulledMaterials > 0) parts.push(pulledMaterials + t('materialsCount'));
-                    showToast(t('restoredFromCloud') + parts.join(', '));
+                    if (pulledLectures > 0) parts.push(pulledLectures + ' 篇讲义');
+                    if (pulledAbstracts > 0) parts.push(pulledAbstracts + ' 篇摘要');
+                    if (pulledMaterials > 0) parts.push(pulledMaterials + ' 个课堂素材');
+                    showToast('已从云端恢复 ' + parts.join('、'));
                     renderNotesPage();
                     renderClassroomPage();
                 }
@@ -10901,23 +9979,23 @@ Note format requirements:
         async function syncFromR2() {
             const config = appData.settings.r2Config;
             if (!config || !config.accessKeyId) {
-                showToast(t('configR2First'));
+                showToast('请先配置 R2');
                 showModal('r2ConfigModal');
                 loadR2Config();
                 return;
             }
             
-            if (!confirm(t('confirmRestoreFromCloud'))) {
+            if (!confirm('从云端恢复将覆盖本地数据，确定继续？')) {
                 return;
             }
             
-            showToast(t('restoring'));
+            showToast('恢复中...');
             
             try {
                 // 1. 下载元数据
                 const metadataStr = await r2GetObject('metadata.json');
                 if (!metadataStr) {
-                    showToast(t('noCloudData'));
+                    showToast('云端无数据');
                     return;
                 }
                 
@@ -10947,7 +10025,7 @@ Note format requirements:
                 appData.lectures = metadata.lectures || {};
                 appData.drafts = metadata.drafts || {};
                 appData.classroom = metadata.classroom || { courses: [], seminars: [] };
-                appData.settings = { ...metadata.settings, ...localApiSettings, r2Config: localR2Config, lang: appData.settings.lang };
+                appData.settings = { ...metadata.settings, ...localApiSettings, r2Config: localR2Config };
                 
                 saveData();
                 
@@ -11036,10 +10114,10 @@ Note format requirements:
                 // immediately reflect the restored data without needing a refresh.
                 try { applySettings(); } catch (e) { console.warn('applySettings failed', e); }
                 try { initR2AutoSync(); } catch (e) { console.warn('initR2AutoSync failed', e); }
-                showToast(t('downloadComplete') + downloadedFiles + t('files') + ', ' + downloadedLectures + t('lecturesCount') + ', ' + downloadedAbstracts + t('abstractsCount'));
+                showToast(`恢复完成! 下载了 ${downloadedFiles} 个文件, ${downloadedLectures} 篇讲义, ${downloadedAbstracts} 篇摘要`);
             } catch (err) {
                 console.error('Sync from R2 failed:', err);
-                showToast(t('restoreFail') + err.message);
+                showToast('恢复失败: ' + err.message);
             }
         }
 
@@ -11061,17 +10139,17 @@ Note format requirements:
             a.download = 'math-reader-export-' + new Date().toISOString().slice(0,10) + '.json';
             a.click();
             URL.revokeObjectURL(url);
-            showToast(t('exportSuccess'));
+            showToast('导出成功');
         }
 
         function clearAllData() {
-            if (confirm(t('confirmClearAll'))) {
+            if (confirm('确定清除所有数据？此操作不可恢复。')) {
                 localStorage.removeItem('mathReader');
                 appData = { books: [], papers: [], notes: {}, archived: [], settings: appData.settings };
                 saveData();
                 renderLibrary();
                 renderNotesPage();
-                showToast(t('dataCleared'));
+                showToast('数据已清除');
             }
         }
 
@@ -11236,7 +10314,7 @@ Note format requirements:
         function setupReaderChatLongPress(element, msgIndex) {
             element.addEventListener('touchstart', () => {
                 readerChatLongPressTimer = setTimeout(() => {
-                    if (confirm(t('confirmDeleteMessage'))) {
+                    if (confirm('删除这条消息?')) {
                         deleteReaderChatMessage(msgIndex);
                     }
                 }, 600);
@@ -11245,7 +10323,7 @@ Note format requirements:
             element.addEventListener('touchmove', () => clearTimeout(readerChatLongPressTimer));
             element.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
-                if (confirm(t('confirmDeleteMessage'))) {
+                if (confirm('删除这条消息?')) {
                     deleteReaderChatMessage(msgIndex);
                 }
             });
@@ -11260,7 +10338,7 @@ Note format requirements:
         }
 
         async function openReaderChat() {
-            if (!currentDoc) { showToast(t('openDocFirst')); return; }
+            if (!currentDoc) { showToast('请先打开文档'); return; }
 
             document.getElementById('readerChatTitle').textContent = 'AI - ' + currentDoc.title;
 
@@ -11271,8 +10349,7 @@ Note format requirements:
                 const notes = getDocAnnotations(currentDoc.id, currentPage, 'note');
                 const notesSummary = notes.map(n => n.text).filter(Boolean).join('; ');
 
-                const notesInfo = notesSummary ? t('readerChatNotesPrefix') + notesSummary + '. ' : '';
-                const greeting = t('readerChatGreeting').replace('$title', currentDoc.title).replace('$current', currentPage).replace('$total', totalPages).replace('$notes', notesInfo);
+                const greeting = `你好! 我是你的 AI 阅读助手。当前文档: ${currentDoc.title}，第 ${currentPage}/${totalPages} 页。${notesSummary ? '你在这里记了一些笔记: ' + notesSummary + '。' : ''}有什么我可以帮你的?`;
                 history = [{ role: 'assistant', content: greeting }];
                 if (screenshot) {
                     history[0].screenshot = screenshot;
@@ -11313,15 +10390,14 @@ Note format requirements:
             // Build system prompt with context
             const notes = getDocAnnotations(currentDoc.id, currentPage, 'note');
             const notesSummary = notes.map(n => n.text).filter(Boolean).join('; ');
-            let systemPrompt = t('readerAIPrompt');
-            if (notesSummary) {
-                systemPrompt += '\n' + t('readerAINoteLabel') + notesSummary;
-            }
-            systemPrompt += '\n' + t('readerAISuffix');
+            const systemPrompt = `你是一个数学阅读AI助手。
+当前文档: ${currentDoc.title} (${currentDoc.type.toUpperCase()})
+当前页码: ${currentPage}/${totalPages}
+阅读进度: ${currentDoc.progress}%
+该页笔记: ${notesSummary || '无'}
+附件是当前页的PDF，请根据附件内容和用户问题给出帮助。简洁、准确、数学专业。`;
 
-            // Only send last 10 messages to avoid token overflow
-            const recentHistory = history.slice(-10);
-            const apiMessages = recentHistory.map(h => ({ role: h.role, content: h.content }));
+            const apiMessages = history.map(h => ({ role: h.role, content: h.content }));
 
             // Show typing indicator
             const container = document.getElementById('readerChatContainer');
@@ -11352,7 +10428,14 @@ Note format requirements:
                     renderReaderChatHistory();
                 } else {
                     document.getElementById('readerChatLoading')?.remove();
-                    const fallback = t('readerFallbackConfigAPI');
+                    const replies = [
+                        '这个问题很好。建议你先回顾这一页的定义和关键定理。',
+                        '可以试试从具体例子出发理解这个概念。',
+                        '建议对照笔记中的推导过程再看一遍。',
+                        '这个证明可以分步理解，你想从哪个环节开始?',
+                        '请先在设置中配置 API 以获得更好的回答。'
+                    ];
+                    const fallback = replies[Math.floor(Math.random() * replies.length)];
                     history.push({ role: 'assistant', content: fallback });
                     saveReaderChatHistory(currentDoc.id, history);
                     renderReaderChatHistory();
@@ -11360,7 +10443,7 @@ Note format requirements:
             } catch (e) {
                 console.error('Reader chat error:', e);
                 document.getElementById('readerChatLoading')?.remove();
-                history.push({ role: 'assistant', content: t('aiRequestFail') + (e.message || '') });
+                history.push({ role: 'assistant', content: '请求失败: ' + (e.message || '未知错误') });
                 saveReaderChatHistory(currentDoc.id, history);
                 renderReaderChatHistory();
             }
@@ -11395,7 +10478,7 @@ Note format requirements:
                     console.error('主API调用失败:', e);
                     // 如果有备用API，尝试备用
                     if (backupConfig.url && backupConfig.key) {
-                        showToast(t('primaryAPIFailed'));
+                        showToast('主API失败，尝试备用API...');
                         try {
                             const result = await doAIRequest(backupConfig, systemPrompt, messages, options);
                             return result;
@@ -11728,7 +10811,7 @@ Note format requirements:
             if (!currentDoc) return;
             const history = loadReaderChatHistory(currentDoc.id);
             if (!history || history.length === 0) {
-                showToast(t('noChatHistory'));
+                showToast('暂无聊天记录');
                 return;
             }
 
@@ -11757,7 +10840,7 @@ Note format requirements:
         // ==================== AI Modal ====================
         function showAIModal() {
             const userName = getUserName();
-            document.getElementById('aiGreeting').textContent = 'Hi, ' + userName + '! ' + t('aiGreeting');
+            document.getElementById('aiGreeting').textContent = 'Hi, ' + userName + '! 你需要我做什么?';
             showModal('aiModal');
         }
 
@@ -11768,9 +10851,9 @@ Note format requirements:
             aiCurrentAction = action;
 
             if (action === 'lecture' || action === 'outline') {
-                showAISelectList(t('selectBook'), appData.books);
+                showAISelectList('选择书籍', appData.books);
             } else if (action === 'abstract') {
-                showAISelectList(t('selectPaper'), appData.papers);
+                showAISelectList('选择论文', appData.papers);
             } else if (action === 'chat') {
                 showAIChatModal();
             }
@@ -11782,14 +10865,14 @@ Note format requirements:
             const list = document.getElementById('taskSelectList');
 
             if (items.length === 0) {
-                list.innerHTML = `<div class="task-select-empty">${aiCurrentAction === 'lecture' ? t('emptyBooksImport') : t('emptyPapersImport')}</div>`;
+                list.innerHTML = `<div class="task-select-empty">${aiCurrentAction === 'lecture' ? '暂无书籍，请先导入' : '暂无论文，请先导入'}</div>`;
             } else {
                 list.innerHTML = items.map(item => `
                     <div class="task-select-item" onclick="aiSelectItem('${item.id}')">
                         <div class="task-select-name">${escapeHtml(item.title)}</div>
                         <div class="task-select-meta">
                             <span>${item.type.toUpperCase()}</span>
-                            <span>${t('progressLabel')} ${item.progress}%</span>
+                            <span>进度 ${item.progress}%</span>
                         </div>
                     </div>
                 `).join('');
@@ -11877,32 +10960,48 @@ Note format requirements:
             const book = appData.books.find(b => b.id === bookId);
             if (!book) return;
             if (book.type !== 'pdf') {
-                showToast(t('onlyPdfOutline'));
+                showToast('当前仅支持 PDF 书籍生成大纲');
                 return;
             }
 
-            showToast(t('readingBook'));
+            showToast('正在读取书籍...');
             let bytes;
             try {
                 bytes = await loadBookPdfBytes(book);
             } catch (e) {
-                showToast(t('readFail') + e.message);
+                showToast('读取失败: ' + e.message);
                 return;
             }
 
             const existingOutline = await extractBuiltinOutline(bytes);
 
-            showToast(t('aiGeneratingOutline'));
+            showToast('AI 正在生成大纲...');
 
-            const systemPrompt = t('outlineSystemPrompt');
+            const systemPrompt = `你是一个专业的数学教育专家。下面附件是一本完整的书（PDF）。
+请你通读附件，为这本书生成一份结构化大纲（每节大约 1 小时学习量），并给出每一节对应的 PDF 页码范围。
 
-            const userText = `${t('outlineUserPrefix')}${book.title}
-${book.author ? t('outlineUserAuthor') + book.author : ''}
-${book.subject ? t('outlineUserSubject') + book.subject : ''}
-${t('outlineUserPages')}${book.totalPages || t('outlineUserUnknown')}
+【页码准确性要求——极其重要】
+- startPage 和 endPage 必须是 PDF 文件内的实际页码（从 1 开始计数），对照附件 PDF 真实页面。
+- 禁止按固定间隔机械填写（例如 1、3、5、7、9 或 1、10、20、30 这种等差分布是明显错误，严禁出现）。页码必须来自附件实际内容的章节边界判断。
+- 相邻节允许在同一页重叠 1 页：如果某页上半部分是上一节的结尾、下半部分是下一节的开头，则上一节 endPage 和下一节 startPage 可以是同一个页码。除此之外页码应连续，不得跳过或大段重复。
+- 覆盖全书，最后一节的 endPage 必须接近书籍总页数，不得只分到前面几页就停止。
 
-${existingOutline ? t('outlineUserHasBookmarks') + existingOutline : t('outlineUserNoBookmarks')}
-${t('outlineUserSuffix')}`;
+严格以 JSON 返回，不要有任何额外说明：
+{
+  "chapters": [
+    {"title": "第1节: 标题", "topics": ["主题1", "主题2"], "startPage": 1, "endPage": 20},
+    ...
+  ]
+}`;
+
+            const userText = `书名：${book.title}
+${book.author ? '作者：' + book.author : ''}
+${book.subject ? '学科：' + book.subject : ''}
+书籍总页数：${book.totalPages || '未知'}
+
+${existingOutline ? 'PDF 已有书签（供参考，页码以附件实际内容为准）：\n' + existingOutline : 'PDF 无内置书签。'}
+
+请基于附件 PDF 实际内容生成大纲 JSON。`;
 
             try {
                 const result = await callAI(systemPrompt, [{ role: 'user', content: userText }], {
@@ -11917,13 +11016,13 @@ ${t('outlineUserSuffix')}`;
                         const parsed = JSON.parse(m[0]);
                         chapters = parsed.chapters || [];
                     } catch (e) {
-                        showToast(t('outlineParseFail'));
+                        showToast('AI 返回格式解析失败');
                         console.error('Outline JSON 解析失败:', e, result);
                         return;
                     }
                 }
                 if (chapters.length === 0) {
-                    showToast(t('outlineEmpty'));
+                    showToast('AI 未返回有效大纲');
                     return;
                 }
 
@@ -11931,7 +11030,7 @@ ${t('outlineUserSuffix')}`;
                 book.aiOutline = {
                     generatedAt: new Date().toISOString(),
                     chapters: chapters.map((ch, idx) => ({
-                        title: ch.title || (t('sectionDefault').replace('$n', idx + 1)),
+                        title: ch.title || ('第' + (idx + 1) + '节'),
                         topics: ch.topics || [],
                         startPage: ch.startPage || 1,
                         endPage: ch.endPage || (book.totalPages || 1)
@@ -11948,10 +11047,10 @@ ${t('outlineUserSuffix')}`;
                 book.outlineUpdatedAt = Date.now();
                 saveData();
                 debouncedChatSync();
-                showToast(t('outlineGenerated') + chapters.length + t('sections'));
+                showToast(`大纲已生成（${chapters.length} 节）`);
             } catch (e) {
                 console.error('生成大纲失败:', e);
-                showToast(t('genFail') + e.message);
+                showToast('生成失败: ' + e.message);
             }
         }
 
@@ -11982,7 +11081,7 @@ ${t('outlineUserSuffix')}`;
             }
 
             if (!sourceChapters) {
-                showToast(t('noOutlineFirst'));
+                showToast('请先点击"生成大纲"');
                 return;
             }
 
@@ -12015,7 +11114,7 @@ ${t('outlineUserSuffix')}`;
             lectureData.status = 'ready';
             saveData();
             debouncedChatSync();
-            showToast(t('outlineLoaded') + lectureData.chapters.length + t('outlineChapters'));
+            showToast(`已加载 ${lectureData.chapters.length} 节大纲`);
             renderNotesPage();
 
             // 优先生成第一节，其余章节在用户点击时按需生成
@@ -12042,13 +11141,47 @@ ${t('outlineUserSuffix')}`;
             }
 
             try {
-                const systemPrompt = t('lectureSystemPrompt');
+                const systemPrompt = `你是一个专业的数学讲师。附件是这一节对应的 PDF 页，请基于附件实际内容，为数学基础一般（仅学过基础数学分析和线性代数）的学生准备讲义。讲义应当与附件 PDF 内容一致，不要凭空发挥。
 
-                const userMessage = `${t('lectureUserBook')}${book.title}
-${t('lectureUserChapter')}${chapter.title}
-${t('lectureUserPages')}${chapter.startPage}${t('lectureUserPagesTo')}${chapter.endPage}${t('lectureUserPagesSuffix')}
-${t('lectureUserTopics')}${(chapter.topics || []).join('、')}
-${t('lectureUserSuffix')}`;
+请严格按以下三个部分组织，每节按 1 小时学习效率把握总量：
+
+## 一、预习
+
+前置概念讲解。假设读者只有基础数学分析和线性代数水平，所有涉及的非初等概念（如线性泛函、流形、测度、分布等）都需要：
+1. 给出严格的数学定义
+2. 简明解释其数学含义
+3. 给出具体例子
+4. 介绍所有需要的数学记号
+
+## 二、大纲
+
+本节主要内容：
+1. 核心定理的完整陈述
+2. 重要引理
+3. 完整的证明过程（不省略任何关键步骤）
+4. 定理之间的逻辑关系
+
+## 三、习题
+
+5道涉及核心概念的习题，难度递进：
+- 第1-2题：基础概念理解
+- 第3-4题：定理应用
+- 第5题：综合应用或证明
+
+在文末给出所有习题的详细解答。
+
+要求：
+- 使用严谨的数学语言，不要口语化表达
+- 不要使用"大家好"、"我们将"、"让我们"等口语
+- 直接陈述数学内容
+- 使用LaTeX格式：行内公式用 $...$ ，独立公式用 $$...$$`;
+
+                const userMessage = `书籍：${book.title}
+章节：${chapter.title}
+对应页码：第 ${chapter.startPage} - ${chapter.endPage} 页
+涉及主题：${(chapter.topics || []).join('、')}
+
+请根据附件 PDF 内容生成这一节完整讲义。`;
 
                 // 切出这一节的子 PDF 作为附件
                 let pdfAttachment = null;
@@ -12065,7 +11198,7 @@ ${t('lectureUserSuffix')}`;
                     pdfAttachment
                 });
 
-                const contentText = result || t('contentGenFail');
+                const contentText = result || '内容生成失败';
                 chapter.status = 'ready';
                 chapter.generatedAt = new Date().toISOString();
                 // 内容存入 IndexedDB，不放 localStorage
@@ -12073,11 +11206,11 @@ ${t('lectureUserSuffix')}`;
                 // 同时在内存中缓存，供当前会话直接使用
                 chapter._contentCache = contentText;
                 saveData();
-                showToast(t('lectureGenerated'));
+                showToast('讲义已生成，正在同步到云端...');
                 debouncedChatSync();
                 // 讲义内容也单独同步到云端
                 triggerSyncOnFileChange(lecContentKey(bookId, chapter.id), 'lecture_upload');
-                sendNotification(t('lectureNotifTitle'), chapter.title);
+                sendNotification('讲义生成完成', chapter.title + ' 的讲义已生成');
 
                 // 如果正在查看这个讲义，刷新显示
                 if (currentLecture && currentLecture.bookId === bookId && currentLecture.chapterIndex === chapterIndex) {
@@ -12090,7 +11223,7 @@ ${t('lectureUserSuffix')}`;
                 console.error('生成章节内容失败:', err);
                 chapter.status = 'error';
                 saveData();
-                showToast(t('genFail') + err.message);
+                showToast('生成失败: ' + err.message);
                 // 刷新讲义界面，让用户看到错误状态而非一直转圈
                 if (currentLecture && currentLecture.bookId === bookId && currentLecture.chapterIndex === chapterIndex) {
                     displayLectureContent();
@@ -12165,7 +11298,7 @@ ${t('lectureUserSuffix')}`;
                 container.innerHTML = `
                     <div class="generating-indicator">
                         <div class="generating-spinner"></div>
-                        <span>${t('generatingLectureContent')}</span>
+                        <span>正在生成讲义内容...</span>
                     </div>
                     <p style="color:var(--text-muted);text-align:center;">首次生成可能需要1-2分钟</p>`;
                 return;
@@ -12446,7 +11579,7 @@ ${t('lectureUserSuffix')}`;
             // Handle paper abstracts
             if (currentLecture.isPaperAbstract) return;
             const chapter = appData.lectures[currentLecture.bookId].chapters[currentLecture.chapterIndex];
-            if (confirm(t('confirmRegenerateLecture'))) {
+            if (confirm('确定要重新生成「' + chapter.title + '」的讲义吗？当前内容将被覆盖。')) {
                 // 删除 IndexedDB 中的旧内容
                 await deleteLectureContent(currentLecture.bookId, chapter.id);
                 delete chapter._contentCache;
@@ -12706,7 +11839,7 @@ ${t('lectureUserSuffix')}`;
             if (!canvas || !lecturePenCtx) return;
             lecturePenCtx.clearRect(0, 0, canvas.width, canvas.height);
             saveLectureDrawing();
-            showToast(t('drawingCleared'));
+            showToast('已清除绘制');
         }
 
         function getLectureDrawingKey() {
@@ -13185,7 +12318,7 @@ ${t('lectureUserSuffix')}`;
 
         function clearLectureDraftCanvas() {
             if (!lectureDraftCanvas || !lectureDraftCtx) return;
-            if (!confirm(t('confirmClearCanvas'))) return;
+            if (!confirm('确定清空画布？')) return;
             lectureDraftCtx.clearRect(0, 0, lectureDraftCanvas.width, lectureDraftCanvas.height);
             saveLectureDraftCanvasState();
             debouncedSaveLectureDraft();
@@ -13384,23 +12517,31 @@ ${t('lectureUserSuffix')}`;
             const userDesc = (document.getElementById('lectureAskInput').value || '').trim();
             hideLectureSelectionMenu();
 
-            showToast(t('askingAI'));
+            showToast('正在询问AI...');
 
             let prompt;
             if (userDesc) {
-                prompt = t('selectionWithDesc').replace('$text', savedText).replace('$desc', userDesc);
+                prompt = `以下是选中的数学内容：
+
+"${savedText}"
+
+用户的问题/补充说明：${userDesc}
+
+请针对用户的问题简洁回答，不要重复问题。`;
             } else {
-                prompt = t('selectionNoDesc').replace('$text', savedText);
+                prompt = `请简洁解释以下数学内容，直接给出解释，不要重复问题：
+
+"${savedText}"`;
             }
 
             try {
-                const aiResponse = await callAI(t('selectionAIPrompt'), [{ role: 'user', content: prompt }]) || t('aiNoAnswer');
+                const aiResponse = await callAI('你是数学助手，简洁解释数学内容。', [{ role: 'user', content: prompt }]) || '无法获取回答';
 
                 insertLectureNote(aiResponse, savedRange);
-                showToast(t('noteAdded'));
+                showToast('已添加笔记');
             } catch (err) {
                 console.error(err);
-                showToast(t('aiRequestFail') + err.message);
+                showToast('AI请求失败: ' + err.message);
             }
         }
 
@@ -13475,7 +12616,7 @@ ${t('lectureUserSuffix')}`;
                 if (pdfDoc && page <= totalPages) {
                     currentPage = page;
                     scrollToPage(page);
-                    showToast(t('jumpedToPage') + page + t('page'));
+                    showToast('已跳转到第 ' + page + ' 页');
                 }
             }, 500);
         }
@@ -13549,33 +12690,40 @@ ${t('lectureUserSuffix')}`;
             const paper = appData.papers.find(p => p.id === paperId);
             if (!paper) return;
 
-            showToast(t('generatingAbstract'));
+            showToast('正在生成摘要...');
 
             try {
-                const systemPrompt = t('abstractSystemPrompt');
+                const systemPrompt = `你是一个学术论文分析专家。请根据提供的论文信息，生成一份结构化的摘要，包括：
+1. 研究背景和目的
+2. 研究方法
+3. 主要发现和结论
+4. 研究意义和贡献
 
-                const userMessage = `${t('abstractUserPrefix')}${paper.title}
-${paper.authors ? t('abstractUserAuthor') + paper.authors : ''}
-${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
+请使用学术性的语言，简洁清晰。`;
+
+                const userMessage = `请为以下论文生成摘要：
+标题：${paper.title}
+${paper.authors ? '作者：' + paper.authors : ''}
+${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
 
                 const result = await callAI(systemPrompt, [{ role: 'user', content: userMessage }], { maxTokens: 8192 });
                 
-                const abstractText = result || t('abstractGenFail');
+                const abstractText = result || '摘要生成失败';
                 // 摘要内容存入 IndexedDB，不放 localStorage
                 await saveAbstractContent(paperId, abstractText);
                 paper._abstractCache = abstractText;
                 paper.hasAiAbstract = true;
                 delete paper.aiAbstract; // 确保旧字段不残留
                 saveData();
-                showToast(t('abstractGenerated'));
+                showToast('摘要已生成，正在同步到云端...');
                 debouncedChatSync();
                 // 摘要内容也单独同步到云端
                 triggerSyncOnFileChange(abstractKey(paperId), 'abstract_upload');
                 renderNotesPage();
-                sendNotification(t('abstractNotifTitle'), paper.title);
+                sendNotification('摘要生成完成', paper.title + ' 的摘要已添加');
             } catch (err) {
                 console.error('生成摘要失败:', err);
-                showToast(t('genFail') + err.message);
+                showToast('生成失败: ' + err.message);
             }
         }
 
@@ -13583,7 +12731,7 @@ ${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
         function showAIChatModal() {
             const container = document.getElementById('chatContainer');
             container.innerHTML = '';
-            addChatMessage(container, false, t('chatGreeting'));
+            addChatMessage(container, false, '你好! 有什么我可以帮你的吗? 可以问我关于数学学习的任何问题。');
             showModal('aiChatModal');
             setTimeout(() => document.getElementById('chatInput').focus(), 300);
         }
@@ -13654,7 +12802,9 @@ ${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
             try {
                 // AI 人设仅在此"不知道，给我建议"聊天中注入
                 const persona = getAIPersona();
-                const basePrompt = t('chatSystemPrompt');
+                const basePrompt = `你是一个友好、专业的数学学习助手。你的任务是帮助用户理解数学概念、解决数学问题、提供学习建议。
+请用清晰易懂的语言回答，必要时使用LaTeX格式的数学公式（用$...$包裹行内公式）。
+保持回答简洁但完整，如果问题复杂，可以分步骤解释。`;
                 const systemPrompt = persona ? (persona + '\n\n' + basePrompt) : basePrompt;
 
                 // 获取之前的聊天记录作为上下文
@@ -13673,10 +12823,10 @@ ${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
                 const result = await callAI(systemPrompt, recentMessages, { maxTokens: 8192 });
                 
                 removeTypingIndicator();
-                addChatMessage(container, false, result || t('aiNoAnswer'));
+                addChatMessage(container, false, result || '抱歉，我暂时无法回答这个问题。');
             } catch (err) {
                 removeTypingIndicator();
-                addChatMessage(container, false, t('aiCallFail') + err.message);
+                addChatMessage(container, false, '调用失败: ' + err.message);
             }
         }
 
@@ -13973,7 +13123,7 @@ ${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
                     if (dist >= PTR_THRESHOLD) {
                         textEl.textContent = '松开刷新';
                     } else {
-                        textEl.textContent = t('pullToRefresh');
+                        textEl.textContent = '下拉刷新';
                     }
                 }, { passive: true });
 
@@ -14007,18 +13157,18 @@ ${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
                 setupPullToRefresh(page1, ptr1, function() { return true; }, async function() {
                     const config = appData.settings && appData.settings.r2Config;
                     if (!config || !config.accessKeyId) {
-                        showToast(t('r2NotConfigured'));
+                        showToast('未配置 R2 云同步');
                         return;
                     }
                     if (r2SyncInProgress) {
-                        showToast(t('syncInProgress'));
+                        showToast('同步进行中，请稍后');
                         return;
                     }
                     try {
                         await performAutoSync();
-                        showToast(t('syncComplete'));
+                        showToast('同步完成');
                     } catch (err) {
-                        showToast(t('syncFail') + err.message);
+                        showToast('同步失败: ' + err.message);
                     }
                 });
             }
@@ -14036,19 +13186,19 @@ ${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
                 }, async function() {
                     const config = appData.settings && appData.settings.r2Config;
                     if (!config || !config.accessKeyId) {
-                        showToast(t('r2NotConfigured'));
+                        showToast('未配置 R2 云同步');
                         return;
                     }
                     if (r2SyncInProgress) {
-                        showToast(t('syncInProgress'));
+                        showToast('同步进行中，请稍后');
                         return;
                     }
                     try {
                         await performAutoSync();
                         renderNotesPage();
-                        showToast(t('syncComplete'));
+                        showToast('同步完成');
                     } catch (err) {
-                        showToast(t('syncFail') + err.message);
+                        showToast('同步失败: ' + err.message);
                     }
                 });
             }
@@ -14072,7 +13222,7 @@ ${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
             const courses = appData.classroom.courses || [];
             document.getElementById('courseCount').textContent = courses.length;
             if (courses.length === 0) {
-                courseList.innerHTML = '<div class="empty-state"><p data-i18n="clickToCreateCourse">点击空白处新建课程</p></div>';
+                courseList.innerHTML = '<div class="empty-state"><p>点击空白处新建课程</p></div>';
             } else {
                 courseList.innerHTML = courses.map(c => {
                     const sessCount = (c.sessions || []).length;
@@ -14092,7 +13242,7 @@ ${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
             const seminars = appData.classroom.seminars || [];
             document.getElementById('seminarCount').textContent = seminars.length;
             if (seminars.length === 0) {
-                seminarList.innerHTML = '<div class="empty-state"><p data-i18n="clickToCreateSeminar">点击空白处新建讲座</p></div>';
+                seminarList.innerHTML = '<div class="empty-state"><p>点击空白处新建讲座</p></div>';
             } else {
                 seminarList.innerHTML = seminars.map(s => {
                     const sessCount = (s.sessions || []).length;
@@ -14110,7 +13260,7 @@ ${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
 
         function onClassroomColumnClick(e, type) {
             if (e.target.closest('.classroom-folder')) return;
-            const name = prompt(type === 'course' ? t('newCourse') : t('newSeminar'));
+            const name = prompt(type === 'course' ? '新建课程名称：' : '新建讲座名称：');
             if (!name || !name.trim()) return;
             if (!appData.classroom) appData.classroom = { courses: [], seminars: [] };
             const list = type === 'course' ? appData.classroom.courses : appData.classroom.seminars;
@@ -14147,21 +13297,21 @@ ${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
             let html = `<div class="classroom-folder" onclick="renderClassroomPage()">
                 <div class="classroom-folder-header">
                     <svg class="note-folder-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
-                    <span class="classroom-folder-name">${t('back')}</span>
+                    <span class="classroom-folder-name">返回</span>
                 </div>
             </div>`;
 
             html += `<div style="display:flex;justify-content:space-between;align-items:center;margin:12px 0 8px;">
                 <span style="font-size:16px;font-weight:600;">${escapeHtml(folder.name)}</span>
                 <div style="display:flex;gap:6px;">
-                    <button onclick="renameClassroomFolder('${type}','${folder.id}')" style="border:none;background:var(--bg-secondary);padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;color:var(--text-secondary);">${t('renameBtn')}</button>
-                    <button onclick="deleteClassroomFolder('${type}','${folder.id}')" style="border:none;background:var(--bg-secondary);padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;color:#ef4444;">${t('deleteBtn')}</button>
+                    <button onclick="renameClassroomFolder('${type}','${folder.id}')" style="border:none;background:var(--bg-secondary);padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;color:var(--text-secondary);">重命名</button>
+                    <button onclick="deleteClassroomFolder('${type}','${folder.id}')" style="border:none;background:var(--bg-secondary);padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;color:#ef4444;">删除</button>
                 </div>
             </div>`;
 
             const sessions = folder.sessions || [];
             if (sessions.length === 0) {
-                html += '<div class="empty-state" onclick="addClassroomSession(\'' + type + '\',\'' + folder.id + '\')"><p>' + t('clickToCreateSession') + '</p></div>';
+                html += '<div class="empty-state" onclick="addClassroomSession(\'' + type + '\',\'' + folder.id + '\')"><p>点击空白处新建子文件夹</p></div>';
             } else {
                 sessions.forEach(sess => {
                     const noteCount = (sess.notes || []).length;
@@ -14169,8 +13319,8 @@ ${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
                     html += `<div class="classroom-session-card" onclick="openClassroomSession('${type}','${folder.id}','${sess.id}')">
                         <div class="classroom-session-title">${escapeHtml(sess.title)}</div>
                         <div class="classroom-session-meta">
-                            <span>${materialCount} ${t('materialsLabel')}</span>
-                            <span>${noteCount} ${t('notesLabel')}</span>
+                            <span>${materialCount} 素材</span>
+                            <span>${noteCount} 笔记</span>
                             <span>${sess.createdAt ? new Date(sess.createdAt).toLocaleDateString() : ''}</span>
                         </div>
                     </div>`;
@@ -14186,7 +13336,7 @@ ${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
         function renameClassroomFolder(type, folderId) {
             const folder = getClassroomFolder(type, folderId);
             if (!folder) return;
-            const newName = prompt(t('renamePlaceholder'), folder.name);
+            const newName = prompt('重命名：', folder.name);
             if (!newName || !newName.trim()) return;
             folder.name = newName.trim();
             saveData();
@@ -14195,7 +13345,7 @@ ${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
         }
 
         function deleteClassroomFolder(type, folderId) {
-            if (!confirm(t('confirmDeleteFolder'))) return;
+            if (!confirm('确定删除此文件夹及所有内容？此操作不可撤销。')) return;
             const list = type === 'course' ? appData.classroom.courses : appData.classroom.seminars;
             const idx = list.findIndex(f => f.id === folderId);
             if (idx >= 0) {
@@ -14214,16 +13364,11 @@ ${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
             const dateStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
             const existingToday = folder.sessions.filter(s => s.title && s.title.startsWith(dateStr));
             const num = existingToday.length + 1;
-            let defaultTitle;
-            if (currentLang === 'zh') {
-                const numMap = ['一','二','三','四','五','六','七','八','九','十'];
-                const numStr = num <= 10 ? numMap[num - 1] : String(num);
-                defaultTitle = dateStr + '-第' + numStr + '讲';
-            } else {
-                defaultTitle = dateStr + '-Lecture ' + num;
-            }
+            const numMap = ['一','二','三','四','五','六','七','八','九','十'];
+            const numStr = num <= 10 ? numMap[num - 1] : String(num);
+            const defaultTitle = dateStr + '-第' + numStr + '讲';
 
-            const title = prompt(t('sessionTitle'), defaultTitle);
+            const title = prompt('子文件夹标题：', defaultTitle);
             if (!title || !title.trim()) return;
 
             const sessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
@@ -14260,16 +13405,16 @@ ${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
                 <div class="classroom-folder" onclick="enterClassroomFolder('${type}','${folder.id}')" style="margin:0;">
                     <div class="classroom-folder-header" style="padding:8px 12px;">
                         <svg class="note-folder-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
-                        <span class="classroom-folder-name" style="font-size:13px;">${t('back')}</span>
+                        <span class="classroom-folder-name" style="font-size:13px;">返回</span>
                     </div>
                 </div>
                 <span style="font-size:16px;font-weight:600;flex:1;margin-left:8px;">${escapeHtml(session.title)}</span>
-                <button onclick="renameClassroomSession('${type}','${folder.id}','${session.id}')" style="border:none;background:var(--bg-secondary);padding:6px 10px;border-radius:8px;font-size:12px;cursor:pointer;color:var(--text-secondary);flex-shrink:0;">${t('renameBtn')}</button>
+                <button onclick="renameClassroomSession('${type}','${folder.id}','${session.id}')" style="border:none;background:var(--bg-secondary);padding:6px 10px;border-radius:8px;font-size:12px;cursor:pointer;color:var(--text-secondary);flex-shrink:0;">重命名</button>
             </div>`;
 
             // AI-generated notes
             if (session.notes.length > 0) {
-                html += `<div style="margin-bottom:12px;font-size:13px;font-weight:600;color:var(--text-secondary);">${t('aiNotes')}</div>`;
+                html += `<div style="margin-bottom:12px;font-size:13px;font-weight:600;color:var(--text-secondary);">AI 笔记</div>`;
                 const sourceIds = new Set((session.sourceFolder || []).map(m => m.id));
                 session.notes.forEach((note, idx) => {
                     const progress = note.maxProgress || note.progress || 0;
@@ -14301,9 +13446,9 @@ ${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
 
             // Source materials
             html += `<div class="classroom-source-section">
-                <div class="classroom-source-title">${t('sourceFolder')} (${session.sourceFolder.length})</div>`;
+                <div class="classroom-source-title">源素材 (${session.sourceFolder.length})</div>`;
             if (session.sourceFolder.length === 0) {
-                html += '<div class="empty-state" style="padding:20px;"><p>' + t('emptyMaterials') + '</p></div>';
+                html += '<div class="empty-state" style="padding:20px;"><p>暂无素材，点击右下角上传</p></div>';
             } else {
                 session.sourceFolder.forEach(mat => {
                     const isImg = mat.type === 'image';
@@ -14329,7 +13474,7 @@ ${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
             if (!folder) return;
             const session = (folder.sessions || []).find(s => s.id === sessionId);
             if (!session) return;
-            const newTitle = prompt(t('renamePlaceholder'), session.title);
+            const newTitle = prompt('重命名：', session.title);
             if (!newTitle || !newTitle.trim()) return;
             session.title = newTitle.trim();
             saveData();
@@ -14381,7 +13526,7 @@ ${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
 
         function deleteClassroomMaterial(type, folderId, sessionId, matId) {
             closeLongPressMenu();
-            if (!confirm(t('confirmDeleteMaterial'))) return;
+            if (!confirm('删除此素材？')) return;
             const folder = getClassroomFolder(type, folderId);
             if (!folder) return;
             const session = (folder.sessions || []).find(s => s.id === sessionId);
@@ -14395,7 +13540,7 @@ ${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
             saveData();
             debouncedChatSync();
             renderClassroomSessionDetail(folder, session, type);
-            showToast(t('materialDeleted'));
+            showToast('素材已删除');
         }
 
         // 笔记长按
@@ -14435,7 +13580,7 @@ ${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
 
         function deleteClassroomNote(type, folderId, sessionId, noteIdx) {
             closeLongPressMenu();
-            if (!confirm(t('confirmDeleteNote'))) return;
+            if (!confirm('删除此笔记？')) return;
             const folder = getClassroomFolder(type, folderId);
             if (!folder) return;
             const session = (folder.sessions || []).find(s => s.id === sessionId);
@@ -14450,7 +13595,7 @@ ${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
             saveData();
             debouncedChatSync();
             renderClassroomSessionDetail(folder, session, type);
-            showToast(t('noteDeleted'));
+            showToast('笔记已删除');
         }
         async function ensureMaterialData(mat) {
             if (mat.data) return mat.data;
@@ -14488,7 +13633,7 @@ ${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
         }
 
         function classroomTakePhoto() {
-            if (!currentClassroomSession) { showToast(t('openSubfolderFirst')); return; }
+            if (!currentClassroomSession) { showToast('请先打开子文件夹'); return; }
             // Clone and replace the input to guarantee iOS Safari re-triggers file picker
             const oldInput = document.getElementById('classroomCameraInput');
             const newInput = oldInput.cloneNode(true);
@@ -14499,7 +13644,7 @@ ${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
         }
 
         function classroomUploadFile() {
-            if (!currentClassroomSession) { showToast(t('openSubfolderFirst')); return; }
+            if (!currentClassroomSession) { showToast('请先打开子文件夹'); return; }
             // Clone and replace the input to guarantee browser re-triggers file picker
             const oldInput = document.getElementById('classroomFileInput');
             const newInput = oldInput.cloneNode(true);
@@ -14530,7 +13675,7 @@ ${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
             if (!session) return;
             if (!session.sourceFolder) session.sourceFolder = [];
 
-            showToast(t('processing'));
+            showToast('处理中...');
 
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
@@ -14592,14 +13737,22 @@ ${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
             await ensureMaterialData(material);
 
             const isSeminar = type === 'seminar';
-            const matTypeLabel = material.type === 'image' ? t('classroomNotePrompt_image') : t('classroomNotePrompt_file');
-            let systemPrompt = t('classroomNoteSystemPrefix') + matTypeLabel + t('classroomNoteSystemSuffix').replace('$ref', material.ref);
+            let systemPrompt = `你是一个专业的学术笔记整理助手。请将上传的${material.type === 'image' ? '照片/截图' : '文件'}内容转换成清晰易读的笔记。
+
+笔记格式要求：
+1. 主标题：笔记内容总览（一句话概括）
+2. 使用多个次级标题组织内容，每个次级标题格式为：## [标题内容] {ref:${material.ref}}
+3. 内容要条理清晰，补充必要的解释
+4. 使用LaTeX格式：行内公式用 $...$ ，独立公式用 $$...$$
+5. 保持学术严谨性`;
 
             if (isSeminar) {
-                systemPrompt += t('classroomNoteSeminarSuffix');
+                systemPrompt += `
+
+注意：这是一个讲座的内容。请额外补充介绍该领域的相关基础知识，帮助读者理解讲座涉及的专业概念和背景。在笔记开头增加一个"背景知识"部分。`;
             }
 
-            const userMsg = t('classroomNoteUserMsg').replace('$folder', folder.name).replace('$session', session.title).replace('$ref', material.ref);
+            const userMsg = `请整理以下内容为笔记。来源：${folder.name} - ${session.title}，引用编号：${material.ref}`;
 
             try {
                 let msgContent = [{ role: 'user', content: userMsg }];
@@ -14639,7 +13792,7 @@ ${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
                     }
                 }
 
-                if (!mainTitle) mainTitle = material.ref + t('noteSuffix');
+                if (!mainTitle) mainTitle = material.ref + ' 笔记';
 
                 if (!session.notes) session.notes = [];
                 session.notes.push({
@@ -14665,7 +13818,7 @@ ${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
 
             } catch (err) {
                 console.error('生成课堂笔记失败:', err);
-                showToast(t('noteGenFail') + err.message);
+                showToast('笔记生成失败: ' + err.message);
             }
         }
 
@@ -14724,7 +13877,7 @@ ${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
         function displayClassroomNoteContent(note) {
             const container = document.getElementById('lectureViewerContent');
             if (!note.content) {
-                container.innerHTML = '<p style="text-align:center;color:var(--text-muted);">' + t('noteContentEmpty') + '</p>';
+                container.innerHTML = '<p style="text-align:center;color:var(--text-muted);">笔记内容为空</p>';
                 return;
             }
 
@@ -14817,7 +13970,7 @@ ${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
             const session = (folder.sessions || []).find(s => s.id === sessionId);
             if (!session) return;
             const mat = (session.sourceFolder || []).find(m => m.ref === ref);
-            if (!mat) { showToast(t('sourceNotFound') + ref); return; }
+            if (!mat) { showToast('未找到源素材: ' + ref); return; }
             viewClassroomSourceItem(type, folderId, sessionId, mat.id);
         }
 
@@ -14847,14 +14000,14 @@ ${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
                 overlay.appendChild(label);
                 document.body.appendChild(overlay);
             } else {
-                showToast(t('fileRef') + mat.ref);
+                showToast('文件引用: ' + mat.ref);
             }
         }
 
         // Regenerate classroom note
         function confirmRegenerateClassroomNote() {
             if (!currentLecture || !currentLecture.isClassroomNote) return;
-            if (!confirm(t('regenerateNote'))) return;
+            if (!confirm('重新生成此笔记？')) return;
             const { classroomType, folderId, sessionId, noteIndex } = currentLecture;
             const folder = getClassroomFolder(classroomType, folderId);
             if (!folder) return;
@@ -14912,7 +14065,7 @@ ${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
             const val = parseInt(document.getElementById('photoRetentionDays').value) || 0;
             appData.settings.photoRetentionDays = Math.max(0, val);
             saveData();
-            showToast(t('saved'));
+            showToast('已保存');
         }
 
         // Override the lecture viewer regen button to handle classroom notes
