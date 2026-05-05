@@ -1966,7 +1966,7 @@
             flex: 1;
             overflow-y: auto;
             overflow-x: hidden;
-            padding: 16px;
+            padding: 8px 0;
             display: flex;
             flex-direction: column;
             gap: 16px;
@@ -1978,9 +1978,10 @@
 
         .chat-message {
             display: flex;
-            gap: 10px;
+            gap: 6px;
             max-width: 85%;
             min-width: 0;
+            padding: 0 4px;
         }
 
         .chat-message.user {
@@ -1994,17 +1995,18 @@
         }
 
         .chat-avatar {
-            width: 36px;
-            height: 36px;
+            width: 24px;
+            height: 24px;
             border-radius: 50%;
             background: var(--bg-tertiary);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 14px;
+            font-size: 11px;
             font-weight: 600;
             flex-shrink: 0;
             overflow: hidden;
+            margin-top: 4px;
         }
 
         .chat-avatar img {
@@ -10327,14 +10329,15 @@
             // Long press on bubble: redo (AI = regenerate, User = edit)
             if (bubble) {
                 let bubbleTimer = null;
+                let bubbleFired = false;
                 bubble.addEventListener('touchstart', (e) => {
+                    bubbleFired = false;
                     bubbleTimer = setTimeout(() => {
                         e.preventDefault();
+                        bubbleFired = true;
                         if (isUser) {
-                            // Edit user message
                             editReaderChatMessage(msgIndex);
                         } else {
-                            // Regenerate AI message
                             regenerateReaderChatMessage(msgIndex);
                         }
                     }, 600);
@@ -10343,6 +10346,7 @@
                 bubble.addEventListener('touchmove', () => clearTimeout(bubbleTimer));
                 bubble.addEventListener('contextmenu', (e) => {
                     e.preventDefault();
+                    if (bubbleFired) return;
                     if (isUser) {
                         editReaderChatMessage(msgIndex);
                     } else {
@@ -10354,9 +10358,12 @@
             // Long press on avatar: delete
             if (avatar) {
                 let avatarTimer = null;
+                let avatarFired = false;
                 avatar.addEventListener('touchstart', (e) => {
+                    avatarFired = false;
                     avatarTimer = setTimeout(() => {
                         e.preventDefault();
+                        avatarFired = true;
                         if (confirm('删除这条消息?')) {
                             deleteReaderChatMessage(msgIndex);
                         }
@@ -10366,6 +10373,7 @@
                 avatar.addEventListener('touchmove', () => clearTimeout(avatarTimer));
                 avatar.addEventListener('contextmenu', (e) => {
                     e.preventDefault();
+                    if (avatarFired) return;
                     if (confirm('删除这条消息?')) {
                         deleteReaderChatMessage(msgIndex);
                     }
@@ -10451,6 +10459,8 @@ stage2:用户针对你的回答提出问题，你针对问题给出回答（禁�
             let history = loadReaderChatHistory(currentDoc.id);
             if (index < 0 || index >= history.length) return;
             if (history[index].role !== 'assistant') return;
+
+            if (!confirm('重新生成此回复?')) return;
 
             // Remove this AI message and all subsequent messages
             history = history.slice(0, index);
