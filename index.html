@@ -4895,13 +4895,13 @@
                 handwritingPrompt: '你是一个手写识别助手。识别图中手写内容，数学公式用LaTeX，只输出结果。',
                 recognizeFail: '识别失败',
                 // System prompts for AI
-                readerAIPrompt: '你是一个数学阅读AI助手。',
-                readerAIDocLabel: '当前文档: ',
-                readerAIPageLabel: '当前页码: ',
-                readerAIProgressLabel: '阅读进度: ',
-                readerAINoteLabel: '该页笔记: ',
+                readerAIPrompt: '你是一个数学助手。附件是用户正在阅读的页面。',
+                readerAINoteLabel: '用户在此页的笔记: ',
                 readerAINone: '无',
-                readerAISuffix: '附上前文和，请根据用户问题和上下文给出帮助。简洁、准确、数学专业。禁用比喻。禁止重复输出上文已经讲解过的内容。',
+                readerAISuffix: '请根据用户问题，附件和上下文给出帮助。简洁、准确、数学专业。禁用比喻和物理解释。常见工作流程:
+                stage1:用户针对附件提出问题，你结合附件解答
+                stage2:用户针对你的回答提出问题，你结合上下文解答（严禁结合附件）
+                stage3:用户再次回到附件中的问题，你结合上下文和附件解答',
                 outlineSystemPrompt: `你是一个专业的数学教育专家。下面附件是一本完整的书（PDF）。
 请你通读附件，为这本书生成一份结构化大纲（每节大约 1 小时学习量），并给出每一节对应的 PDF 页码范围。
 
@@ -5303,13 +5303,10 @@
                 dateFormat_lecture: 'Lecture $n',
                 handwritingPrompt: 'You are a handwriting recognition assistant. Recognize handwritten content in the image, use LaTeX for math formulas, output results only.',
                 recognizeFail: 'Recognition failed',
-                readerAIPrompt: 'You are a math reading AI assistant.',
-                readerAIDocLabel: 'Current document: ',
-                readerAIPageLabel: 'Current page: ',
-                readerAIProgressLabel: 'Reading progress: ',
-                readerAINoteLabel: 'Page notes: ',
+                readerAIPrompt: 'You are a math assistant. The attachment is the page the user is currently reading.',
+                readerAINoteLabel: "User's notes on this page: ",
                 readerAINone: 'None',
-                readerAISuffix: 'The attachment is the current PDF page. Respond based on: the user question (high priority), conversation context (medium priority), attachment content (low priority). The user may ask questions beyond the attachment — do not be limited by the attachment content. Use your own knowledge base to #answer the user question directly#. Accurate, mathematically rigorous.',
+                readerAISuffix: "The user's question may or may not relate to the attachment. If related, use the attachment to help answer; if not, answer directly from your own knowledge. Accurate, professional, concise.",
                 outlineSystemPrompt: `You are a professional mathematics education expert. The attachment is a complete book (PDF).
 Please read the attachment and generate a structured outline (each section ~1 hour of study), with PDF page ranges for each section.
 
@@ -11319,14 +11316,15 @@ Note format requirements:
             // Build system prompt with context
             const notes = getDocAnnotations(currentDoc.id, currentPage, 'note');
             const notesSummary = notes.map(n => n.text).filter(Boolean).join('; ');
-            const systemPrompt = t('readerAIPrompt') + `
-${t('readerAIDocLabel')}${currentDoc.title} (${currentDoc.type.toUpperCase()})
-${t('readerAIPageLabel')}${currentPage}/${totalPages}
-${t('readerAIProgressLabel')}${currentDoc.progress}%
-${t('readerAINoteLabel')}${notesSummary || t('readerAINone')}
-${t('readerAISuffix')}`;
+            let systemPrompt = t('readerAIPrompt');
+            if (notesSummary) {
+                systemPrompt += '\n' + t('readerAINoteLabel') + notesSummary;
+            }
+            systemPrompt += '\n' + t('readerAISuffix');
 
-            const apiMessages = history.map(h => ({ role: h.role, content: h.content }));
+            // Only send last 10 messages to avoid token overflow
+            const recentHistory = history.slice(-10);
+            const apiMessages = recentHistory.map(h => ({ role: h.role, content: h.content }));
 
             // Show typing indicator
             const container = document.getElementById('readerChatContainer');
