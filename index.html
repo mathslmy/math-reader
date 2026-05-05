@@ -1986,13 +1986,15 @@
 
         .chat-message.user {
             align-self: flex-end;
-            align-items: flex-end;
             max-width: 85%;
+        }
+
+        .chat-message.user .chat-sender {
+            align-self: flex-end;
         }
 
         .chat-message.ai {
             align-self: flex-start;
-            align-items: flex-start;
         }
 
         .chat-sender {
@@ -2053,6 +2055,8 @@
             background: #000;
             color: #fff;
             border-bottom-right-radius: 4px;
+            width: fit-content;
+            align-self: flex-end;
         }
 
         .chat-message.ai .chat-bubble {
