@@ -1976,8 +1976,8 @@
 
         .chat-message {
             display: flex;
-            gap: 10px;
-            max-width: 85%;
+            gap: 8px;
+            max-width: 78%;
         }
 
         .chat-message.user {
@@ -10312,21 +10312,130 @@
         let readerChatLongPressTimer = null;
 
         function setupReaderChatLongPress(element, msgIndex) {
-            element.addEventListener('touchstart', () => {
-                readerChatLongPressTimer = setTimeout(() => {
+            const isUser = element.classList.contains('user');
+            const bubble = element.querySelector('.chat-bubble');
+            const avatar = element.querySelector('.chat-avatar');
+
+            // Long-press on bubble: redo (AI=regenerate, user=edit)
+            if (bubble) {
+                let bubbleTimer = null;
+                bubble.addEventListener('touchstart', (e) => {
+                    bubbleTimer = setTimeout(() => {
+                        e.preventDefault();
+                        if (isUser) {
+                            // User message: edit
+                            const oldText = bubble.textContent.trim();
+                            const newText = prompt('编辑消息', oldText);
+                            if (newText !== null && newText.trim() !== '') {
+                                editReaderChatMessage(msgIndex, newText.trim());
+                            }
+                        } else {
+                            // AI message: regenerate
+                            if (confirm('重新生成此回复?')) {
+                                regenerateReaderChatMessage(msgIndex);
+                            }
+                        }
+                    }, 600);
+                });
+                bubble.addEventListener('touchend', () => clearTimeout(bubbleTimer));
+                bubble.addEventListener('touchmove', () => clearTimeout(bubbleTimer));
+                bubble.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    if (isUser) {
+                        const oldText = bubble.textContent.trim();
+                        const newText = prompt('编辑消息', oldText);
+                        if (newText !== null && newText.trim() !== '') {
+                            editReaderChatMessage(msgIndex, newText.trim());
+                        }
+                    } else {
+                        if (confirm('重新生成此回复?')) {
+                            regenerateReaderChatMessage(msgIndex);
+                        }
+                    }
+                });
+            }
+
+            // Long-press on avatar: delete
+            if (avatar) {
+                let avatarTimer = null;
+                avatar.addEventListener('touchstart', (e) => {
+                    avatarTimer = setTimeout(() => {
+                        e.preventDefault();
+                        if (confirm('删除这条消息?')) {
+                            deleteReaderChatMessage(msgIndex);
+                        }
+                    }, 600);
+                });
+                avatar.addEventListener('touchend', () => clearTimeout(avatarTimer));
+                avatar.addEventListener('touchmove', () => clearTimeout(avatarTimer));
+                avatar.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
                     if (confirm('删除这条消息?')) {
                         deleteReaderChatMessage(msgIndex);
                     }
-                }, 600);
-            });
-            element.addEventListener('touchend', () => clearTimeout(readerChatLongPressTimer));
-            element.addEventListener('touchmove', () => clearTimeout(readerChatLongPressTimer));
-            element.addEventListener('contextmenu', (e) => {
-                e.preventDefault();
-                if (confirm('删除这条消息?')) {
-                    deleteReaderChatMessage(msgIndex);
+                });
+            }
+        }
+
+        function editReaderChatMessage(index, newText) {
+            if (!currentDoc) return;
+            let history = loadReaderChatHistory(currentDoc.id);
+            if (index < 0 || index >= history.length) return;
+            history[index].content = newText;
+            // Remove all messages after the edited one, so AI can re-respond
+            history = history.slice(0, index + 1);
+            saveReaderChatHistory(currentDoc.id, history);
+            renderReaderChatHistory();
+        }
+
+        async function regenerateReaderChatMessage(index) {
+            if (!currentDoc) return;
+            let history = loadReaderChatHistory(currentDoc.id);
+            if (index < 0 || index >= history.length) return;
+            // Remove the AI message and everything after it
+            history = history.slice(0, index);
+            saveReaderChatHistory(currentDoc.id, history);
+            renderReaderChatHistory();
+
+            // Re-send to get new AI response
+            let pdfAttachment = null;
+            if (currentDoc.type === 'pdf') {
+                try {
+                    const fullBytes = await loadBookPdfBytes(currentDoc);
+                    const slice = await slicePdfPages(fullBytes, currentPage, currentPage);
+                    pdfAttachment = { bytes: slice.bytes, base64: slice.base64, name: `${currentDoc.title}_p${currentPage}.pdf` };
+                } catch (e) {}
+            }
+            const notes = getDocAnnotations(currentDoc.id, currentPage, 'note');
+            const notesSummary = notes.map(n => n.text).filter(Boolean).join('; ');
+            const systemPrompt = `你是一个数学AI助手。\n\n用户笔记: ${notesSummary || '无'}\n请根据用户问题给出帮助。简洁、准确、数学专业。禁用比喻和物理解释。\n参考工作流程:\nstage1:用户提出附件相关问题，你结合附件给出回答。\nstage2:用户针对你的回答提出问题，你针对问题给出回答（禁止结合附件）。stage 2的回答必须完全独立,仅针对数学问题本身进行专业解释。严禁提及、暗示或关联任何附件内容。`;
+            const apiMessages = history.map(h => ({ role: h.role, content: h.content }));
+
+            const container = document.getElementById('readerChatContainer');
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'chat-message ai';
+            loadingDiv.id = 'readerChatLoading';
+            const _aiAvatar = getAIAvatar();
+            const _aiName = getAIName();
+            const _aiAvatarHtml = _aiAvatar
+                ? `<div class="chat-avatar"><img src="${_aiAvatar}" alt="${escapeHtml(_aiName)}"></div>`
+                : `<div class="chat-avatar">${(_aiName || 'AI').charAt(0).toUpperCase()}</div>`;
+            loadingDiv.innerHTML = `${_aiAvatarHtml}<div class="chat-bubble"><div class="chat-typing"><span></span><span></span><span></span></div></div>`;
+            container.appendChild(loadingDiv);
+            container.scrollTop = container.scrollHeight;
+
+            try {
+                const result = await callReaderAI(systemPrompt, apiMessages, { pdfAttachment });
+                document.getElementById('readerChatLoading')?.remove();
+                if (result) {
+                    history.push({ role: 'assistant', content: result });
+                    saveReaderChatHistory(currentDoc.id, history);
+                    renderReaderChatHistory();
                 }
-            });
+            } catch (err) {
+                document.getElementById('readerChatLoading')?.remove();
+                showToast('重新生成失败: ' + err.message);
+            }
         }
 
         function deleteReaderChatMessage(index) {
