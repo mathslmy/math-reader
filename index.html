@@ -3564,11 +3564,11 @@
         <!-- Archive view (hidden by default) -->
         <div id="archiveView" style="display:none;">
             <div class="column-header" style="margin-top:12px;">
-                <span class="column-title">存档</span>
-                <button class="archive-btn" onclick="toggleArchive()">返回</button>
+                <span class="column-title" data-i18n="archiveTitle">存档</span>
+                <button class="archive-btn" onclick="toggleArchive()" data-i18n="back">返回</button>
             </div>
             <div class="item-list" id="archiveList">
-                <div class="empty-state"><p>暂无存档</p></div>
+                <div class="empty-state"><p data-i18n="emptyArchive">暂无存档</p></div>
             </div>
         </div>
     </div>
@@ -3625,7 +3625,7 @@
         <div class="search-panel" id="searchPanel">
             <div class="search-input-row">
                 <div class="search-input-wrapper">
-                    <input type="text" class="search-input" id="searchInput" placeholder="搜索文档内容...">
+                    <input type="text" class="search-input" id="searchInput" placeholder="搜索文档内容..." data-i18n-placeholder="searchDocContent">
                     <button class="search-clear-btn" id="searchClearBtn" onclick="clearSearch()">x</button>
                 </div>
                 <button class="search-close-btn" onclick="closeSearchPanel()">
@@ -3673,7 +3673,7 @@
             </div>
             <!-- Page jump popup -->
             <div class="page-jump-popup" id="pageJumpPopup">
-                <input type="number" id="pageJumpInput" placeholder="输入页码" min="1">
+                <input type="number" id="pageJumpInput" placeholder="输入页码" data-i18n-placeholder="enterPageNum" min="1">
                 <div class="page-jump-popup-btns">
                     <button class="cancel-btn" onclick="closePageJumpPopup()">取消</button>
                     <button class="confirm-btn" onclick="confirmPageJump()">跳转</button>
@@ -3744,7 +3744,7 @@
             </button>
         </div>
         <div class="draft-content">
-            <div class="draft-editor" id="draftTextarea" contenteditable="true" data-placeholder="在这里写草稿..." oninput="saveDraft()"></div>
+            <div class="draft-editor" id="draftTextarea" contenteditable="true" data-placeholder="在这里写草稿..." data-i18n-dataplaceholder="draftPlaceholder" oninput="saveDraft()"></div>
             <div class="draft-canvas-wrapper" id="draftCanvasWrapper">
                 <canvas class="draft-canvas" id="draftCanvas"></canvas>
             </div>
@@ -3778,7 +3778,7 @@
         <div class="note-result" id="noteResult"></div>
         <textarea class="note-text-input" id="noteTextInput" placeholder="输入文字笔记或手写识别结果..." data-i18n-placeholder="inputNoteOrRecognize"></textarea>
         <div class="note-actions">
-            <button class="note-btn danger" id="noteDeleteBtn" onclick="deleteCurrentNote()" style="display:none;">删除</button>
+            <button class="note-btn danger" id="noteDeleteBtn" onclick="deleteCurrentNote()" style="display:none;" data-i18n="deleteBtn">删除</button>
             <button class="note-btn recognize" onclick="recognizeHandwriting()" data-i18n="recognize">识别</button>
             <button class="note-btn primary" onclick="saveNote()" data-i18n="save">保存</button>
         </div>
@@ -3944,7 +3944,7 @@
                     </div>
                 </div>
                 <div class="setting-item-right">
-                    <button id="storagePersistBtn" style="padding:6px 14px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);font-size:13px;cursor:pointer;">请求授权</button>
+                    <button id="storagePersistBtn" style="padding:6px 14px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);font-size:13px;cursor:pointer;"data-i18n="requestAuth">请求授权</button>
                 </div>
             </div>
         </div>
@@ -3987,7 +3987,7 @@
                 <span class="settings-item-arrow" id="aiPersonaArrow">›</span>
             </div>
             <div class="ai-persona-edit" id="aiPersonaEdit" style="display: none;">
-                <textarea id="aiPersonaText" placeholder="描述你希望AI具有的性格特点..." onblur="saveAIPersona()">你是一个温柔且有耐心的助手，善于鼓励用户完成任务。</textarea>
+                <textarea id="aiPersonaText" placeholder="描述你希望AI具有的性格特点..." data-i18n-placeholder="aiPersonaPlaceholder" onblur="saveAIPersona()">你是一个温柔且有耐心的助手，善于鼓励用户完成任务。</textarea>
             </div>
         </div>
 
@@ -4054,7 +4054,7 @@
                     </label>
                     <div class="upload-url-group">
                         <input type="text" id="avatarUrl" placeholder="或输入图片链接" data-i18n-placeholder="orImageUrl" class="form-input">
-                        <button onclick="setAvatarUrl()" class="url-confirm-btn">确定</button>
+                        <button onclick="setAvatarUrl()" class="url-confirm-btn" data-i18n="confirm">确定</button>
                     </div>
                 </div>
             </div>
@@ -4074,7 +4074,7 @@
                     </label>
                     <div class="upload-url-group">
                         <input type="text" id="aiAvatarUrl" placeholder="或输入图片链接" data-i18n-placeholder="orImageUrl" class="form-input">
-                        <button onclick="setAIAvatarUrl()" class="url-confirm-btn">确定</button>
+                        <button onclick="setAIAvatarUrl()" class="url-confirm-btn" data-i18n="confirm">确定</button>
                     </div>
                 </div>
             </div>
@@ -4088,14 +4088,14 @@
                     <button class="modal-close" onclick="hideModal('bgModal')">&times;</button>
                 </div>
                 <div style="text-align:center;margin-bottom:16px;">
-                    <button class="ai-action-btn" onclick="document.getElementById('bgFileInput').click()" style="text-align:center;">上传图片</button>
+                    <button class="ai-action-btn" onclick="document.getElementById('bgFileInput').click()" style="text-align:center;" data-i18n="uploadImage">上传图片</button>
                     <input type="file" id="bgFileInput" accept="image/*" style="display:none;" onchange="handleBgUpload(event)">
                 </div>
-                <button class="ai-action-btn" onclick="clearBgImage()" style="text-align:center;color:#ef4444;">清空背景图</button>
+                <button class="ai-action-btn" onclick="clearBgImage()" style="text-align:center;color:#ef4444;" data-i18n="clearBgImage">清空背景图</button>
                 <div style="padding:16px 0;">
-                    <div class="section-label" style="margin-bottom:8px;">背景透明度</div>
+                    <div class="section-label" style="margin-bottom:8px;" data-i18n="bgOpacity">背景透明度</div>
                     <input type="range" min="50" max="100" value="90" id="bgOpacity" oninput="updateBgOpacity(this.value)" style="width:100%;">
-                    <div class="section-label" style="margin-top:12px;margin-bottom:8px;">背景模糊</div>
+                    <div class="section-label" style="margin-top:12px;margin-bottom:8px;" data-i18n="bgBlur">背景模糊</div>
                     <input type="range" min="0" max="30" value="10" id="bgBlur" oninput="updateBgBlur(this.value)" style="width:100%;">
                 </div>
             </div>
@@ -4118,29 +4118,29 @@
                     <div class="section-label" style="margin-top:12px;margin-bottom:6px;">Endpoint URL</div>
                     <input type="text" id="r2Endpoint" placeholder="https://xxx.r2.cloudflarestorage.com" style="width:100%;padding:10px;border:1px solid var(--border-color);border-radius:8px;background:var(--bg-secondary);color:var(--text-primary);font-size:13px;box-sizing:border-box;">
                     
-                    <div class="section-label" style="margin-top:12px;margin-bottom:6px;">存储桶名称</div>
+                    <div class="section-label" style="margin-top:12px;margin-bottom:6px;" data-i18n="bucketName">存储桶名称</div>
                     <input type="text" id="r2BucketName" placeholder="math-reader-sync" style="width:100%;padding:10px;border:1px solid var(--border-color);border-radius:8px;background:var(--bg-secondary);color:var(--text-primary);font-size:13px;box-sizing:border-box;">
                     
-                    <div class="section-label" style="margin-top:12px;margin-bottom:6px;">自定义域名 (可选，用于下载)</div>
+                    <div class="section-label" style="margin-top:12px;margin-bottom:6px;" data-i18n="customDomain">自定义域名 (可选，用于下载)</div>
                     <input type="text" id="r2CustomDomain" placeholder="r2.math-reader-sync.top" style="width:100%;padding:10px;border:1px solid var(--border-color);border-radius:8px;background:var(--bg-secondary);color:var(--text-primary);font-size:13px;box-sizing:border-box;">
                     
                     <hr style="border:none;border-top:1px solid var(--border-color);margin:16px 0;">
                     
-                    <div class="section-label" style="margin-bottom:6px;">自动同步设置</div>
+                    <div class="section-label" style="margin-bottom:6px;" data-i18n="autoSyncSettings">自动同步设置</div>
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-                        <span style="font-size:13px;color:var(--text-secondary);">启用自动同步</span>
+                        <span style="font-size:13px;color:var(--text-secondary);" data-i18n="enableAutoSync">启用自动同步</span>
                         <div class="toggle-switch" id="r2AutoSyncToggle" onclick="toggleR2AutoSync()">
                             <div class="toggle-thumb"></div>
                         </div>
                     </div>
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-                        <span style="font-size:13px;color:var(--text-secondary);white-space:nowrap;">同步间隔</span>
+                        <span style="font-size:13px;color:var(--text-secondary);white-space:nowrap;" data-i18n="syncInterval">同步间隔</span>
                         <select id="r2SyncInterval" style="flex:1;padding:8px;border:1px solid var(--border-color);border-radius:8px;background:var(--bg-secondary);color:var(--text-primary);font-size:13px;">
-                            <option value="5">5 分钟</option>
-                            <option value="10">10 分钟</option>
-                            <option value="15" selected>15 分钟</option>
-                            <option value="30">30 分钟</option>
-                            <option value="60">60 分钟</option>
+                            <option value="5" data-i18n="min5">5 分钟</option>
+                            <option value="10" data-i18n="min10">10 分钟</option>
+                            <option value="15" selected data-i18n="min15">15 分钟</option>
+                            <option value="30" data-i18n="min30">30 分钟</option>
+                            <option value="60" data-i18n="min60">60 分钟</option>
                         </select>
                     </div>
                     <div style="font-size:11px;color:var(--text-muted);margin-bottom:12px;">
@@ -4148,7 +4148,7 @@
                         建议间隔 15 分钟，每月约消耗 4320 次操作，远低于免费额度。
                     </div>
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-                        <span style="font-size:13px;color:var(--text-secondary);">文件变更时自动同步</span>
+                        <span style="font-size:13px;color:var(--text-secondary);" data-i18n="autoSyncOnChange">文件变更时自动同步</span>
                         <div class="toggle-switch" id="r2AutoSyncOnChangeToggle" onclick="toggleR2AutoSyncOnChange()">
                             <div class="toggle-thumb"></div>
                         </div>
@@ -4160,8 +4160,8 @@
                         上次同步: --
                     </div>
                     
-                    <button onclick="saveR2Config()" style="width:100%;margin-top:16px;padding:12px;background:var(--accent);color:white;border:none;border-radius:8px;font-size:14px;cursor:pointer;">保存配置</button>
-                    <button onclick="testR2Connection()" style="width:100%;margin-top:8px;padding:12px;background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:8px;font-size:14px;cursor:pointer;">测试连接</button>
+                    <button onclick="saveR2Config()" style="width:100%;margin-top:16px;padding:12px;background:var(--accent);color:white;border:none;border-radius:8px;font-size:14px;cursor:pointer;" data-i18n="saveConfig">保存配置</button>
+                    <button onclick="testR2Connection()" style="width:100%;margin-top:8px;padding:12px;background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:8px;font-size:14px;cursor:pointer;" data-i18n="testConnection">测试连接</button>
                 </div>
             </div>
         </div>
@@ -4315,14 +4315,14 @@
             <div style="margin-bottom:16px;">
                 <div class="drop-zone" id="dropZone">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:40px;height:40px;color:var(--text-muted);margin-bottom:8px;"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3"/></svg>
-                    <p>点击或拖拽文件</p>
-                    <p class="hint">支持 PDF, ePub, LaTeX</p>
+                    <p data-i18n="clickToUpload">点击或拖拽文件</p>
+                    <p class="hint" data-i18n="supportedFormats">支持 PDF, ePub, LaTeX</p>
                 </div>
                 <input type="file" id="fileInput" accept=".pdf,.epub,.tex,.latex" style="display:none" onchange="handleFileSelect(event)">
-                <input class="setting-input" id="uploadTitle" type="text" placeholder="标题（可选，默认使用文件名）" style="margin-bottom:12px;">
-                <textarea class="note-text-input" id="uploadAbstract" placeholder="摘要（可选）" style="height:60px;"></textarea>
+                <input class="setting-input" id="uploadTitle" type="text" placeholder="标题（可选，默认使用文件名）" data-i18n-placeholder="titleOptional" style="margin-bottom:12px;">
+                <textarea class="note-text-input" id="uploadAbstract" placeholder="摘要（可选）" data-i18n-placeholder="abstractOptional" style="height:60px;"></textarea>
             </div>
-            <button class="ai-action-btn" onclick="confirmUpload()" style="text-align:center;background:var(--accent);color:white;">添加</button>
+            <button class="ai-action-btn" onclick="confirmUpload()" style="text-align:center;background:var(--accent);color:white;" data-i18n="add">添加</button>
         </div>
     </div>
 
@@ -4336,13 +4336,13 @@
             
             <div class="api-section-title" data-i18n="primaryAPI">主要 API</div>
             <div class="form-group">
-                <label class="form-label">渠道</label>
+                <label class="form-label" data-i18n="channel">渠道</label>
                 <select class="form-select" id="apiProvider" onchange="updateDefaultUrl('primary')">
                     <option value="deepseek">deepseek</option>
                     <option value="openai">openai</option>
                     <option value="google">google</option>
                     <option value="claude">claude</option>
-                    <option value="custom">自定义</option>
+                    <option value="custom" data-i18n="custom">自定义</option>
                 </select>
             </div>
             <div class="form-group">
@@ -4350,14 +4350,14 @@
                 <input type="text" class="form-input" id="modalAiApiUrl" placeholder="https://api.deepseek.com/v1/chat/completions">
             </div>
             <div class="form-group">
-                <label class="form-label">密钥</label>
+                <label class="form-label" data-i18n="apiKey">密钥</label>
                 <input type="password" class="form-input" id="modalAiApiKey" placeholder="sk-...">
             </div>
             <div class="form-group">
-                <label class="form-label">模型名称</label>
+                <label class="form-label" data-i18n="modelName">模型名称</label>
                 <div class="model-input-row">
                     <input type="text" class="form-input" id="modalAiModel" placeholder="deepseek-chat">
-                    <button class="fetch-models-btn" onclick="fetchModels('primary')">拉取模型</button>
+                    <button class="fetch-models-btn" onclick="fetchModels('primary')" data-i18n="fetchModels">拉取模型</button>
                 </div>
                 <select class="form-select model-select" id="apiModelSelect" style="display:none;margin-top:8px;" onchange="selectModel('primary')">
                 </select>
@@ -4365,16 +4365,16 @@
             
             <hr style="border: none; border-top: 1px solid var(--border-color); margin: 20px 0;">
             
-            <div class="api-section-title">备用 API <span style="font-size:12px;color:var(--text-muted);">(主API失败时使用)</span></div>
+            <div class="api-section-title"><span data-i18n="backupAPI">备用 API</span> <span style="font-size:12px;color:var(--text-muted);" data-i18n="backupAPIDesc">(主API失败时使用)</span></div>
             <div class="form-group">
-                <label class="form-label">渠道</label>
+                <label class="form-label" data-i18n="channel">渠道</label>
                 <select class="form-select" id="backupProvider" onchange="updateDefaultUrl('backup')">
-                    <option value="">不使用备用</option>
+                    <option value="" data-i18n="noBackup">不使用备用</option>
                     <option value="deepseek">deepseek</option>
                     <option value="openai">openai</option>
                     <option value="google">google</option>
                     <option value="claude">claude</option>
-                    <option value="custom">自定义</option>
+                    <option value="custom" data-i18n="custom">自定义</option>
                 </select>
             </div>
             <div class="form-group">
@@ -4382,14 +4382,14 @@
                 <input type="text" class="form-input" id="backupUrl" placeholder="https://api.openai.com/v1/chat/completions">
             </div>
             <div class="form-group">
-                <label class="form-label">密钥</label>
+                <label class="form-label" data-i18n="apiKey">密钥</label>
                 <input type="password" class="form-input" id="backupKey" placeholder="sk-...">
             </div>
             <div class="form-group">
-                <label class="form-label">模型名称</label>
+                <label class="form-label" data-i18n="modelName">模型名称</label>
                 <div class="model-input-row">
                     <input type="text" class="form-input" id="backupModel" placeholder="gpt-3.5-turbo">
-                    <button class="fetch-models-btn" onclick="fetchModels('backup')">拉取模型</button>
+                    <button class="fetch-models-btn" onclick="fetchModels('backup')" data-i18n="fetchModels">拉取模型</button>
                 </div>
                 <select class="form-select model-select" id="backupModelSelect" style="display:none;margin-top:8px;" onchange="selectModel('backup')">
                 </select>
@@ -4553,7 +4553,7 @@
             </button>
         </div>
         <div class="draft-content">
-            <div class="draft-editor" id="lectureDraftTextarea" contenteditable="true" data-placeholder="在这里写草稿..." oninput="saveLectureDraft()"></div>
+            <div class="draft-editor" id="lectureDraftTextarea" contenteditable="true" data-placeholder="在这里写草稿..." data-i18n-dataplaceholder="draftPlaceholder" oninput="saveLectureDraft()"></div>
             <div class="draft-canvas-wrapper" id="lectureDraftCanvasWrapper">
                 <canvas class="draft-canvas" id="lectureDraftCanvas"></canvas>
             </div>
@@ -5007,6 +5007,33 @@
                 confirmRegenerateLecture: '确定要重新生成此讲义吗？当前内容将被覆盖。',
                 confirmDeleteMaterial: '删除此素材？',
                 confirmDeleteNote: '删除此笔记？',
+                // Archive view
+                archiveTitle: '存档',
+                back: '返回',
+                emptyArchive: '暂无存档',
+                archivedType: '已存档',
+                // Storage persistence
+                persistedStatus: '✅ 已持久化',
+                notPersistedStatus: '⚠️ 未持久化（可能被清理）',
+                usageLabel: '已用 ',
+                authorized: '已授权',
+                // Dynamic rendering
+                materialsLabel: '素材',
+                notesLabel: '笔记',
+                aiNotes: 'AI 笔记',
+                emptyMaterials: '暂无素材，点击右下角上传',
+                noteContentEmpty: '笔记内容为空',
+                handwrittenNote: '(手写笔记)',
+                readerChatGreeting: '你好! 我是你的 AI 阅读助手。当前文档: $title，第 $current/$total 页。$notes有什么我可以帮你的?',
+                readerChatNotesPrefix: '你在这里记了一些笔记: ',
+                deleteBtn: '删除',
+                archiveBtn: '存档',
+                renameBtn: '重命名',
+                generatingStatus: '生成中...',
+                planningChapters: '正在规划讲义章节...',
+                generatingLectureContent: '正在生成讲义内容...',
+                searchDocContent: '搜索文档内容...',
+                enterPageNum: '输入页码',
             },
             en: {
                 appTitle: 'Math Reader',
@@ -5381,6 +5408,30 @@ Note format requirements:
                 confirmRegenerateLecture: 'Regenerate this lecture? Current content will be overwritten.',
                 confirmDeleteMaterial: 'Delete this material?',
                 confirmDeleteNote: 'Delete this note?',
+                archiveTitle: 'Archive',
+                back: 'Back',
+                emptyArchive: 'No archived items',
+                archivedType: 'Archived',
+                persistedStatus: '✅ Persisted',
+                notPersistedStatus: '⚠️ Not persisted (may be cleared)',
+                usageLabel: 'Used ',
+                authorized: 'Authorized',
+                materialsLabel: 'materials',
+                notesLabel: 'notes',
+                aiNotes: 'AI Notes',
+                emptyMaterials: 'No materials, tap bottom-right to upload',
+                noteContentEmpty: 'Note content is empty',
+                handwrittenNote: '(handwritten note)',
+                readerChatGreeting: "Hi! I'm your AI reading assistant. Current document: $title, page $current/$total. $notesHow can I help?",
+                readerChatNotesPrefix: 'Your notes here: ',
+                deleteBtn: 'Delete',
+                archiveBtn: 'Archive',
+                renameBtn: 'Rename',
+                generatingStatus: 'Generating...',
+                planningChapters: 'Planning lecture chapters...',
+                generatingLectureContent: 'Generating lecture content...',
+                searchDocContent: 'Search document...',
+                enterPageNum: 'Page number',
             }
         };
 
@@ -5619,17 +5670,17 @@ Note format requirements:
             if (!el) return;
             const usedMB = (info.usage / 1024 / 1024).toFixed(1);
             const totalMB = (info.quota / 1024 / 1024 / 1024).toFixed(1);
-            const statusText = info.persisted ? '✅ 已持久化' : '⚠️ 未持久化（可能被清理）';
-            el.textContent = `${statusText} · 已用 ${usedMB} MB / ${totalMB} GB`;
+            const statusText = info.persisted ? t('persistedStatus') : t('notPersistedStatus');
+            el.textContent = `${statusText} · ${t('usageLabel')}${usedMB} MB / ${totalMB} GB`;
 
             const btn = document.getElementById('storagePersistBtn');
             if (btn) {
                 if (info.persisted) {
-                    btn.textContent = '已授权';
+                    btn.textContent = t('authorized');
                     btn.disabled = true;
                     btn.style.opacity = '0.5';
                 } else {
-                    btn.textContent = '请求授权';
+                    btn.textContent = t('requestAuth');
                     btn.disabled = false;
                     btn.style.opacity = '1';
                 }
@@ -6799,7 +6850,7 @@ Note format requirements:
             pendingFile = null;
 
             const dz = document.getElementById('dropZone');
-            dz.querySelector('p').textContent = '点击或拖拽文件';
+            dz.querySelector('p').textContent = t('clickToUpload');
             dz.onclick = () => document.getElementById('fileInput').click();
             dz.ondragover = (e) => { e.preventDefault(); dz.classList.add('drag-over'); };
             dz.ondragleave = () => dz.classList.remove('drag-over');
@@ -6977,14 +7028,14 @@ Note format requirements:
         function renderArchive() {
             const list = document.getElementById('archiveList');
             if (appData.archived.length === 0) {
-                list.innerHTML = '<div class="empty-state"><p>暂无存档</p></div>';
+                list.innerHTML = '<div class="empty-state"><p>' + t('emptyArchive') + '</p></div>';
                 return;
             }
             list.innerHTML = appData.archived.map(item => `
                 <div class="item-card" onclick="restoreFromArchive('${item.id}')">
                     <div class="item-card-title">${escapeHtml(item.title)}</div>
                     <div class="item-card-meta">
-                        <span class="item-card-type">${item.type.toUpperCase()} · 已存档</span>
+                        <span class="item-card-type">${item.type.toUpperCase()} · ${t('archivedType')}</span>
                     </div>
                 </div>
             `).join('');
@@ -7019,11 +7070,11 @@ Note format requirements:
             menu.innerHTML = `
                 <button class="longpress-menu-item" onclick="archiveItem('${id}', '${category}')">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
-                    存档
+                    ${t('archiveBtn')}
                 </button>
                 <button class="longpress-menu-item danger" onclick="deleteItem('${id}', '${category}')">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
-                    删除
+                    ${t('deleteBtn')}
                 </button>
             `;
             
@@ -7572,7 +7623,7 @@ Note format requirements:
                 marker.style.position = 'relative';
                 marker.style.transform = 'translate(-50%, -50%)';
                 marker.textContent = (i + 1);
-                marker.title = n.text || '笔记';
+                marker.title = n.text || t('note');
 
                 // 长按编辑
                 let pressTimer = null;
@@ -7602,7 +7653,7 @@ Note format requirements:
                     
                     const textDiv = document.createElement('div');
                     textDiv.className = 'note-bubble-text';
-                    textDiv.textContent = n.text || '(手写笔记)';
+                    textDiv.textContent = n.text || t('handwrittenNote');
                     
                     bubble.appendChild(closeBtn);
                     bubble.appendChild(textDiv);
@@ -8812,7 +8863,7 @@ Note format requirements:
 
                 let statusText = '';
                 if (status === 'generating') {
-                    statusText = '<span style="color:var(--accent);font-size:11px;margin-left:6px;">生成中...</span>';
+                    statusText = '<span style="color:var(--accent);font-size:11px;margin-left:6px;">' + t('generatingStatus') + '</span>';
                 }
 
                 booksHtml += `<div class="note-folder" onclick="enterNotesFolder('book', '${book.id}')">
@@ -8976,7 +9027,7 @@ Note format requirements:
             let html = `<div class="note-folder" onclick="renderNotesPage()">
                 <div class="note-folder-header">
                     <svg class="note-folder-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
-                    <span class="note-folder-name">返回</span>
+                    <span class="note-folder-name">${t('back')}</span>
                 </div>
             </div>`;
             
@@ -8984,7 +9035,7 @@ Note format requirements:
                 if (lectureData?.status === 'generating') {
                     html += `<div class="generating-indicator">
                         <div class="generating-spinner"></div>
-                        <span>正在规划讲义章节...</span>
+                        <span>${t('planningChapters')}</span>
                     </div>`;
                 } else {
                     html += '<div class="empty-state"><p>暂无讲义</p><p style="font-size:12px;color:var(--text-muted);margin-top:8px;">在书架长按书籍可生成AI讲义</p></div>';
@@ -9828,6 +9879,7 @@ Note format requirements:
             // API 相关设置仅保存本地，不上传
             const settingsToSync = stripApiSettingsFrom(appData.settings);
             delete settingsToSync.r2Config;
+                delete settingsToSync.lang;
             const metadata = {
                 books: appData.books.map(b => cleanDocForSync(b)),
                 papers: appData.papers.map(p => cleanDocForSync(p)),
@@ -10421,6 +10473,7 @@ Note format requirements:
                 // API 相关设置仅保存本地，不上传
                 const settingsToSync = stripApiSettingsFrom(appData.settings);
                 delete settingsToSync.r2Config;
+                delete settingsToSync.lang;
                 const metadata = {
                     books: appData.books.map(b => cleanDocForSync(b)),
                     papers: appData.papers.map(p => cleanDocForSync(p)),
@@ -10742,7 +10795,7 @@ Note format requirements:
                 );
                 appData.lectureDrafts = metadata.lectureDrafts || appData.lectureDrafts || {};
                 // API 设置仅保留本地值，不被云端覆盖
-                appData.settings = { ...metadata.settings, ...localApiSettings, r2Config: localR2Config };
+                appData.settings = { ...metadata.settings, ...localApiSettings, r2Config: localR2Config, lang: appData.settings.lang };
                 saveData();
                 refreshAllUIFromAppData();
                 if (config.lastSyncTime || metadata.syncedAt) {
@@ -10890,7 +10943,7 @@ Note format requirements:
                 appData.lectures = metadata.lectures || {};
                 appData.drafts = metadata.drafts || {};
                 appData.classroom = metadata.classroom || { courses: [], seminars: [] };
-                appData.settings = { ...metadata.settings, ...localApiSettings, r2Config: localR2Config };
+                appData.settings = { ...metadata.settings, ...localApiSettings, r2Config: localR2Config, lang: appData.settings.lang };
                 
                 saveData();
                 
@@ -11214,7 +11267,8 @@ Note format requirements:
                 const notes = getDocAnnotations(currentDoc.id, currentPage, 'note');
                 const notesSummary = notes.map(n => n.text).filter(Boolean).join('; ');
 
-                const greeting = `你好! 我是你的 AI 阅读助手。当前文档: ${currentDoc.title}，第 ${currentPage}/${totalPages} 页。${notesSummary ? '你在这里记了一些笔记: ' + notesSummary + '。' : ''}有什么我可以帮你的?`;
+                const notesInfo = notesSummary ? t('readerChatNotesPrefix') + notesSummary + '. ' : '';
+                const greeting = t('readerChatGreeting').replace('$title', currentDoc.title).replace('$current', currentPage).replace('$total', totalPages).replace('$notes', notesInfo);
                 history = [{ role: 'assistant', content: greeting }];
                 if (screenshot) {
                     history[0].screenshot = screenshot;
@@ -12113,7 +12167,7 @@ ${t('lectureUserSuffix')}`;
                 container.innerHTML = `
                     <div class="generating-indicator">
                         <div class="generating-spinner"></div>
-                        <span>正在生成讲义内容...</span>
+                        <span>${t('generatingLectureContent')}</span>
                     </div>
                     <p style="color:var(--text-muted);text-align:center;">首次生成可能需要1-2分钟</p>`;
                 return;
@@ -13921,7 +13975,7 @@ ${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
                     if (dist >= PTR_THRESHOLD) {
                         textEl.textContent = '松开刷新';
                     } else {
-                        textEl.textContent = '下拉刷新';
+                        textEl.textContent = t('pullToRefresh');
                     }
                 }, { passive: true });
 
@@ -14095,15 +14149,15 @@ ${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
             let html = `<div class="classroom-folder" onclick="renderClassroomPage()">
                 <div class="classroom-folder-header">
                     <svg class="note-folder-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
-                    <span class="classroom-folder-name">返回</span>
+                    <span class="classroom-folder-name">${t('back')}</span>
                 </div>
             </div>`;
 
             html += `<div style="display:flex;justify-content:space-between;align-items:center;margin:12px 0 8px;">
                 <span style="font-size:16px;font-weight:600;">${escapeHtml(folder.name)}</span>
                 <div style="display:flex;gap:6px;">
-                    <button onclick="renameClassroomFolder('${type}','${folder.id}')" style="border:none;background:var(--bg-secondary);padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;color:var(--text-secondary);">重命名</button>
-                    <button onclick="deleteClassroomFolder('${type}','${folder.id}')" style="border:none;background:var(--bg-secondary);padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;color:#ef4444;">删除</button>
+                    <button onclick="renameClassroomFolder('${type}','${folder.id}')" style="border:none;background:var(--bg-secondary);padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;color:var(--text-secondary);">${t('renameBtn')}</button>
+                    <button onclick="deleteClassroomFolder('${type}','${folder.id}')" style="border:none;background:var(--bg-secondary);padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;color:#ef4444;">${t('deleteBtn')}</button>
                 </div>
             </div>`;
 
@@ -14117,8 +14171,8 @@ ${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
                     html += `<div class="classroom-session-card" onclick="openClassroomSession('${type}','${folder.id}','${sess.id}')">
                         <div class="classroom-session-title">${escapeHtml(sess.title)}</div>
                         <div class="classroom-session-meta">
-                            <span>${materialCount} 素材</span>
-                            <span>${noteCount} 笔记</span>
+                            <span>${materialCount} ${t('materialsLabel')}</span>
+                            <span>${noteCount} ${t('notesLabel')}</span>
                             <span>${sess.createdAt ? new Date(sess.createdAt).toLocaleDateString() : ''}</span>
                         </div>
                     </div>`;
@@ -14162,9 +14216,14 @@ ${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
             const dateStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
             const existingToday = folder.sessions.filter(s => s.title && s.title.startsWith(dateStr));
             const num = existingToday.length + 1;
-            const numMap = ['一','二','三','四','五','六','七','八','九','十'];
-            const numStr = num <= 10 ? numMap[num - 1] : String(num);
-            const defaultTitle = dateStr + '-第' + numStr + '讲';
+            let defaultTitle;
+            if (currentLang === 'zh') {
+                const numMap = ['一','二','三','四','五','六','七','八','九','十'];
+                const numStr = num <= 10 ? numMap[num - 1] : String(num);
+                defaultTitle = dateStr + '-第' + numStr + '讲';
+            } else {
+                defaultTitle = dateStr + '-Lecture ' + num;
+            }
 
             const title = prompt(t('sessionTitle'), defaultTitle);
             if (!title || !title.trim()) return;
@@ -14203,16 +14262,16 @@ ${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
                 <div class="classroom-folder" onclick="enterClassroomFolder('${type}','${folder.id}')" style="margin:0;">
                     <div class="classroom-folder-header" style="padding:8px 12px;">
                         <svg class="note-folder-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
-                        <span class="classroom-folder-name" style="font-size:13px;">返回</span>
+                        <span class="classroom-folder-name" style="font-size:13px;">${t('back')}</span>
                     </div>
                 </div>
                 <span style="font-size:16px;font-weight:600;flex:1;margin-left:8px;">${escapeHtml(session.title)}</span>
-                <button onclick="renameClassroomSession('${type}','${folder.id}','${session.id}')" style="border:none;background:var(--bg-secondary);padding:6px 10px;border-radius:8px;font-size:12px;cursor:pointer;color:var(--text-secondary);flex-shrink:0;">重命名</button>
+                <button onclick="renameClassroomSession('${type}','${folder.id}','${session.id}')" style="border:none;background:var(--bg-secondary);padding:6px 10px;border-radius:8px;font-size:12px;cursor:pointer;color:var(--text-secondary);flex-shrink:0;">${t('renameBtn')}</button>
             </div>`;
 
             // AI-generated notes
             if (session.notes.length > 0) {
-                html += `<div style="margin-bottom:12px;font-size:13px;font-weight:600;color:var(--text-secondary);">AI 笔记</div>`;
+                html += `<div style="margin-bottom:12px;font-size:13px;font-weight:600;color:var(--text-secondary);">${t('aiNotes')}</div>`;
                 const sourceIds = new Set((session.sourceFolder || []).map(m => m.id));
                 session.notes.forEach((note, idx) => {
                     const progress = note.maxProgress || note.progress || 0;
@@ -14246,7 +14305,7 @@ ${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
             html += `<div class="classroom-source-section">
                 <div class="classroom-source-title">${t('sourceFolder')} (${session.sourceFolder.length})</div>`;
             if (session.sourceFolder.length === 0) {
-                html += '<div class="empty-state" style="padding:20px;"><p>暂无素材，点击右下角上传</p></div>';
+                html += '<div class="empty-state" style="padding:20px;"><p>' + t('emptyMaterials') + '</p></div>';
             } else {
                 session.sourceFolder.forEach(mat => {
                     const isImg = mat.type === 'image';
@@ -14667,7 +14726,7 @@ ${paper.abstract ? t('abstractUserAbstract') + paper.abstract : ''}`;
         function displayClassroomNoteContent(note) {
             const container = document.getElementById('lectureViewerContent');
             if (!note.content) {
-                container.innerHTML = '<p style="text-align:center;color:var(--text-muted);">笔记内容为空</p>';
+                container.innerHTML = '<p style="text-align:center;color:var(--text-muted);">' + t('noteContentEmpty') + '</p>';
                 return;
             }
 
