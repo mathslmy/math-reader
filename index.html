@@ -1965,7 +1965,6 @@
         .chat-container {
             flex: 1;
             overflow-y: auto;
-            overflow-x: hidden;
             padding: 16px;
             display: flex;
             flex-direction: column;
@@ -1973,14 +1972,12 @@
             background: var(--bg-secondary);
             border-radius: 12px;
             margin-bottom: 12px;
-            min-width: 0;
         }
 
         .chat-message {
             display: flex;
             gap: 10px;
-            max-width: 85%;
-            min-width: 0;
+            width: 100%;
         }
 
         .chat-message.user {
@@ -2020,7 +2017,7 @@
             word-break: break-word;
             overflow-wrap: break-word;
             min-width: 0;
-            max-width: 100%;
+            flex: 1;
             overflow: hidden;
         }
 
@@ -2045,9 +2042,9 @@
         .chat-bubble em { font-style: italic; }
         .chat-bubble li { margin-left: 16px; list-style: disc; }
         .chat-bubble code { background: rgba(0,0,0,0.06); padding: 1px 4px; border-radius: 3px; font-size: 13px; }
-        .chat-bubble .latex-display { margin: 8px 0; overflow-x: auto; max-width: 100%; }
+        .chat-bubble .latex-display { margin: 8px 0; overflow-x: auto; }
         .chat-bubble .katex { font-size: 0.95em; }
-        .chat-bubble .katex-display { margin: 8px 0; overflow-x: auto; max-width: 100%; }
+        .chat-bubble .katex-display { margin: 8px 0; }
         .chat-bubble .katex-display > .katex { text-align: left; }
         body.dark .chat-bubble code { background: rgba(255,255,255,0.1); }
 
@@ -10323,17 +10320,14 @@
             const avatar = element.querySelector('.chat-avatar');
             const isUser = element.classList.contains('user');
 
-            // Long press on bubble: redo (AI = regenerate, User = edit)
             if (bubble) {
                 let bubbleTimer = null;
                 bubble.addEventListener('touchstart', (e) => {
                     bubbleTimer = setTimeout(() => {
                         e.preventDefault();
                         if (isUser) {
-                            // Edit user message
                             editReaderChatMessage(msgIndex);
                         } else {
-                            // Regenerate AI message
                             regenerateReaderChatMessage(msgIndex);
                         }
                     }, 600);
@@ -10342,32 +10336,24 @@
                 bubble.addEventListener('touchmove', () => clearTimeout(bubbleTimer));
                 bubble.addEventListener('contextmenu', (e) => {
                     e.preventDefault();
-                    if (isUser) {
-                        editReaderChatMessage(msgIndex);
-                    } else {
-                        regenerateReaderChatMessage(msgIndex);
-                    }
+                    if (isUser) { editReaderChatMessage(msgIndex); }
+                    else { regenerateReaderChatMessage(msgIndex); }
                 });
             }
 
-            // Long press on avatar: delete
             if (avatar) {
                 let avatarTimer = null;
                 avatar.addEventListener('touchstart', (e) => {
                     avatarTimer = setTimeout(() => {
                         e.preventDefault();
-                        if (confirm('删除这条消息?')) {
-                            deleteReaderChatMessage(msgIndex);
-                        }
+                        if (confirm('删除这条消息?')) { deleteReaderChatMessage(msgIndex); }
                     }, 600);
                 });
                 avatar.addEventListener('touchend', () => clearTimeout(avatarTimer));
                 avatar.addEventListener('touchmove', () => clearTimeout(avatarTimer));
                 avatar.addEventListener('contextmenu', (e) => {
                     e.preventDefault();
-                    if (confirm('删除这条消息?')) {
-                        deleteReaderChatMessage(msgIndex);
-                    }
+                    if (confirm('删除这条消息?')) { deleteReaderChatMessage(msgIndex); }
                 });
             }
         }
@@ -10375,20 +10361,15 @@
         function editReaderChatMessage(index) {
             if (!currentDoc) return;
             let history = loadReaderChatHistory(currentDoc.id);
-            if (index < 0 || index >= history.length) return;
-            const msg = history[index];
-            if (msg.role !== 'user') return;
+            if (index < 0 || index >= history.length || history[index].role !== 'user') return;
 
-            const newText = prompt('编辑消息:', msg.content);
+            const newText = prompt('编辑消息:', history[index].content);
             if (newText === null || newText.trim() === '') return;
 
-            // Update this message and remove all messages after it
             history[index].content = newText.trim();
             history = history.slice(0, index + 1);
             saveReaderChatHistory(currentDoc.id, history);
             renderReaderChatHistory();
-
-            // Re-send to get new AI response
             resendReaderChatFromIndex(index);
         }
 
@@ -10396,16 +10377,9 @@
             if (!currentDoc) return;
             let history = loadReaderChatHistory(currentDoc.id);
 
-            // Build system prompt
             const notes = getDocAnnotations(currentDoc.id, currentPage, 'note');
             const notesSummary = notes.map(n => n.text).filter(Boolean).join('; ');
-            const systemPrompt = `你是一个数学AI助手。
-
-用户笔记: ${notesSummary || '无'}
-请根据用户问题给出帮助。简洁、准确、数学专业。禁用比喻和物理解释。
-参考工作流程:
-stage1:用户提出附件相关问题，你结合附件给出回答。
-stage2:用户针对你的回答提出问题，你针对问题给出回答（禁止结合附件）。stage 2的回答必须完全独立,仅针对数学问题本身进行专业解释。严禁提及、暗示或关联任何附件内容。`;
+            const systemPrompt = `你是一个数学AI助手。\n\n用户笔记: ${notesSummary || '无'}\n请根据用户问题给出帮助。简洁、准确、数学专业。禁用比喻和物理解释。\n参考工作流程:\nstage1:用户提出附件相关问题，你结合附件给出回答。\nstage2:用户针对你的回答提出问题，你针对问题给出回答（禁止结合附件）。stage 2的回答必须完全独立,仅针对数学问题本身进行专业解释。严禁提及、暗示或关联任何附件内容。`;
 
             let pdfAttachment = null;
             if (currentDoc.type === 'pdf') {
@@ -10417,17 +10391,16 @@ stage2:用户针对你的回答提出问题，你针对问题给出回答（禁�
             }
 
             const apiMessages = history.map(h => ({ role: h.role, content: h.content }));
-
             const container = document.getElementById('readerChatContainer');
             const loadingDiv = document.createElement('div');
             loadingDiv.className = 'chat-message ai';
             loadingDiv.id = 'readerChatLoading';
             const _aiAvatar = getAIAvatar();
             const _aiName = getAIName();
-            const _aiAvatarHtml = _aiAvatar
+            const _avatarHtml = _aiAvatar
                 ? `<div class="chat-avatar"><img src="${_aiAvatar}" alt="${escapeHtml(_aiName)}"></div>`
                 : `<div class="chat-avatar">${(_aiName || 'AI').charAt(0).toUpperCase()}</div>`;
-            loadingDiv.innerHTML = `${_aiAvatarHtml}<div class="chat-bubble"><div class="chat-typing"><span></span><span></span><span></span></div></div>`;
+            loadingDiv.innerHTML = `${_avatarHtml}<div class="chat-bubble"><div class="chat-typing"><span></span><span></span><span></span></div></div>`;
             container.appendChild(loadingDiv);
             container.scrollTop = container.scrollHeight;
 
@@ -10448,15 +10421,12 @@ stage2:用户针对你的回答提出问题，你针对问题给出回答（禁�
         function regenerateReaderChatMessage(index) {
             if (!currentDoc) return;
             let history = loadReaderChatHistory(currentDoc.id);
-            if (index < 0 || index >= history.length) return;
-            if (history[index].role !== 'assistant') return;
+            if (index < 0 || index >= history.length || history[index].role !== 'assistant') return;
 
-            // Remove this AI message and all subsequent messages
             history = history.slice(0, index);
             saveReaderChatHistory(currentDoc.id, history);
             renderReaderChatHistory();
 
-            // Find last user message to re-send
             const lastUserIdx = history.length - 1;
             if (lastUserIdx >= 0 && history[lastUserIdx].role === 'user') {
                 resendReaderChatFromIndex(lastUserIdx);
