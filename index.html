@@ -10349,7 +10349,7 @@
                 const notes = getDocAnnotations(currentDoc.id, currentPage, 'note');
                 const notesSummary = notes.map(n => n.text).filter(Boolean).join('; ');
 
-                const greeting = `你好! 我是你的 AI 阅读助手。当前文档: ${currentDoc.title}，第 ${currentPage}/${totalPages} 页。${notesSummary ? '你在这里记了一些笔记: ' + notesSummary + '。' : ''}有什么我可以帮你的?`;
+                const greeting = `你好! 我是你的 AI 数学助手。当前文档: ${currentDoc.title}，。${notesSummary ? '你在这里记了一些笔记: ' + notesSummary + '。' : ''}有什么我可以帮你的?`;
                 history = [{ role: 'assistant', content: greeting }];
                 if (screenshot) {
                     history[0].screenshot = screenshot;
@@ -10390,12 +10390,14 @@
             // Build system prompt with context
             const notes = getDocAnnotations(currentDoc.id, currentPage, 'note');
             const notesSummary = notes.map(n => n.text).filter(Boolean).join('; ');
-            const systemPrompt = `你是一个数学阅读AI助手。
-当前文档: ${currentDoc.title} (${currentDoc.type.toUpperCase()})
-当前页码: ${currentPage}/${totalPages}
-阅读进度: ${currentDoc.progress}%
-该页笔记: ${notesSummary || '无'}
-附件是当前页的PDF，请根据附件内容和用户问题给出帮助。简洁、准确、数学专业。`;
+            const systemPrompt = `你是一个数学AI助手。
+
+用户笔记: ${notesSummary || '无'}
+请根据用户问题给出帮助。简洁、准确、数学专业。禁用比喻和物理解释。
+参考工作流程:
+stage1:用户提出附件相关问题，你结合附件给出回答。
+stage2:用户针对你的回答提出问题，你针对问题给出回答（禁止结合附件）
+stage3:用户回到针对附件问题，你结合附件回答`;
 
             const apiMessages = history.map(h => ({ role: h.role, content: h.content }));
 
