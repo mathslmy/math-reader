@@ -8844,6 +8844,7 @@
                 // 并在合并后把这些新加书的 PDF 文件一起上传到云端。
                 // 阅读进度按时间戳合并保留较新的值。合并完再把结果写回云端。
                 let newlyAddedIds = [];
+                let newMatIds = [];
                 try {
                     const metadataStr = await r2GetObject('metadata.json');
                     if (metadataStr) {
@@ -8869,6 +8870,35 @@
                         }
                         appData.books = mergeDocsPreferringLocalProgress(cloudBooks, localBooks, cloudSyncedAtMs);
                         appData.papers = mergeDocsPreferringLocalProgress(cloudPapers, localPapers, cloudSyncedAtMs);
+
+                        // 合并 classroom 数据，避免覆盖另一设备新增的素材和笔记
+                        const localClassroom = appData.classroom;
+                        appData.classroom = mergeClassroomData(
+                            metadata.classroom,
+                            localClassroom,
+                            cloudSyncedAtMs
+                        );
+
+                        // 收集本地新加但云端还没有的课堂素材 id
+                        const cloudMatIds = new Set();
+                        ['courses', 'seminars'].forEach(lk => {
+                            ((metadata.classroom || {})[lk] || []).forEach(f => {
+                                (f.sessions || []).forEach(s => {
+                                    (s.sourceFolder || []).forEach(m => { if (m.id) cloudMatIds.add(m.id); });
+                                });
+                            });
+                        });
+                        newMatIds = [];
+                        ['courses', 'seminars'].forEach(lk => {
+                            ((appData.classroom || {})[lk] || []).forEach(f => {
+                                (f.sessions || []).forEach(s => {
+                                    (s.sourceFolder || []).forEach(m => {
+                                        if (m.id && !cloudMatIds.has(m.id)) newMatIds.push(m.id);
+                                    });
+                                });
+                            });
+                        });
+
                         saveData();
                         refreshAllUIFromAppData();
                     }
@@ -8889,6 +8919,18 @@
                         }
                     } catch (e) {
                         console.warn('上传新文件失败:', id, e);
+                    }
+                }
+
+                // 把本地新加、云端还没有的课堂素材文件一起上传
+                for (const matId of (newMatIds || [])) {
+                    try {
+                        const matData = await getFileData('classroom_' + matId).catch(() => null);
+                        if (matData) {
+                            await r2PutObject('classroom/' + matId, matData, 'application/octet-stream');
+                        }
+                    } catch (e) {
+                        console.warn('上传新课堂素材失败:', matId, e);
                     }
                 }
                 
@@ -9663,6 +9705,131 @@
             return merged;
         }
 
+        // ==================== Classroom 数据合并 ====================
+        // 合并云端和本地的 classroom 数据，避免任何一方直接覆盖另一方。
+        // 策略：
+        //   - folder 级别按 id 合并；本地有云端没有且 createdAt > cloudSyncedAtMs 则保留
+        //   - session 级别按 id 合并；同上
+        //   - sourceFolder (素材) 按 id 合并，取并集；本地有云端没有且 uploadedAt > cloudSyncedAtMs 保留
+        //   - notes (笔记) 按 id 合并，取并集；本地有云端没有且 generatedAt > cloudSyncedAtMs 保留
+        //   - 同一笔记的 progress/maxProgress 取较大值
+        function mergeClassroomData(cloudClassroom, localClassroom, cloudSyncedAtMs) {
+            const cloud = cloudClassroom || { courses: [], seminars: [] };
+            const local = localClassroom || { courses: [], seminars: [] };
+            const baseline = Number(cloudSyncedAtMs) || 0;
+            const result = {};
+
+            for (const listKey of ['courses', 'seminars']) {
+                const cloudFolders = cloud[listKey] || [];
+                const localFolders = local[listKey] || [];
+                const localFolderMap = {};
+                localFolders.forEach(f => { if (f && f.id) localFolderMap[f.id] = f; });
+                const cloudFolderIds = new Set(cloudFolders.map(f => f && f.id).filter(Boolean));
+
+                // 以云端 folder 列表为基础，合并本地数据
+                const merged = cloudFolders.map(cf => {
+                    if (!cf || !cf.id) return cf;
+                    const lf = localFolderMap[cf.id];
+                    if (!lf) return cf; // 云端有、本地没有 → 用云端
+                    // 合并 sessions
+                    return { ...cf, sessions: mergeClassroomSessions(cf.sessions, lf.sessions, baseline) };
+                });
+
+                // 本地有、云端没有的 folder：如果 createdAt > baseline 则视为本地新加，保留
+                localFolders.forEach(lf => {
+                    if (!lf || !lf.id || cloudFolderIds.has(lf.id)) return;
+                    const createdMs = lf.createdAt ? Date.parse(lf.createdAt) : NaN;
+                    if (!isNaN(createdMs) && createdMs > baseline) {
+                        merged.push(lf);
+                    }
+                });
+
+                result[listKey] = merged;
+            }
+
+            return result;
+        }
+
+        function mergeClassroomSessions(cloudSessions, localSessions, baseline) {
+            const cs = cloudSessions || [];
+            const ls = localSessions || [];
+            const localMap = {};
+            ls.forEach(s => { if (s && s.id) localMap[s.id] = s; });
+            const cloudIds = new Set(cs.map(s => s && s.id).filter(Boolean));
+
+            const merged = cs.map(cSess => {
+                if (!cSess || !cSess.id) return cSess;
+                const lSess = localMap[cSess.id];
+                if (!lSess) return cSess;
+                // 合并 sourceFolder 和 notes
+                return {
+                    ...cSess,
+                    sourceFolder: mergeClassroomMaterials(cSess.sourceFolder, lSess.sourceFolder, baseline),
+                    notes: mergeClassroomNotes(cSess.notes, lSess.notes, baseline)
+                };
+            });
+
+            // 本地有、云端没有的 session
+            ls.forEach(lSess => {
+                if (!lSess || !lSess.id || cloudIds.has(lSess.id)) return;
+                const createdMs = lSess.createdAt ? Date.parse(lSess.createdAt) : NaN;
+                if (!isNaN(createdMs) && createdMs > baseline) {
+                    merged.push(lSess);
+                }
+            });
+
+            return merged;
+        }
+
+        function mergeClassroomMaterials(cloudMats, localMats, baseline) {
+            const cm = cloudMats || [];
+            const lm = localMats || [];
+            const cloudIds = new Set(cm.map(m => m && m.id).filter(Boolean));
+            const merged = [...cm];
+
+            // 本地有、云端没有的素材：如果 uploadedAt > baseline 则为本地新加，保留
+            lm.forEach(mat => {
+                if (!mat || !mat.id || cloudIds.has(mat.id)) return;
+                const uploadedMs = mat.uploadedAt ? Date.parse(mat.uploadedAt) : NaN;
+                if (!isNaN(uploadedMs) && uploadedMs > baseline) {
+                    merged.push(mat);
+                }
+            });
+
+            return merged;
+        }
+
+        function mergeClassroomNotes(cloudNotes, localNotes, baseline) {
+            const cn = cloudNotes || [];
+            const ln = localNotes || [];
+            const localMap = {};
+            ln.forEach(n => { if (n && n.id) localMap[n.id] = n; });
+            const cloudIds = new Set(cn.map(n => n && n.id).filter(Boolean));
+
+            // 对云端已有的笔记，合并阅读进度（取较大值）
+            const merged = cn.map(cNote => {
+                if (!cNote || !cNote.id) return cNote;
+                const lNote = localMap[cNote.id];
+                if (!lNote) return cNote;
+                return {
+                    ...cNote,
+                    progress: Math.max(cNote.progress || 0, lNote.progress || 0),
+                    maxProgress: Math.max(cNote.maxProgress || 0, lNote.maxProgress || 0)
+                };
+            });
+
+            // 本地有、云端没有的笔记：如果 generatedAt > baseline 则为本地新加，保留
+            ln.forEach(lNote => {
+                if (!lNote || !lNote.id || cloudIds.has(lNote.id)) return;
+                const generatedMs = lNote.generatedAt ? Date.parse(lNote.generatedAt) : NaN;
+                if (!isNaN(generatedMs) && generatedMs > baseline) {
+                    merged.push(lNote);
+                }
+            });
+
+            return merged;
+        }
+
         async function autoSyncFromR2OnStartup() {
             const config = appData.settings && appData.settings.r2Config;
             if (!config || !config.accessKeyId || !config.autoSyncEnabled) return;
@@ -9703,7 +9870,11 @@
                 appData.archived = metadata.archived || [];
                 appData.lectures = metadata.lectures || {};
                 appData.drafts = metadata.drafts || {};
-                appData.classroom = metadata.classroom || { courses: [], seminars: [] };
+                appData.classroom = mergeClassroomData(
+                    metadata.classroom,
+                    appData.classroom,
+                    cloudSyncedAtMs
+                );
                 appData.lectureDrafts = metadata.lectureDrafts || appData.lectureDrafts || {};
                 // API 设置仅保留本地值，不被云端覆盖
                 appData.settings = { ...metadata.settings, ...localApiSettings, r2Config: localR2Config };
@@ -9711,6 +9882,29 @@
                 refreshAllUIFromAppData();
                 if (config.lastSyncTime || metadata.syncedAt) {
                     r2LastSyncTime = metadata.syncedAt || config.lastSyncTime;
+                }
+
+                // 后台拉取云端新增的课堂素材文件（本地 IndexedDB 中没有的）
+                let pulledMaterials = 0;
+                for (const listKey of ['courses', 'seminars']) {
+                    for (const folder of (appData.classroom?.[listKey] || [])) {
+                        for (const session of (folder.sessions || [])) {
+                            for (const mat of (session.sourceFolder || [])) {
+                                const localMat = await getFileData('classroom_' + mat.id).catch(() => null);
+                                if (!localMat) {
+                                    try {
+                                        const cloudMat = await r2GetObject('classroom/' + mat.id);
+                                        if (cloudMat) {
+                                            await saveFileData('classroom_' + mat.id, cloudMat);
+                                            pulledMaterials++;
+                                        }
+                                    } catch(e) {
+                                        console.warn('启动拉取课堂素材失败:', mat.id, e);
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 // 后台拉取云端新增的讲义内容（本地 IndexedDB 中没有的）
@@ -9760,12 +9954,14 @@
                     }
                 }
 
-                if (pulledLectures > 0 || pulledAbstracts > 0) {
+                if (pulledLectures > 0 || pulledAbstracts > 0 || pulledMaterials > 0) {
                     const parts = [];
                     if (pulledLectures > 0) parts.push(pulledLectures + ' 篇讲义');
                     if (pulledAbstracts > 0) parts.push(pulledAbstracts + ' 篇摘要');
+                    if (pulledMaterials > 0) parts.push(pulledMaterials + ' 个课堂素材');
                     showToast('已从云端恢复 ' + parts.join('、'));
                     renderNotesPage();
+                    renderClassroomPage();
                 }
             } catch (err) {
                 console.warn('Startup auto-sync failed:', err);
