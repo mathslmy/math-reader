@@ -6091,9 +6091,11 @@
                     clearTimeout(pressTimer);
                 });
 
-                // 桌面端右键菜单
+                // 桌面端右键菜单（移动端由touchstart处理，这里仅桌面生效）
                 card.addEventListener('contextmenu', (e) => {
                     e.preventDefault();
+                    if (isLongPress) return;
+                    if ('ontouchstart' in window) return;
                     showItemLongPressMenu(e, id, category);
                 });
             });
@@ -6695,6 +6697,7 @@
             pageWrapper.addEventListener('contextmenu', (e) => {
                 if (penMode) { e.preventDefault(); return; }
                 e.preventDefault();
+                if ('ontouchstart' in window) return;
                 const rect = pageWrapper.getBoundingClientRect();
                 currentNotePosition = {
                     page: pageNum,
@@ -7230,6 +7233,7 @@
             // Desktop right-click
             pageNav.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
+                if ('ontouchstart' in window) return;
                 openPageJumpPopup();
             });
         }
@@ -10329,55 +10333,35 @@
             // Long press on bubble: redo (AI = regenerate, User = edit)
             if (bubble) {
                 let bubbleTimer = null;
-                let bubbleFired = false;
                 bubble.addEventListener('touchstart', (e) => {
-                    bubbleFired = false;
                     bubbleTimer = setTimeout(() => {
-                        e.preventDefault();
-                        bubbleFired = true;
+                        bubbleTimer = null;
                         if (isUser) {
                             editReaderChatMessage(msgIndex);
                         } else {
                             regenerateReaderChatMessage(msgIndex);
                         }
-                    }, 600);
-                });
-                bubble.addEventListener('touchend', () => clearTimeout(bubbleTimer));
-                bubble.addEventListener('touchmove', () => clearTimeout(bubbleTimer));
-                bubble.addEventListener('contextmenu', (e) => {
-                    e.preventDefault();
-                    if (bubbleFired) return;
-                    if (isUser) {
-                        editReaderChatMessage(msgIndex);
-                    } else {
-                        regenerateReaderChatMessage(msgIndex);
-                    }
-                });
+                    }, 500);
+                }, { passive: true });
+                bubble.addEventListener('touchend', () => { if (bubbleTimer) clearTimeout(bubbleTimer); bubbleTimer = null; });
+                bubble.addEventListener('touchmove', () => { if (bubbleTimer) clearTimeout(bubbleTimer); bubbleTimer = null; });
+                bubble.addEventListener('contextmenu', (e) => { e.preventDefault(); e.stopPropagation(); });
             }
 
             // Long press on avatar: delete
             if (avatar) {
                 let avatarTimer = null;
-                let avatarFired = false;
                 avatar.addEventListener('touchstart', (e) => {
-                    avatarFired = false;
                     avatarTimer = setTimeout(() => {
-                        e.preventDefault();
-                        avatarFired = true;
+                        avatarTimer = null;
                         if (confirm('删除这条消息?')) {
                             deleteReaderChatMessage(msgIndex);
                         }
-                    }, 600);
-                });
-                avatar.addEventListener('touchend', () => clearTimeout(avatarTimer));
-                avatar.addEventListener('touchmove', () => clearTimeout(avatarTimer));
-                avatar.addEventListener('contextmenu', (e) => {
-                    e.preventDefault();
-                    if (avatarFired) return;
-                    if (confirm('删除这条消息?')) {
-                        deleteReaderChatMessage(msgIndex);
-                    }
-                });
+                    }, 500);
+                }, { passive: true });
+                avatar.addEventListener('touchend', () => { if (avatarTimer) clearTimeout(avatarTimer); avatarTimer = null; });
+                avatar.addEventListener('touchmove', () => { if (avatarTimer) clearTimeout(avatarTimer); avatarTimer = null; });
+                avatar.addEventListener('contextmenu', (e) => { e.preventDefault(); e.stopPropagation(); });
             }
         }
 
@@ -13577,7 +13561,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                             }
                         });
                     }
-                    html += `<div class="classroom-note-card" style="${orphanStyle}" onclick="openClassroomNote('${type}','${folder.id}','${session.id}',${idx})" oncontextmenu="event.preventDefault();showClassroomNoteLongPress(event,'${type}','${folder.id}','${session.id}',${idx})" ontouchstart="startClassroomNoteLongPress(event,'${type}','${folder.id}','${session.id}',${idx})" ontouchend="cancelClassroomLongPress()" ontouchmove="cancelClassroomLongPress()">
+                    html += `<div class="classroom-note-card" style="${orphanStyle}" onclick="openClassroomNote('${type}','${folder.id}','${session.id}',${idx})" oncontextmenu="event.preventDefault();if(!('ontouchstart' in window))showClassroomNoteLongPress(event,'${type}','${folder.id}','${session.id}',${idx})" ontouchstart="startClassroomNoteLongPress(event,'${type}','${folder.id}','${session.id}',${idx})" ontouchend="cancelClassroomLongPress()" ontouchmove="cancelClassroomLongPress()">
                         <div class="classroom-note-card-title">${escapeHtml(note.title || '笔记')}${hasSource ? '' : '<span style="color:#ef4444;font-size:11px;margin-left:6px;">源素材已删除</span>'}</div>
                         ${uniqueRefs.map(ref =>
                             `<div class="classroom-note-card-sub" onclick="event.stopPropagation();viewClassroomSource('${type}','${folder.id}','${session.id}','${ref}')">${escapeHtml(ref)}</div>`
@@ -13598,7 +13582,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             } else {
                 session.sourceFolder.forEach(mat => {
                     const isImg = mat.type === 'image';
-                    html += `<div class="classroom-material-card" onclick="viewClassroomSourceItem('${type}','${folder.id}','${session.id}','${mat.id}')" oncontextmenu="event.preventDefault();showClassroomMatLongPress(event,'${type}','${folder.id}','${session.id}','${mat.id}')" ontouchstart="startClassroomMatLongPress(event,'${type}','${folder.id}','${session.id}','${mat.id}')" ontouchend="cancelClassroomLongPress()" ontouchmove="cancelClassroomLongPress()">
+                    html += `<div class="classroom-material-card" onclick="viewClassroomSourceItem('${type}','${folder.id}','${session.id}','${mat.id}')" oncontextmenu="event.preventDefault();if(!('ontouchstart' in window))showClassroomMatLongPress(event,'${type}','${folder.id}','${session.id}','${mat.id}')" ontouchstart="startClassroomMatLongPress(event,'${type}','${folder.id}','${session.id}','${mat.id}')" ontouchend="cancelClassroomLongPress()" ontouchmove="cancelClassroomLongPress()">
                         <div class="classroom-material-icon">
                             ${isImg ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>'
                                     : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'}
