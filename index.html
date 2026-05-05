@@ -4895,13 +4895,19 @@
                 handwritingPrompt: '你是一个手写识别助手。识别图中手写内容，数学公式用LaTeX，只输出结果。',
                 recognizeFail: '识别失败',
                 // System prompts for AI
-                readerAIPrompt: '你是一个数学阅读AI助手。',
+                readerAIPrompt: '你是一个数学阅读AI助手，正在帮用户阅读一本数学书。',
                 readerAIDocLabel: '当前文档: ',
                 readerAIPageLabel: '当前页码: ',
                 readerAIProgressLabel: '阅读进度: ',
                 readerAINoteLabel: '该页笔记: ',
                 readerAINone: '无',
-                readerAISuffix: '附件是当前页的PDF，请根据附件内容和用户问题给出帮助。简洁、准确、数学专业。',
+                readerAISuffix: `附件是用户正在阅读的当前页 PDF（仅供参考上下文）。
+
+回答规则：
+1. 如果用户的问题明确涉及当前页面上的具体内容（如"公式(7)怎么来的"、"这个定理什么意思"），请结合附件内容回答。
+2. 如果用户问的是一般性数学概念或与当前页无直接关系的问题，请直接回答该问题本身，不要强行关联当前页面内容。
+3. 回答简洁、准确、数学专业。不要添加用户没有要求的额外拓展。
+4. 回答直接给出核心内容，不要先重复或解读用户的问题。`,
                 outlineSystemPrompt: `你是一个专业的数学教育专家。下面附件是一本完整的书（PDF）。
 请你通读附件，为这本书生成一份结构化大纲（每节大约 1 小时学习量），并给出每一节对应的 PDF 页码范围。
 
@@ -5034,6 +5040,11 @@
                 generatingLectureContent: '正在生成讲义内容...',
                 searchDocContent: '搜索文档内容...',
                 enterPageNum: '输入页码',
+                readerFallbackConfigAPI: '请先在设置中配置 API 以获得 AI 回答。',
+                selectPaper: '选择论文',
+                emptyBooksImport: '暂无书籍，请先导入',
+                emptyPapersImport: '暂无论文，请先导入',
+                progressLabel: '进度',
             },
             en: {
                 appTitle: 'Math Reader',
@@ -5298,13 +5309,19 @@
                 dateFormat_lecture: 'Lecture $n',
                 handwritingPrompt: 'You are a handwriting recognition assistant. Recognize handwritten content in the image, use LaTeX for math formulas, output results only.',
                 recognizeFail: 'Recognition failed',
-                readerAIPrompt: 'You are a math reading AI assistant.',
+                readerAIPrompt: 'You are a math reading AI assistant, helping a user read a math textbook.',
                 readerAIDocLabel: 'Current document: ',
                 readerAIPageLabel: 'Current page: ',
                 readerAIProgressLabel: 'Reading progress: ',
                 readerAINoteLabel: 'Page notes: ',
                 readerAINone: 'None',
-                readerAISuffix: 'The attachment is the current PDF page. Help the user based on the content. Be concise, accurate, and professional in mathematics.',
+                readerAISuffix: `The attachment is the PDF page the user is currently reading (for context reference only).
+
+Response rules:
+1. If the user's question is specifically about content on the current page (e.g., "how is formula (7) derived", "what does this theorem mean"), use the attachment content to answer.
+2. If the user asks about a general math concept or something not directly related to the current page, answer the question directly without forcing connections to the current page.
+3. Be concise, accurate, and mathematically rigorous. Do not add unsolicited extensions or digressions.
+4. Give the core answer directly. Do not repeat or reinterpret the user's question first.`,
                 outlineSystemPrompt: `You are a professional mathematics education expert. The attachment is a complete book (PDF).
 Please read the attachment and generate a structured outline (each section ~1 hour of study), with PDF page ranges for each section.
 
@@ -5432,6 +5449,11 @@ Note format requirements:
                 generatingLectureContent: 'Generating lecture content...',
                 searchDocContent: 'Search document...',
                 enterPageNum: 'Page number',
+                readerFallbackConfigAPI: 'Please configure API in Settings for AI responses.',
+                selectPaper: 'Select Paper',
+                emptyBooksImport: 'No books yet, please import first',
+                emptyPapersImport: 'No papers yet, please import first',
+                progressLabel: 'Progress',
             }
         };
 
@@ -11347,14 +11369,7 @@ ${t('readerAISuffix')}`;
                     renderReaderChatHistory();
                 } else {
                     document.getElementById('readerChatLoading')?.remove();
-                    const replies = [
-                        '这个问题很好。建议你先回顾这一页的定义和关键定理。',
-                        '可以试试从具体例子出发理解这个概念。',
-                        '建议对照笔记中的推导过程再看一遍。',
-                        '这个证明可以分步理解，你想从哪个环节开始?',
-                        '请先在设置中配置 API 以获得更好的回答。'
-                    ];
-                    const fallback = replies[Math.floor(Math.random() * replies.length)];
+                    const fallback = t('readerFallbackConfigAPI');
                     history.push({ role: 'assistant', content: fallback });
                     saveReaderChatHistory(currentDoc.id, history);
                     renderReaderChatHistory();
@@ -11362,7 +11377,7 @@ ${t('readerAISuffix')}`;
             } catch (e) {
                 console.error('Reader chat error:', e);
                 document.getElementById('readerChatLoading')?.remove();
-                history.push({ role: 'assistant', content: '请求失败: ' + (e.message || '未知错误') });
+                history.push({ role: 'assistant', content: t('aiRequestFail') + (e.message || '') });
                 saveReaderChatHistory(currentDoc.id, history);
                 renderReaderChatHistory();
             }
@@ -11770,9 +11785,9 @@ ${t('readerAISuffix')}`;
             aiCurrentAction = action;
 
             if (action === 'lecture' || action === 'outline') {
-                showAISelectList('选择书籍', appData.books);
+                showAISelectList(t('selectBook'), appData.books);
             } else if (action === 'abstract') {
-                showAISelectList('选择论文', appData.papers);
+                showAISelectList(t('selectPaper'), appData.papers);
             } else if (action === 'chat') {
                 showAIChatModal();
             }
@@ -11784,14 +11799,14 @@ ${t('readerAISuffix')}`;
             const list = document.getElementById('taskSelectList');
 
             if (items.length === 0) {
-                list.innerHTML = `<div class="task-select-empty">${aiCurrentAction === 'lecture' ? '暂无书籍，请先导入' : '暂无论文，请先导入'}</div>`;
+                list.innerHTML = `<div class="task-select-empty">${aiCurrentAction === 'lecture' ? t('emptyBooksImport') : t('emptyPapersImport')}</div>`;
             } else {
                 list.innerHTML = items.map(item => `
                     <div class="task-select-item" onclick="aiSelectItem('${item.id}')">
                         <div class="task-select-name">${escapeHtml(item.title)}</div>
                         <div class="task-select-meta">
                             <span>${item.type.toUpperCase()}</span>
-                            <span>进度 ${item.progress}%</span>
+                            <span>${t('progressLabel')} ${item.progress}%</span>
                         </div>
                     </div>
                 `).join('');
