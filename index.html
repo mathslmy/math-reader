@@ -3638,17 +3638,19 @@
     <!-- ==================== Page 2: Reader ==================== -->
     <div class="page" id="page2">
         <div class="reader-toolbar">
-            <button class="reader-ai-btn" onclick="openReaderChat()">AI</button>
-            <span class="reader-title" id="readerTitle">文档标题</span>
-            <div class="reader-tools">
-                <button class="reader-tool-btn" id="searchToggle" onclick="toggleSearchPanel()">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-                </button>
+            <div class="reader-tools-left">
+                <button class="reader-ai-btn" onclick="openReaderChat()">AI</button>
                 <button class="reader-tool-btn" id="undoBtn" onclick="undoStroke()" style="display:none;">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
                 </button>
                 <button class="reader-tool-btn" id="redoBtn" onclick="redoStroke()" style="display:none;">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.13-9.36L23 10"/></svg>
+                </button>
+            </div>
+            <span class="reader-title" id="readerTitle">文档标题</span>
+            <div class="reader-tools">
+                <button class="reader-tool-btn" id="searchToggle" onclick="toggleSearchPanel()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
                 </button>
                 <button class="reader-tool-btn" id="penToggle" onclick="togglePenMode()">
                     <svg id="penIconOff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
@@ -6743,7 +6745,8 @@
             let lpStartPos = { x: 0, y: 0 };
 
             pageWrapper.addEventListener('touchstart', (e) => {
-                if (penMode) { e.preventDefault(); return; }
+                if (penMode && !getApplePencilMode()) { e.preventDefault(); return; }
+                if (penMode && getApplePencilMode()) return;
                 lpMoved = false;
                 lpStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
                 lpTimer = setTimeout(() => {
@@ -7820,9 +7823,16 @@
             if (redoBtn) redoBtn.style.display = penMode ? 'flex' : 'none';
 
             // Toggle annotation canvas pointer events (for all canvases)
+            const isApplePencil = getApplePencilMode();
             document.querySelectorAll('.annotation-canvas').forEach(annoCanvas => {
                 annoCanvas.style.pointerEvents = penMode ? 'auto' : 'none';
                 annoCanvas.style.cursor = penMode ? 'crosshair' : 'default';
+                // Apple Pencil 模式下允许手指滚动翻页
+                if (penMode && isApplePencil) {
+                    annoCanvas.style.touchAction = 'pan-y';
+                } else {
+                    annoCanvas.style.touchAction = penMode ? 'none' : '';
+                }
             });
 
             // 画笔模式下禁止文本选择，防止书写时误触选择
@@ -14483,6 +14493,8 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             setApplePencilMode(next);
             const toggle = document.getElementById('applePencilToggle');
             if (toggle) toggle.classList.toggle('on', next);
+            // 立即刷新画布的 touch-action 等状态
+            if (penMode) applyPenModeUI();
             showToast(next ? 'Apple Pencil 模式已开启' : 'Apple Pencil 模式已关闭');
         }
 
