@@ -3252,18 +3252,11 @@
             height: 100%;
             pointer-events: none;
             z-index: 10;
-            touch-action: auto;
         }
 
         .lecture-draw-canvas.active {
             pointer-events: auto;
             cursor: crosshair;
-            touch-action: none;
-        }
-
-        /* Apple Pencil 模式下，画布允许手指滚动 */
-        body.apple-pencil-mode .lecture-draw-canvas.active {
-            touch-action: pan-x pan-y pinch-zoom;
         }
 
         /* 书签侧边栏 */
@@ -3987,23 +3980,6 @@
                 <input type="number" id="photoRetentionDays" value="0" min="0" class="settings-input" style="width:80px;" onblur="savePhotoRetentionDays()">
             </div>
 
-            <div class="setting-item">
-                <div class="setting-item-left">
-                    <div class="setting-item-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
-                    </div>
-                    <div>
-                        <div class="setting-item-label">Apple Pencil 模式</div>
-                        <div class="setting-item-desc">仅 Pencil 书写，手指仅翻页缩放</div>
-                    </div>
-                </div>
-                <div class="setting-item-right">
-                    <div class="toggle" id="applePencilToggle" onclick="toggleApplePencilMode()">
-                        <div class="toggle-knob"></div>
-                    </div>
-                </div>
-            </div>
-
             <div class="setting-item" onclick="manualRequestPersist()">
                 <div class="setting-item-left">
                     <div class="setting-item-icon">
@@ -4016,6 +3992,23 @@
                 </div>
                 <div class="setting-item-right">
                     <button id="storagePersistBtn" style="padding:6px 14px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);font-size:13px;cursor:pointer;">请求授权</button>
+                </div>
+            </div>
+
+            <div class="setting-item" onclick="toggleApplePencilMode()">
+                <div class="setting-item-left">
+                    <div class="setting-item-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                    </div>
+                    <div>
+                        <div class="setting-item-label">Apple Pencil 模式</div>
+                        <div class="setting-item-desc">开启后仅 Pencil 书写，手指仅翻页缩放</div>
+                    </div>
+                </div>
+                <div class="setting-item-right">
+                    <div class="toggle" id="applePencilToggle">
+                        <div class="toggle-knob"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -4545,10 +4538,10 @@
                 <div class="lecture-pen-size" data-size="8" onclick="setLecturePenSize(this)"><div class="lecture-pen-size-dot" style="width:12px;height:12px;"></div></div>
             </div>
             <div class="lecture-pen-actions">
-                <button class="lecture-pen-action" id="lecturePenUndo" onclick="undoLectureStroke()" title="撤销" style="opacity:0.3;">
+                <button class="lecture-pen-action" id="lectureDrawUndoBtn" onclick="undoLectureDrawStroke()" title="撤销" style="opacity:0.3;">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
                 </button>
-                <button class="lecture-pen-action" id="lecturePenRedo" onclick="redoLectureStroke()" title="重做" style="opacity:0.3;">
+                <button class="lecture-pen-action" id="lectureDrawRedoBtn" onclick="redoLectureDrawStroke()" title="重做" style="opacity:0.3;">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.13-9.36L23 10"/></svg>
                 </button>
                 <button class="lecture-pen-action eraser" id="lecturePenEraser" onclick="toggleLecturePenEraser()">
@@ -6676,8 +6669,8 @@
             annoCanvas.addEventListener('pointerdown', (e) => {
                 if (isPinching) return;
                 if (!penMode) return;
-                // Apple Pencil 模式：仅 Pencil 书写，忽略手指
-                if (applePencilMode && e.pointerType === 'touch') return;
+                // Apple Pencil 模式：仅允许 pen 类型书写，手指不绘制
+                if (getApplePencilMode() && e.pointerType !== 'pen') return;
                 e.preventDefault();
                 // 入栈当前页快照，供撤销回滚（全局 stack 里带 pageNum）
                 saveStrokeState(pageNum, annoCanvas);
@@ -6709,8 +6702,6 @@
                     return; 
                 }
                 if (!penMode || !drawing) return;
-                // Apple Pencil 模式：忽略手指
-                if (applePencilMode && e.pointerType === 'touch') return;
                 const p = pointerToCanvasXY(e);
                 annoCtx.beginPath();
                 annoCtx.moveTo(lastX, lastY);
@@ -7832,12 +7823,6 @@
             document.querySelectorAll('.annotation-canvas').forEach(annoCanvas => {
                 annoCanvas.style.pointerEvents = penMode ? 'auto' : 'none';
                 annoCanvas.style.cursor = penMode ? 'crosshair' : 'default';
-                // Apple Pencil 模式下允许手指滚动
-                if (penMode) {
-                    annoCanvas.style.touchAction = applePencilMode ? 'pan-x pan-y pinch-zoom' : 'none';
-                } else {
-                    annoCanvas.style.touchAction = 'auto';
-                }
             });
 
             // 画笔模式下禁止文本选择，防止书写时误触选择
@@ -8338,13 +8323,8 @@
             const prEl = document.getElementById('photoRetentionDays');
             if (prEl) prEl.value = s.photoRetentionDays || 0;
 
-            // Apple Pencil 模式（仅本地存储，不参与云同步）
-            try {
-                applePencilMode = localStorage.getItem('applePencilMode') === 'true';
-            } catch(e) { applePencilMode = false; }
-            const apToggle = document.getElementById('applePencilToggle');
-            if (apToggle) apToggle.classList.toggle('on', applePencilMode);
-            document.body.classList.toggle('apple-pencil-mode', applePencilMode);
+            // Apple Pencil 模式（本地存储）
+            initApplePencilToggle();
         }
 
         function saveSettings() {
@@ -8777,26 +8757,6 @@
             } else if (!appData.settings.notify) {
                 showToast('通知已关闭');
             }
-        }
-
-        // ==================== Apple Pencil Mode ====================
-        function toggleApplePencilMode() {
-            applePencilMode = !applePencilMode;
-            const toggle = document.getElementById('applePencilToggle');
-            if (toggle) toggle.classList.toggle('on', applePencilMode);
-            // body class 用于 CSS 控制
-            document.body.classList.toggle('apple-pencil-mode', applePencilMode);
-            // 更新所有 annotation-canvas 的 touch-action
-            document.querySelectorAll('.annotation-canvas').forEach(c => {
-                if (penMode) {
-                    c.style.touchAction = applePencilMode ? 'pan-x pan-y pinch-zoom' : 'none';
-                }
-            });
-            // 仅存储在 localStorage，不参与云同步
-            try {
-                localStorage.setItem('applePencilMode', applePencilMode ? 'true' : 'false');
-            } catch(e) {}
-            showToast(applePencilMode ? 'Apple Pencil 模式已开启' : 'Apple Pencil 模式已关闭');
         }
 
         // ==================== Supabase Sync ====================
@@ -11934,13 +11894,6 @@ ${existingOutline ? 'PDF 已有书签（供参考，页码以附件实际内容�
         let lecturePenLastX = 0;
         let lecturePenLastY = 0;
         let lecturePenCtx = null;
-        // 讲义画笔撤销/重做
-        let lectureStrokeHistory = [];
-        let lectureRedoHistory = [];
-        // Apple Pencil 模式（仅本地存储，不云同步）
-        let applePencilMode = false;
-        // 讲义双指滑动支持
-        let lecturePinching = false;
 
         function toggleLecturePenMode() {
             lecturePenMode = !lecturePenMode;
@@ -11993,186 +11946,26 @@ ${existingOutline ? 'PDF 已有书签（供参考，页码以附件实际内容�
             const lectureBody = canvas.parentElement;
             canvas.width = lectureBody.scrollWidth;
             canvas.height = lectureBody.scrollHeight;
+            // Allow touch-action pan on canvas so two-finger can scroll
+            canvas.style.touchAction = 'none';
             
             lecturePenCtx = canvas.getContext('2d');
-            // Reset history for new canvas
-            lectureStrokeHistory = [];
-            lectureRedoHistory = [];
-            updateLectureUndoRedoButtons();
+            
+            canvas.addEventListener('touchstart', handleLecturePenTouchStart, { passive: false });
+            canvas.addEventListener('touchmove', handleLecturePenTouchMove, { passive: false });
+            canvas.addEventListener('touchend', handleLecturePenTouchEnd);
+            canvas.addEventListener('mousedown', startLecturePenDraw);
+            canvas.addEventListener('mousemove', doLecturePenDraw);
+            canvas.addEventListener('mouseup', endLecturePenDraw);
+            canvas.addEventListener('mouseleave', endLecturePenDraw);
 
-            // Use pointer events for Apple Pencil distinction
-            canvas.addEventListener('pointerdown', handleLecturePenPointerDown);
-            canvas.addEventListener('pointermove', handleLecturePenPointerMove);
-            canvas.addEventListener('pointerup', handleLecturePenPointerUp);
-            canvas.addEventListener('pointercancel', handleLecturePenPointerUp);
-            // Touch events for two-finger scroll detection
-            canvas.addEventListener('touchstart', handleLectureTouchStart, { passive: false });
-            canvas.addEventListener('touchmove', handleLectureTouchMove, { passive: false });
-            canvas.addEventListener('touchend', handleLectureTouchEnd, { passive: true });
-
-            // ResizeObserver to fix iPad split screen distortion
-            if (typeof ResizeObserver !== 'undefined') {
-                const ro = new ResizeObserver(() => {
-                    resizeLectureDrawCanvas();
-                });
-                ro.observe(lectureBody);
-                canvas._resizeObserver = ro;
-            }
+            // 设置 ResizeObserver 监听分屏变化
+            setupLectureCanvasResizeObserver();
         }
 
-        // 讲义画布：检查是否应忽略此指针（Apple Pencil 模式下忽略手指）
-        function shouldIgnoreLecturePointer(e) {
-            if (!applePencilMode) return false;
-            return e.pointerType === 'touch';
-        }
-
-        // 保存讲义画笔状态（用于撤销）
-        function saveLectureStrokeState() {
-            const canvas = document.getElementById('lectureDrawCanvas');
-            if (!canvas || !lecturePenCtx) return;
-            lectureStrokeHistory.push(lecturePenCtx.getImageData(0, 0, canvas.width, canvas.height));
-            if (lectureStrokeHistory.length > 30) lectureStrokeHistory.shift();
-        }
-
-        function undoLectureStroke() {
-            if (lectureStrokeHistory.length === 0) return;
-            const canvas = document.getElementById('lectureDrawCanvas');
-            if (!canvas || !lecturePenCtx) return;
-            // 当前状态入 redo
-            lectureRedoHistory.push(lecturePenCtx.getImageData(0, 0, canvas.width, canvas.height));
-            const prev = lectureStrokeHistory.pop();
-            lecturePenCtx.putImageData(prev, 0, 0);
-            updateLectureUndoRedoButtons();
-            saveLectureDrawing();
-        }
-
-        function redoLectureStroke() {
-            if (lectureRedoHistory.length === 0) return;
-            const canvas = document.getElementById('lectureDrawCanvas');
-            if (!canvas || !lecturePenCtx) return;
-            lectureStrokeHistory.push(lecturePenCtx.getImageData(0, 0, canvas.width, canvas.height));
-            const next = lectureRedoHistory.pop();
-            lecturePenCtx.putImageData(next, 0, 0);
-            updateLectureUndoRedoButtons();
-            saveLectureDrawing();
-        }
-
-        function updateLectureUndoRedoButtons() {
-            const undoBtn = document.getElementById('lecturePenUndo');
-            const redoBtn = document.getElementById('lecturePenRedo');
-            if (undoBtn) undoBtn.style.opacity = lectureStrokeHistory.length > 0 ? '1' : '0.3';
-            if (redoBtn) redoBtn.style.opacity = lectureRedoHistory.length > 0 ? '1' : '0.3';
-        }
-
-        // 讲义画布 - 双指滚动检测
-        let _lecturePenStrokeSnapshot = null; // pre-stroke snapshot for rollback on pinch
-        let _lecturePinchLastY = 0;
-
-        function handleLectureTouchStart(e) {
-            if (!lecturePenMode) return;
-            if (e.touches.length === 2) {
-                // 双指 -> 滚动模式
-                lecturePinching = true;
-                _lecturePinchLastY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-                // 如果正在画，回滚这一笔
-                if (lecturePenDrawing) {
-                    lecturePenDrawing = false;
-                    if (_lecturePenStrokeSnapshot && lecturePenCtx) {
-                        const canvas = document.getElementById('lectureDrawCanvas');
-                        if (canvas) lecturePenCtx.putImageData(_lecturePenStrokeSnapshot, 0, 0);
-                        if (lectureStrokeHistory.length > 0) lectureStrokeHistory.pop();
-                    }
-                    _lecturePenStrokeSnapshot = null;
-                }
-                e.preventDefault();
-                return;
-            }
-            if (e.touches.length === 1 && !lecturePinching) {
-                if (applePencilMode) {
-                    // Apple Pencil 模式下手指不 preventDefault，允许滚动
-                    return;
-                }
-                e.preventDefault();
-            }
-        }
-
-        function handleLectureTouchMove(e) {
-            if (!lecturePenMode) return;
-            if (e.touches.length === 2 || lecturePinching) {
-                // 双指手动滚动
-                if (e.touches.length === 2) {
-                    const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-                    const deltaY = cy - _lecturePinchLastY;
-                    _lecturePinchLastY = cy;
-                    const scrollContainer = document.getElementById('lectureViewerContent');
-                    if (scrollContainer) {
-                        scrollContainer.scrollTop -= deltaY;
-                    }
-                }
-                e.preventDefault();
-                return;
-            }
-            if (applePencilMode) {
-                // Apple Pencil 模式下手指不阻止
-                return;
-            }
-            if (lecturePenDrawing) {
-                e.preventDefault();
-            }
-        }
-
-        function handleLectureTouchEnd(e) {
-            if (e.touches.length === 0) {
-                setTimeout(() => { lecturePinching = false; }, 150);
-            }
-        }
-
-        function handleLecturePenPointerDown(e) {
-            if (!lecturePenMode) return;
-            if (lecturePinching) return;
-            if (shouldIgnoreLecturePointer(e)) return;
-
-            e.preventDefault();
-            const canvas = e.target;
-            const rect = canvas.getBoundingClientRect();
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
-            lecturePenLastX = (e.clientX - rect.left) * scaleX;
-            lecturePenLastY = (e.clientY - rect.top) * scaleY;
-            lecturePenDrawing = true;
-            // 保存 pre-stroke 快照
-            saveLectureStrokeState();
-            _lecturePenStrokeSnapshot = lectureStrokeHistory[lectureStrokeHistory.length - 1] || null;
-        }
-
-        function handleLecturePenPointerMove(e) {
-            if (!lecturePenDrawing || !lecturePenMode) return;
-            if (lecturePinching) {
-                // 被双指抢占了
-                lecturePenDrawing = false;
-                return;
-            }
-            if (shouldIgnoreLecturePointer(e)) return;
-            e.preventDefault();
-            const canvas = e.target;
-            const rect = canvas.getBoundingClientRect();
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
-            const x = (e.clientX - rect.left) * scaleX;
-            const y = (e.clientY - rect.top) * scaleY;
-            drawLecturePenLine(lecturePenLastX, lecturePenLastY, x, y);
-            lecturePenLastX = x;
-            lecturePenLastY = y;
-        }
-
-        function handleLecturePenPointerUp(e) {
-            if (!lecturePenDrawing) return;
-            lecturePenDrawing = false;
-            _lecturePenStrokeSnapshot = null;
-            lectureRedoHistory = [];
-            updateLectureUndoRedoButtons();
-            saveLectureDrawing();
-        }
+        // 讲义画布使用归一化坐标 (0~1) 存储笔画，以避免分屏/旋转后变形
+        let lectureDrawStrokes = []; // [{points:[{x,y}...], color, size, eraser}]
+        let lectureDrawRedoStack = [];
 
         function resizeLectureDrawCanvas() {
             const canvas = document.getElementById('lectureDrawCanvas');
@@ -12182,20 +11975,198 @@ ${existingOutline ? 'PDF 已有书签（供参考，页码以附件实际内容�
             const newW = lectureBody.scrollWidth;
             const newH = lectureBody.scrollHeight;
             if (canvas.width === newW && canvas.height === newH) return;
-            // 保存旧内容
-            const oldDataUrl = canvas.toDataURL();
-            const oldW = canvas.width;
-            const oldH = canvas.height;
-            // 调整尺寸（会清空内容）
             canvas.width = newW;
             canvas.height = newH;
-            // 按比例重绘旧内容
-            if (oldW > 0 && oldH > 0) {
-                const img = new Image();
-                img.onload = () => {
-                    lecturePenCtx.drawImage(img, 0, 0, newW, newH);
-                };
-                img.src = oldDataUrl;
+            // 用归一化坐标重绘所有笔画
+            redrawLectureStrokes();
+        }
+
+        function redrawLectureStrokes() {
+            const canvas = document.getElementById('lectureDrawCanvas');
+            if (!canvas || !lecturePenCtx) return;
+            const w = canvas.width, h = canvas.height;
+            lecturePenCtx.clearRect(0, 0, w, h);
+            for (const stroke of lectureDrawStrokes) {
+                if (stroke.points.length < 2) continue;
+                lecturePenCtx.beginPath();
+                lecturePenCtx.moveTo(stroke.points[0].x * w, stroke.points[0].y * h);
+                for (let i = 1; i < stroke.points.length; i++) {
+                    lecturePenCtx.lineTo(stroke.points[i].x * w, stroke.points[i].y * h);
+                }
+                if (stroke.eraser) {
+                    lecturePenCtx.globalCompositeOperation = 'destination-out';
+                    lecturePenCtx.strokeStyle = 'rgba(0,0,0,1)';
+                    lecturePenCtx.lineWidth = stroke.size * 5;
+                } else {
+                    lecturePenCtx.globalCompositeOperation = 'source-over';
+                    lecturePenCtx.strokeStyle = stroke.color;
+                    lecturePenCtx.lineWidth = stroke.size;
+                }
+                lecturePenCtx.lineCap = 'round';
+                lecturePenCtx.lineJoin = 'round';
+                lecturePenCtx.stroke();
+            }
+            lecturePenCtx.globalCompositeOperation = 'source-over';
+        }
+
+        // 监听视口/分屏变化
+        let _lectureResizeTimer = null;
+        function debouncedResizeLectureCanvas() {
+            clearTimeout(_lectureResizeTimer);
+            _lectureResizeTimer = setTimeout(() => { resizeLectureDrawCanvas(); }, 120);
+        }
+        window.addEventListener('resize', debouncedResizeLectureCanvas);
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', debouncedResizeLectureCanvas);
+        }
+
+        let _lectureCanvasResizeObserver = null;
+        function setupLectureCanvasResizeObserver() {
+            if (_lectureCanvasResizeObserver) _lectureCanvasResizeObserver.disconnect();
+            const canvas = document.getElementById('lectureDrawCanvas');
+            if (!canvas || !canvas.parentElement) return;
+            _lectureCanvasResizeObserver = new ResizeObserver(() => { debouncedResizeLectureCanvas(); });
+            _lectureCanvasResizeObserver.observe(canvas.parentElement);
+        }
+
+        let _lecturePenCurrentStroke = null; // points being drawn
+
+        function handleLecturePenTouchStart(e) {
+            if (!lecturePenMode) return;
+            // Apple Pencil mode: only pencil can draw
+            if (getApplePencilMode()) {
+                const touch = e.touches[0];
+                if (touch.touchType !== 'stylus') return; // finger, let it scroll
+            }
+            // Two-finger = scroll, cancel any active stroke
+            if (e.touches.length >= 2) {
+                if (_lecturePenCurrentStroke) {
+                    _lecturePenCurrentStroke = null;
+                    lecturePenDrawing = false;
+                }
+                return; // let scroll happen
+            }
+            e.preventDefault();
+            const touch = e.touches[0];
+            const canvas = e.target;
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const px = (touch.clientX - rect.left) * scaleX;
+            const py = (touch.clientY - rect.top) * scaleY;
+            lecturePenLastX = px;
+            lecturePenLastY = py;
+            lecturePenDrawing = true;
+            _lecturePenCurrentStroke = {
+                points: [{ x: px / canvas.width, y: py / canvas.height }],
+                color: lecturePenColor,
+                size: lecturePenSize,
+                eraser: lecturePenEraser
+            };
+        }
+
+        function handleLecturePenTouchMove(e) {
+            if (!lecturePenMode) return;
+            // Apple Pencil mode check
+            if (getApplePencilMode() && e.touches.length === 1 && e.touches[0].touchType !== 'stylus') return;
+            // Two-finger = scroll
+            if (e.touches.length >= 2) {
+                if (lecturePenDrawing && _lecturePenCurrentStroke) {
+                    // Cancel active stroke, redraw without it
+                    _lecturePenCurrentStroke = null;
+                    lecturePenDrawing = false;
+                    redrawLectureStrokes();
+                }
+                // Allow two-finger scroll on the lecture content
+                const container = document.getElementById('lectureViewerContent');
+                if (container && e.touches.length === 2) {
+                    const touch0 = e.touches[0];
+                    const touch1 = e.touches[1];
+                    const cy = (touch0.clientY + touch1.clientY) / 2;
+                    if (typeof handleLecturePenTouchMove._lastCY === 'number') {
+                        const delta = cy - handleLecturePenTouchMove._lastCY;
+                        container.scrollTop -= delta;
+                    }
+                    handleLecturePenTouchMove._lastCY = cy;
+                    e.preventDefault();
+                }
+                return;
+            }
+            if (!lecturePenDrawing || !_lecturePenCurrentStroke) return;
+            e.preventDefault();
+            const touch = e.touches[0];
+            const canvas = e.target;
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const x = (touch.clientX - rect.left) * scaleX;
+            const y = (touch.clientY - rect.top) * scaleY;
+            drawLecturePenLine(lecturePenLastX, lecturePenLastY, x, y);
+            lecturePenLastX = x;
+            lecturePenLastY = y;
+            _lecturePenCurrentStroke.points.push({ x: x / canvas.width, y: y / canvas.height });
+        }
+
+        function handleLecturePenTouchEnd(e) {
+            handleLecturePenTouchMove._lastCY = undefined;
+            if (!lecturePenDrawing || !_lecturePenCurrentStroke) {
+                lecturePenDrawing = false;
+                _lecturePenCurrentStroke = null;
+                return;
+            }
+            lecturePenDrawing = false;
+            if (_lecturePenCurrentStroke.points.length >= 2) {
+                lectureDrawStrokes.push(_lecturePenCurrentStroke);
+                lectureDrawRedoStack = [];
+                updateLectureUndoRedoButtons();
+            }
+            _lecturePenCurrentStroke = null;
+            saveLectureDrawing();
+        }
+
+        function startLecturePenDraw(e) {
+            if (!lecturePenMode) return;
+            lecturePenDrawing = true;
+            const canvas = e.target;
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            lecturePenLastX = (e.clientX - rect.left) * scaleX;
+            lecturePenLastY = (e.clientY - rect.top) * scaleY;
+            _lecturePenCurrentStroke = {
+                points: [{ x: lecturePenLastX / canvas.width, y: lecturePenLastY / canvas.height }],
+                color: lecturePenColor,
+                size: lecturePenSize,
+                eraser: lecturePenEraser
+            };
+        }
+
+        function doLecturePenDraw(e) {
+            if (!lecturePenDrawing || !lecturePenMode) return;
+            const canvas = e.target;
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const x = (e.clientX - rect.left) * scaleX;
+            const y = (e.clientY - rect.top) * scaleY;
+            drawLecturePenLine(lecturePenLastX, lecturePenLastY, x, y);
+            lecturePenLastX = x;
+            lecturePenLastY = y;
+            if (_lecturePenCurrentStroke) {
+                _lecturePenCurrentStroke.points.push({ x: x / canvas.width, y: y / canvas.height });
+            }
+        }
+
+        function endLecturePenDraw() {
+            if (lecturePenDrawing) {
+                lecturePenDrawing = false;
+                if (_lecturePenCurrentStroke && _lecturePenCurrentStroke.points.length >= 2) {
+                    lectureDrawStrokes.push(_lecturePenCurrentStroke);
+                    lectureDrawRedoStack = [];
+                    updateLectureUndoRedoButtons();
+                }
+                _lecturePenCurrentStroke = null;
+                saveLectureDrawing();
             }
         }
 
@@ -12219,12 +12190,39 @@ ${existingOutline ? 'PDF 已有书签（供参考，页码以附件实际内容�
         function clearLectureDrawing() {
             const canvas = document.getElementById('lectureDrawCanvas');
             if (!canvas || !lecturePenCtx) return;
-            saveLectureStrokeState();
-            lectureRedoHistory = [];
             lecturePenCtx.clearRect(0, 0, canvas.width, canvas.height);
+            lectureDrawStrokes = [];
+            lectureDrawRedoStack = [];
             updateLectureUndoRedoButtons();
             saveLectureDrawing();
             showToast('已清除绘制');
+        }
+
+        // 讲义画布撤销
+        function undoLectureDrawStroke() {
+            if (lectureDrawStrokes.length === 0) return;
+            const stroke = lectureDrawStrokes.pop();
+            lectureDrawRedoStack.push(stroke);
+            redrawLectureStrokes();
+            updateLectureUndoRedoButtons();
+            saveLectureDrawing();
+        }
+
+        // 讲义画布重做
+        function redoLectureDrawStroke() {
+            if (lectureDrawRedoStack.length === 0) return;
+            const stroke = lectureDrawRedoStack.pop();
+            lectureDrawStrokes.push(stroke);
+            redrawLectureStrokes();
+            updateLectureUndoRedoButtons();
+            saveLectureDrawing();
+        }
+
+        function updateLectureUndoRedoButtons() {
+            const undoBtn = document.getElementById('lectureDrawUndoBtn');
+            const redoBtn = document.getElementById('lectureDrawRedoBtn');
+            if (undoBtn) undoBtn.style.opacity = lectureDrawStrokes.length > 0 ? '1' : '0.3';
+            if (redoBtn) redoBtn.style.opacity = lectureDrawRedoStack.length > 0 ? '1' : '0.3';
         }
 
         function getLectureDrawingKey() {
@@ -12237,11 +12235,9 @@ ${existingOutline ? 'PDF 已有书签（供参考，页码以附件实际内容�
         function saveLectureDrawing() {
             const key = getLectureDrawingKey();
             if (!key) return;
-            const canvas = document.getElementById('lectureDrawCanvas');
-            if (!canvas) return;
-            const dataUrl = canvas.toDataURL();
             if (!appData.lectureDrawings) appData.lectureDrawings = {};
-            appData.lectureDrawings[key] = dataUrl;
+            // 存储归一化的笔画数据（而非 bitmap），这样分屏/旋转后不变形
+            appData.lectureDrawings[key] = JSON.stringify(lectureDrawStrokes);
             saveData();
         }
 
@@ -12250,18 +12246,32 @@ ${existingOutline ? 'PDF 已有书签（供参考，页码以附件实际内容�
             if (!key) return;
             const canvas = document.getElementById('lectureDrawCanvas');
             if (!canvas || !lecturePenCtx) return;
-            // Reset history on load
-            lectureStrokeHistory = [];
-            lectureRedoHistory = [];
-            updateLectureUndoRedoButtons();
-            
+
+            lectureDrawStrokes = [];
+            lectureDrawRedoStack = [];
+
             if (appData.lectureDrawings && appData.lectureDrawings[key]) {
-                const img = new Image();
-                img.onload = () => {
-                    lecturePenCtx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                };
-                img.src = appData.lectureDrawings[key];
+                const raw = appData.lectureDrawings[key];
+                try {
+                    // 新格式：JSON 笔画数组
+                    const parsed = JSON.parse(raw);
+                    if (Array.isArray(parsed)) {
+                        lectureDrawStrokes = parsed;
+                        redrawLectureStrokes();
+                        updateLectureUndoRedoButtons();
+                        return;
+                    }
+                } catch(e) {}
+                // 兼容旧格式：dataURL bitmap
+                if (typeof raw === 'string' && raw.startsWith('data:')) {
+                    const img = new Image();
+                    img.onload = () => {
+                        lecturePenCtx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    };
+                    img.src = raw;
+                }
             }
+            updateLectureUndoRedoButtons();
         }
 
         // ==================== 讲义草稿功能 ====================
@@ -14458,6 +14468,29 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             showToast('已保存');
         }
 
+        // ==================== Apple Pencil 模式（仅本地存储，不云同步） ====================
+        function getApplePencilMode() {
+            try { return localStorage.getItem('applePencilMode') === '1'; } catch(e) { return false; }
+        }
+
+        function setApplePencilMode(on) {
+            try { localStorage.setItem('applePencilMode', on ? '1' : '0'); } catch(e) {}
+        }
+
+        function toggleApplePencilMode() {
+            const current = getApplePencilMode();
+            const next = !current;
+            setApplePencilMode(next);
+            const toggle = document.getElementById('applePencilToggle');
+            if (toggle) toggle.classList.toggle('on', next);
+            showToast(next ? 'Apple Pencil 模式已开启' : 'Apple Pencil 模式已关闭');
+        }
+
+        function initApplePencilToggle() {
+            const toggle = document.getElementById('applePencilToggle');
+            if (toggle) toggle.classList.toggle('on', getApplePencilMode());
+        }
+
         // Override the lecture viewer regen button to handle classroom notes
         const origConfirmRegenerateLecture = typeof confirmRegenerateLecture === 'function' ? confirmRegenerateLecture : null;
 
@@ -14465,32 +14498,6 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js').catch(() => {});
         }
-
-        // ==================== iPad Split Screen / Viewport Resize Fix ====================
-        // 当 iPad 使用系统分屏（Split View / Slide Over）时，viewport 会改变。
-        // 需要重新计算 annotation canvas 和 lecture canvas 的尺寸和坐标。
-        (function() {
-            let resizeTimer = null;
-            function onViewportResize() {
-                if (resizeTimer) clearTimeout(resizeTimer);
-                resizeTimer = setTimeout(() => {
-                    // 重新调整讲义画布
-                    if (typeof resizeLectureDrawCanvas === 'function') {
-                        resizeLectureDrawCanvas();
-                    }
-                    // 如果阅读器打开且有 PDF，重建页面以适应新宽度
-                    if (pdfDoc && currentDoc && document.getElementById('page2')?.classList.contains('active')) {
-                        const focusPage = currentPage || 1;
-                        rebuildPagesForZoom(userZoom, focusPage);
-                    }
-                }, 300);
-            }
-            // 使用 visualViewport API（iPad 支持）
-            if (window.visualViewport) {
-                window.visualViewport.addEventListener('resize', onViewportResize);
-            }
-            window.addEventListener('resize', onViewportResize);
-        })();
 
         // Init
         init();
