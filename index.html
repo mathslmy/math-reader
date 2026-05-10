@@ -5272,6 +5272,10 @@
             await migrateLectureContentToIDB();
             // 将 localStorage 中残留的论文摘要迁移到 IndexedDB
             await migrateAbstractsToIDB();
+            // 将 localStorage 中残留的标注大数据、草稿画布、截图迁移到 IndexedDB
+            await migrateAnnotationsToIDB();
+            // 从 IndexedDB 恢复标注大数据、草稿画布、截图到内存
+            await restoreBlobsFromIDB();
             // 如果localStorage被iOS清理导致API设置丢失，从IndexedDB恢复
             if (!appData.settings.aiApiKey && !appData.settings.aiApiUrl) {
                 const backup = await restoreApiSettingsFromIDB();
@@ -5632,6 +5636,217 @@
             }
         }
 
+        // ==================== 标注大数据存储 (IndexedDB) ====================
+        // annotations 中的 drawing data 和 note canvasData 是 base64 大数据，
+        // 迁移到 IndexedDB，localStorage 中仅保留元数据（page, type, x, y, text, createdAt）
+
+        function annoKey(docId) { return 'annotations_' + docId; }
+        function draftCanvasKey(docId) { return 'draft_canvas_' + docId; }
+        function screenshotKey(docId) { return 'screenshot_' + docId; }
+
+        // 保存单个文档的标注大数据到 IDB
+        async function saveAnnotationBlobsToIDB(docId, annotations) {
+            if (!annotations || annotations.length === 0) return;
+            // 提取大数据：{ index -> { data?, canvasData? } }
+            const blobs = {};
+            annotations.forEach((a, i) => {
+                if (a.data || a.canvasData) {
+                    blobs[i] = {};
+                    if (a.data) blobs[i].data = a.data;
+                    if (a.canvasData) blobs[i].canvasData = a.canvasData;
+                }
+            });
+            if (Object.keys(blobs).length > 0) {
+                await saveFileData(annoKey(docId), JSON.stringify(blobs));
+            }
+        }
+
+        // 从 IDB 恢复标注大数据到内存中的 doc.annotations
+        async function restoreAnnotationBlobsFromIDB(docId, annotations) {
+            if (!annotations || annotations.length === 0) return;
+            try {
+                const raw = await getFileData(annoKey(docId));
+                if (!raw) return;
+                const blobs = JSON.parse(raw);
+                annotations.forEach((a, i) => {
+                    if (blobs[i]) {
+                        if (blobs[i].data && !a.data) a.data = blobs[i].data;
+                        if (blobs[i].canvasData && !a.canvasData) a.canvasData = blobs[i].canvasData;
+                    }
+                });
+            } catch(e) {
+                console.warn('[restoreAnnotationBlobs] 失败:', docId, e);
+            }
+        }
+
+        // 保存草稿画布到 IDB
+        async function saveDraftCanvasToIDB(docId, canvasDataUrl) {
+            if (!canvasDataUrl) return;
+            await saveFileData(draftCanvasKey(docId), canvasDataUrl);
+        }
+
+        // 从 IDB 加载草稿画布
+        async function getDraftCanvasFromIDB(docId) {
+            return await getFileData(draftCanvasKey(docId));
+        }
+
+        // 保存截图到 IDB
+        async function saveScreenshotToIDB(docId, screenshotData) {
+            if (!screenshotData) return;
+            await saveFileData(screenshotKey(docId), screenshotData);
+        }
+
+        // 从 IDB 加载截图
+        async function getScreenshotFromIDB(docId) {
+            return await getFileData(screenshotKey(docId));
+        }
+
+        // 启动时迁移：将 localStorage 中残留的标注大数据、草稿画布、截图迁移到 IndexedDB
+        async function migrateAnnotationsToIDB() {
+            let migrated = false;
+            const allDocs = [...(appData.books || []), ...(appData.papers || []), ...(appData.archived || [])];
+            for (const doc of allDocs) {
+                // 迁移标注大数据
+                if (doc.annotations && doc.annotations.length > 0 && doc.id) {
+                    const hasBlobs = doc.annotations.some(a => a.data || a.canvasData);
+                    if (hasBlobs) {
+                        try {
+                            await saveAnnotationBlobsToIDB(doc.id, doc.annotations);
+                            migrated = true;
+                        } catch(e) {
+                            console.warn('[migrate] 标注迁移失败:', doc.id, e);
+                        }
+                    }
+                }
+                // 迁移截图
+                if (doc.screenshot && doc.id) {
+                    try {
+                        await saveScreenshotToIDB(doc.id, doc.screenshot);
+                        migrated = true;
+                    } catch(e) {
+                        console.warn('[migrate] 截图迁移失败:', doc.id, e);
+                    }
+                }
+            }
+            // 迁移草稿画布
+            if (appData.drafts) {
+                for (const docId of Object.keys(appData.drafts)) {
+                    const draft = appData.drafts[docId];
+                    if (draft && draft.canvas) {
+                        try {
+                            await saveDraftCanvasToIDB(docId, draft.canvas);
+                            migrated = true;
+                        } catch(e) {
+                            console.warn('[migrate] 草稿画布迁移失败:', docId, e);
+                        }
+                    }
+                }
+            }
+            if (migrated) {
+                // saveData 中会自动剔除这些大数据后再写 localStorage
+                saveData();
+                console.log('[migrate] 标注/草稿画布/截图已从 localStorage 迁移到 IndexedDB');
+            }
+        }
+
+        // 启动时从 IDB 恢复标注大数据、草稿画布、截图到内存
+        async function restoreBlobsFromIDB() {
+            const allDocs = [...(appData.books || []), ...(appData.papers || []), ...(appData.archived || [])];
+            for (const doc of allDocs) {
+                if (doc.annotations && doc.annotations.length > 0 && doc.id) {
+                    // 只恢复缺失 data/canvasData 的（说明已迁移到 IDB）
+                    const needRestore = doc.annotations.some(a =>
+                        (a.type === 'drawing' && !a.data) ||
+                        (a.type === 'note' && !a.canvasData && a._hasCanvasData)
+                    );
+                    if (needRestore || !doc.annotations.some(a => a.data || a.canvasData)) {
+                        await restoreAnnotationBlobsFromIDB(doc.id, doc.annotations);
+                    }
+                }
+                // 恢复截图
+                if (!doc.screenshot && doc.id) {
+                    try {
+                        const ss = await getScreenshotFromIDB(doc.id);
+                        if (ss) doc.screenshot = ss;
+                    } catch(e) {}
+                }
+            }
+            // 恢复草稿画布
+            if (appData.drafts) {
+                for (const docId of Object.keys(appData.drafts)) {
+                    const draft = appData.drafts[docId];
+                    if (draft && !draft.canvas) {
+                        try {
+                            const cv = await getDraftCanvasFromIDB(docId);
+                            if (cv) draft.canvas = cv;
+                        } catch(e) {}
+                    }
+                }
+            }
+        }
+
+        // 从 toSave 对象中剔除标注大数据、草稿画布、截图（saveData 时调用）
+        function stripBlobsFromSaveData(toSave) {
+            // 剔除标注中的 drawing data 和 note canvasData
+            const stripDocAnnotations = (doc) => {
+                if (doc.annotations) {
+                    doc.annotations = doc.annotations.map(a => {
+                        const stripped = { ...a };
+                        if (stripped.data) {
+                            delete stripped.data;
+                        }
+                        if (stripped.canvasData) {
+                            stripped._hasCanvasData = true;
+                            delete stripped.canvasData;
+                        }
+                        return stripped;
+                    });
+                }
+                // 截图
+                delete doc.screenshot;
+            };
+            (toSave.books || []).forEach(stripDocAnnotations);
+            (toSave.papers || []).forEach(stripDocAnnotations);
+            (toSave.archived || []).forEach(stripDocAnnotations);
+            // 剔除草稿画布
+            if (toSave.drafts) {
+                for (const docId of Object.keys(toSave.drafts)) {
+                    if (toSave.drafts[docId]) {
+                        delete toSave.drafts[docId].canvas;
+                    }
+                }
+            }
+        }
+
+        // saveData 时异步保存标注大数据到 IDB
+        async function saveBlobsToIDB() {
+            const allDocs = [...(appData.books || []), ...(appData.papers || []), ...(appData.archived || [])];
+            for (const doc of allDocs) {
+                if (doc.annotations && doc.annotations.length > 0 && doc.id) {
+                    try {
+                        await saveAnnotationBlobsToIDB(doc.id, doc.annotations);
+                    } catch(e) {
+                        console.warn('[saveBlobsToIDB] 标注保存失败:', doc.id, e);
+                    }
+                }
+                if (doc.screenshot && doc.id) {
+                    try {
+                        await saveScreenshotToIDB(doc.id, doc.screenshot);
+                    } catch(e) {}
+                }
+            }
+            if (appData.drafts) {
+                for (const docId of Object.keys(appData.drafts)) {
+                    const draft = appData.drafts[docId];
+                    if (draft && draft.canvas) {
+                        try {
+                            await saveDraftCanvasToIDB(docId, draft.canvas);
+                        } catch(e) {}
+                    }
+                }
+            }
+        }
+
         function loadData() {
             const saved = localStorage.getItem('mathReader');
             if (saved) {
@@ -5751,6 +5966,8 @@
             // 剔除论文AI摘要（大文本已在 IndexedDB）
             toBackup.papers.forEach(p => { delete p.aiAbstract; delete p._abstractCache; });
             toBackup.archived.forEach(a => { delete a.aiAbstract; delete a._abstractCache; });
+            // 剔除标注大数据、草稿画布、截图（已在 IndexedDB）
+            stripBlobsFromSaveData(toBackup);
             // 习题数据已单独存 IndexedDB，备份中不再包含
             delete toBackup.exercises;
             saveFileData('__appdata_backup__', JSON.stringify(toBackup)).catch(e => {
@@ -5788,6 +6005,8 @@
             // 剔除论文AI摘要（大文本存在IndexedDB）
             toSave.papers.forEach(p => { delete p.aiAbstract; delete p._abstractCache; });
             toSave.archived.forEach(a => { delete a.aiAbstract; delete a._abstractCache; });
+            // 剔除标注大数据、草稿画布、截图（已迁移到 IndexedDB）
+            stripBlobsFromSaveData(toSave);
             // 习题数据完全存入 IndexedDB，不放 localStorage
             const exercisesToIDB = toSave.exercises ? JSON.parse(JSON.stringify(toSave.exercises)) : null;
             delete toSave.exercises;
@@ -5815,18 +6034,12 @@
                 localStorage.setItem('mathReader', JSON.stringify(toSave));
             } catch (e) {
                 console.error('[saveData] localStorage 写入失败:', e);
-                // QuotaExceeded 时尝试清理 screenshot 等大字段后重试
-                try {
-                    toSave.books.forEach(b => delete b.screenshot);
-                    toSave.papers.forEach(p => delete p.screenshot);
-                    toSave.archived.forEach(a => delete a.screenshot);
-                    localStorage.setItem('mathReader', JSON.stringify(toSave));
-                    console.log('[saveData] 清理 screenshot 后重试成功');
-                } catch (e2) {
-                    console.error('[saveData] 重试仍失败:', e2);
-                    showToast('存储空间不足，数据可能未保存');
-                }
+                showToast('存储空间不足，数据可能未保存');
             }
+            // 异步保存标注大数据、草稿画布、截图到 IndexedDB
+            saveBlobsToIDB().catch(e => {
+                console.warn('[saveData] blobs 写入 IndexedDB 失败:', e);
+            });
             // 异步备份到 IndexedDB（双保险）
             backupAppDataToIDB();
         }
@@ -6949,6 +7162,10 @@
             
             // 删除IndexedDB中的文件数据
             deleteFileData(id);
+            // 删除标注大数据、草稿画布、截图（IndexedDB）
+            deleteFileData(annoKey(id)).catch(() => {});
+            deleteFileData(draftCanvasKey(id)).catch(() => {});
+            deleteFileData(screenshotKey(id)).catch(() => {});
             
             saveData();
             renderLibrary();
