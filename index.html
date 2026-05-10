@@ -16384,6 +16384,29 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             // 额外等待确保 KaTeX 排版完成
             await new Promise(r => setTimeout(r, 300));
 
+            // iOS 上 html2canvas 对 KaTeX web font 渲染异常，强制换用系统字体
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+            if (isIOS) {
+                const iosFontOverride = document.createElement('style');
+                iosFontOverride.textContent = `
+                    .katex, .katex .mathnormal, .katex .mathit,
+                    .katex .mathrm, .katex .mathbf, .katex .mathbb,
+                    .katex .mathcal, .katex .mathfrak, .katex .mathsf,
+                    .katex .mathtt, .katex .mainrm,
+                    .katex .amsrm, .katex .textrm, .katex .textit,
+                    .katex .textbf, .katex .textsf, .katex .texttt,
+                    .katex .mathdefault,
+                    .katex .mord, .katex .mbin, .katex .mrel,
+                    .katex .mopen, .katex .mclose, .katex .mpunct,
+                    .katex .minner, .katex .mop {
+                        font-family: 'Times New Roman', 'STIX Two Math', Georgia, 'Noto Serif', serif !important;
+                    }
+                `;
+                container.appendChild(iosFontOverride);
+                // 等待样式生效后重新排版
+                await new Promise(r => setTimeout(r, 200));
+            }
+
             try {
                 const canvas = await html2canvas(container, {
                     scale: 2,
