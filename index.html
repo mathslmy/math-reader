@@ -1661,24 +1661,19 @@
             padding: 16px;
             border-bottom: 1px solid var(--border-color);
             overflow-y: auto;
-            max-height: 40%;
-            line-height: 2;
+            max-height: 35%;
+            line-height: 1.8;
             flex-shrink: 0;
-            -webkit-overflow-scrolling: touch;
         }
 
         .exercise-doing-question .lecture-body { padding: 0; }
-        .exercise-doing-question .lecture-body p { margin-bottom: 16px; text-align: justify; }
-        .exercise-doing-question .lecture-body li { margin-left: 24px; margin-bottom: 10px; line-height: 1.8; }
-        .exercise-doing-question .lecture-body strong { font-weight: 700; }
-        .exercise-doing-question .lecture-body h1 { font-size: 1.375em; margin-top: 20px; margin-bottom: 12px; }
-        .exercise-doing-question .lecture-body h2 { font-size: 1.1875em; margin-top: 20px; margin-bottom: 12px; }
-        .exercise-doing-question .lecture-body h3 { font-size: 1.0625em; margin-top: 16px; margin-bottom: 10px; }
-        .exercise-doing-question .latex-display { margin: 20px 0; text-align: center; }
+        .exercise-doing-question .lecture-body p { margin-bottom: 12px; text-align: justify; }
+        .exercise-doing-question .lecture-body li { margin-left: 24px; margin-bottom: 8px; line-height: 1.8; }
+        .exercise-doing-question .latex-display { margin: 16px 0; text-align: center; }
         .exercise-doing-question .lecture-body .katex { font-size: 1.1em; }
         .exercise-doing-question .lecture-body .katex-display {
-            margin: 24px 0;
-            padding: 16px;
+            margin: 16px 0;
+            padding: 12px;
             background: var(--bg-secondary);
             border-radius: 8px;
             overflow-x: auto;
@@ -3452,7 +3447,6 @@
             background: var(--bg-secondary);
             border-radius: 8px;
             overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
         }
 
         .lecture-body .katex-display > .katex {
@@ -7396,48 +7390,17 @@
             const viewportTop = scrollTop - containerRect.height;
             const viewportBottom = scrollTop + containerRect.height * 2;
 
-            // iOS 内存紧张：回收距离视口过远的已渲染页面 canvas，释放 GPU/内存
-            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-            const unloadBuffer = containerRect.height * (isIOS ? 3 : 5);
-
             for (let i = 1; i <= totalPages; i++) {
                 const pageData = pageElements[i];
-                if (!pageData) continue;
+                if (!pageData || pageData.rendered) continue;
 
                 const placeholder = pageData.placeholder;
                 const pageTop = placeholder.offsetTop;
                 const pageBottom = pageTop + placeholder.offsetHeight;
 
+                // 渲染可见范围内的页面（包括上下各一屏的缓冲区）
                 if (pageBottom >= viewportTop && pageTop <= viewportBottom) {
-                    // 在可视范围内，渲染
-                    if (!pageData.rendered) {
-                        await renderSinglePage(i);
-                    }
-                } else if (pageData.rendered && isIOS) {
-                    // iOS：回收距视口过远的页面 canvas 释放内存
-                    const distTop = viewportTop - pageBottom;
-                    const distBottom = pageTop - viewportBottom;
-                    if (distTop > unloadBuffer || distBottom > unloadBuffer) {
-                        // 保存批注数据再回收
-                        if (pageData.annoCanvas && currentDoc) {
-                            const annoData = pageData.annoCanvas.toDataURL('image/png');
-                            // 只保存非空白批注
-                            const base64Part = annoData.split(',')[1] || '';
-                            if (base64Part.length > 100) {
-                                setDocAnnotation(currentDoc.id, i, 'drawing', annoData);
-                            }
-                        }
-                        // 清空 canvas 并标记为未渲染
-                        placeholder.innerHTML = '';
-                        placeholder.style.width = pageData.viewport.width + 'px';
-                        placeholder.style.height = pageData.viewport.height + 'px';
-                        placeholder.style.background = '#fff';
-                        placeholder.className = 'pdf-page-placeholder';
-                        pageData.rendered = false;
-                        pageData.annoCanvas = null;
-                        pageData.annoCtx = null;
-                        renderedPages.delete(i);
-                    }
+                    await renderSinglePage(i);
                 }
             }
         }
@@ -7451,13 +7414,8 @@
             const placeholder = pageData.placeholder;
 
             // 限制canvas实际像素，zoom大时降低DPR避免内存爆炸
-            // iOS Safari 对 canvas 有严格的像素上限（iPhone ~4096*4096，iPad ~8192*4096），
-            // 超出会导致 canvas 白屏。用保守值确保兼容。
-            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-            const maxCanvasPixels = isIOS ? 4096 * 2048 : 4096 * 4096;
+            const maxCanvasPixels = 4096 * 4096; // ~16M pixels
             let dpr = window.devicePixelRatio || 1;
-            // iOS 上进一步限制 DPR，避免高分屏下超限
-            if (isIOS) dpr = Math.min(dpr, 2);
             const rawPixels = viewport.width * dpr * viewport.height * dpr;
             if (rawPixels > maxCanvasPixels) {
                 dpr = Math.sqrt(maxCanvasPixels / (viewport.width * viewport.height));
@@ -9108,7 +9066,8 @@
                         {left: '\\[', right: '\\]', display: true},
                         {left: '\\(', right: '\\)', display: false}
                     ],
-                    throwOnError: false
+                    throwOnError: false,
+                    strict: false
                 });
             }
             
@@ -14506,12 +14465,10 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             // 记住焦点页面在视口中的相对位置
             const focusEl = pageElements[focusPageNum];
             let focusOffsetRatio = 0;
-            if (focusEl && focusEl.placeholder) {
+            if (focusEl) {
                 const containerRect = container.getBoundingClientRect();
-                const elRect = focusEl.placeholder.getBoundingClientRect();
-                if (elRect.height > 0) {
-                    focusOffsetRatio = (containerRect.top - elRect.top) / elRect.height;
-                }
+                const elRect = focusEl.getBoundingClientRect();
+                focusOffsetRatio = (containerRect.top - elRect.top) / elRect.height;
             }
 
             // 重新渲染（会重建所有 placeholder 尺寸）
@@ -14524,12 +14481,10 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
 
             // 恢复滚动位置：把焦点页面放回视口中原来的相对位置
             const newFocusEl = pageElements[focusPageNum];
-            if (newFocusEl && newFocusEl.placeholder) {
-                const newElTop = newFocusEl.placeholder.offsetTop;
-                const newElHeight = newFocusEl.placeholder.offsetHeight;
-                if (newElHeight > 0) {
-                    container.scrollTop = newElTop + focusOffsetRatio * newElHeight * -1;
-                }
+            if (newFocusEl) {
+                const newElTop = newFocusEl.offsetTop;
+                const newElHeight = newFocusEl.offsetHeight;
+                container.scrollTop = newElTop + focusOffsetRatio * newElHeight * -1;
             }
             currentPage = savedPage;
             document.getElementById('pageInfo').textContent = `${currentPage} / ${totalPages}`;
@@ -16296,8 +16251,9 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                             const imgBytes = Uint8Array.from(atob(questionImg.split(',')[1]), c => c.charCodeAt(0));
                             const img = await pdfDoc.embedPng(imgBytes);
                             const imgDims = img.scale(1);
-                            let drawW = imgDims.width / 2;
-                            let drawH = imgDims.height / 2;
+                            // renderWidth = targetWidth*2, html2canvas scale=2 → 总像素 = 4x PDF点数
+                            let drawW = imgDims.width / 4;
+                            let drawH = imgDims.height / 4;
                             if (drawW > contentWidth) {
                                 drawH = drawH * (contentWidth / drawW);
                                 drawW = contentWidth;
@@ -16307,6 +16263,9 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                                 drawW = drawW * (maxQH / drawH);
                                 drawH = maxQH;
                             }
+                            // 四舍五入到整数点数，避免iOS PDF渲染器亚像素错位
+                            drawW = Math.round(drawW);
+                            drawH = Math.round(drawH);
                             page.drawImage(img, {
                                 x: margin, y: yPos - drawH,
                                 width: drawW, height: drawH
@@ -16336,6 +16295,10 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                         const maxH = yPos - margin;
                         let drawW = imgDims.width;
                         let drawH = imgDims.height;
+                        // 手写canvas的像素密度通常是屏幕dpr，按2x缩放到PDF点数
+                        const dpr = window.devicePixelRatio || 2;
+                        drawW = drawW / dpr;
+                        drawH = drawH / dpr;
                         if (drawW > maxW) {
                             drawH = drawH * (maxW / drawW);
                             drawW = maxW;
@@ -16344,6 +16307,8 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                             drawW = drawW * (maxH / drawH);
                             drawH = maxH;
                         }
+                        drawW = Math.round(drawW);
+                        drawH = Math.round(drawH);
                         page.drawImage(img, {
                             x: margin, y: yPos - drawH,
                             width: drawW, height: drawH
@@ -16389,6 +16354,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
 
         // 用和阅读页面完全一致的渲染管线（renderChatMarkdownLatex + lecture-body + renderLectureMath）生成题目截图
         async function renderQuestionToImage(latexText, qIdx, targetWidth) {
+            // 使用与PDF点数1:1的像素宽度，避免缩放链导致iOS阅读器错位
             const renderWidth = Math.round(targetWidth * 2);
 
             // 创建离屏容器
@@ -16405,20 +16371,23 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 pointer-events: none;
             `;
 
-            // 注入和页面 .lecture-body 一致的CSS（离屏容器不继承页面样式表）
+            // 注入和页面 .lecture-body 完全一致的CSS（包括 .latex-display 和 KaTeX 样式）
             const styleEl = document.createElement('style');
             styleEl.textContent = `
                 .lecture-body { line-height: 2; word-wrap: break-word; }
                 .lecture-body p { margin-bottom: 16px; text-align: justify; }
                 .lecture-body li { margin-left: 24px; margin-bottom: 10px; line-height: 1.8; }
-                .lecture-body strong { font-weight: 700; color: #000; }
-                .lecture-body h1 { font-size: 1.375em; font-weight: 700; margin-top: 32px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #000; }
-                .lecture-body h2 { font-size: 1.1875em; margin-top: 28px; margin-bottom: 16px; color: #000; }
-                .lecture-body h3 { font-size: 1.0625em; margin-top: 24px; margin-bottom: 12px; }
+                .lecture-body strong { font-weight: 700; }
+                .lecture-body h1 { font-size: 1.375em; font-weight: 700; margin-top: 20px; margin-bottom: 12px; }
+                .lecture-body h2 { font-size: 1.1875em; margin-top: 20px; margin-bottom: 12px; }
+                .lecture-body h3 { font-size: 1.0625em; margin-top: 16px; margin-bottom: 10px; }
                 .latex-display { margin: 20px 0; text-align: center; }
                 .lecture-body .katex { font-size: 1.1em; }
-                .lecture-body .katex-display { margin: 24px 0; padding: 16px; background: #f5f5f5; border-radius: 8px; overflow-x: auto; }
+                .lecture-body .katex-display { margin: 24px 0; padding: 16px; background: #f5f5f5; border-radius: 8px; overflow-x: visible; }
                 .lecture-body .katex-display > .katex { font-size: 1.15em; }
+                /* 防止公式被截断 */
+                .katex-display { overflow: visible !important; }
+                .katex { overflow: visible !important; }
             `;
             container.appendChild(styleEl);
 
@@ -16440,8 +16409,12 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             // 和阅读页面一致：renderLectureMath 渲染 KaTeX
             renderLectureMath(bodyEl);
 
-            // 等待 KaTeX 字体渲染完毕
-            await new Promise(r => setTimeout(r, 500));
+            // 等待 KaTeX 字体渲染完毕 + 检测字体就绪
+            await new Promise(r => setTimeout(r, 200));
+            if (document.fonts && document.fonts.ready) {
+                try { await Promise.race([document.fonts.ready, new Promise(r => setTimeout(r, 2000))]); } catch(e) {}
+            }
+            await new Promise(r => setTimeout(r, 300));
 
             try {
                 container.style.opacity = '1';
@@ -16449,7 +16422,8 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     scale: 2,
                     backgroundColor: '#ffffff',
                     useCORS: true,
-                    logging: false
+                    logging: false,
+                    allowTaint: true
                 });
                 document.body.removeChild(container);
                 return canvas.toDataURL('image/png');
@@ -17244,7 +17218,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 // 错题模式：未点重做前，只显示题目和之前的作答结果，隐藏画布
                 const scoreColor = q.score >= 8 ? '#22c55e' : q.score >= 6 ? '#eab308' : '#ef4444';
                 const timeUsedStr = q.timeUsedSeconds ? formatExTime(q.timeUsedSeconds) : '';
-                let html = `<div class="lecture-body" style="padding:0;">${renderChatMarkdownLatex(q.latex || '')}</div>`;
+                let html = `<div class="lecture-body" style="font-size:15px;line-height:2;padding:0;">${renderChatMarkdownLatex(q.latex || '')}</div>`;
                 html += `<div class="wrong-exercise-comment" style="background:${scoreColor}15;border-left:3px solid ${scoreColor};">`;
                 html += `<span class="wrong-exercise-score" style="background:${scoreColor};">${q.score}/10</span>`;
                 if (timeUsedStr) {
@@ -17254,7 +17228,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     html += `<img class="wrong-exercise-user-drawing" src="${q.userDrawing}" alt="作答">`;
                 }
                 if (q.aiComment) {
-                    html += `<div class="ex-ai-comment lecture-body" style="margin-top:6px;font-size:14px;padding:0;">${renderChatMarkdownLatex(q.aiComment)}</div>`;
+                    html += `<div class="ex-ai-comment" style="margin-top:6px;line-height:1.6;font-size:14px;">${renderChatMarkdownLatex(q.aiComment)}</div>`;
                 }
                 html += `</div>`;
                 qDiv.innerHTML = html;
@@ -17266,7 +17240,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 qDiv.style.maxHeight = 'none';
             } else {
                 // 正常做题 或 错题重做中：只显示题目 + 画布
-                let html = `<div class="lecture-body" style="padding:0;">${renderChatMarkdownLatex(q.latex || '')}</div>`;
+                let html = `<div class="lecture-body" style="font-size:15px;line-height:2;padding:0;">${renderChatMarkdownLatex(q.latex || '')}</div>`;
                 qDiv.innerHTML = html;
                 // 显示画布和工具栏
                 canvasWrap.style.display = '';
