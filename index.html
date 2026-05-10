@@ -15885,54 +15885,71 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 const result = await callAI(systemPrompt, msgContent, { maxTokens: 4096, temperature: 0.3 });
                 if (!result) { showToast('AI解析返回为空'); return; }
 
-                // Parse JSON - handle various AI response formats
+                // Parse JSON from AI response
                 let questions;
                 try {
-                    let cleaned = result.replace(/```json\s*|```\s*/g, '').trim();
-                    cleaned = cleaned.replace(/^\uFEFF/, '');
-                    const parsed = JSON.parse(cleaned);
-                    if (Array.isArray(parsed)) {
-                        questions = parsed;
-                    } else if (parsed && typeof parsed === 'object') {
-                        const arrKey = Object.keys(parsed).find(k => Array.isArray(parsed[k]));
-                        questions = arrKey ? parsed[arrKey] : null;
+                    // Step 1: 尝试提取代码块内容
+                    let jsonStr = result;
+                    const codeBlockMatch = result.match(/```(?:json)?\s*\n?([\s\S]*?)```/);
+                    if (codeBlockMatch) {
+                        jsonStr = codeBlockMatch[1].trim();
                     }
-                } catch (e) {
-                    // Try extracting array from mixed text
-                    const arrMatch = result.match(/\[[\s\S]*\]/);
-                    if (arrMatch) {
-                        try { questions = JSON.parse(arrMatch[0]); } catch(e2) {
-                            try { questions = JSON.parse(arrMatch[0].replace(/,\s*\]/g, ']').replace(/'/g, '"')); } catch(e3) {}
+
+                    // Step 2: 尝试直接解析
+                    try {
+                        const parsed = JSON.parse(jsonStr);
+                        if (Array.isArray(parsed)) {
+                            questions = parsed;
+                        } else if (parsed && typeof parsed === 'object') {
+                            // 可能是 {"questions": [...]} 这种格式
+                            const arrKey = Object.keys(parsed).find(k => Array.isArray(parsed[k]));
+                            if (arrKey) questions = parsed[arrKey];
                         }
-                    }
-                    // Try extracting object with array
-                    if (!questions) {
-                        const objMatch = result.match(/\{[\s\S]*\}/);
-                        if (objMatch) {
+                    } catch(e1) {
+                        // Step 3: 从文本中提取JSON数组
+                        // 找到最外层的 [ ... ]，用贪婪匹配
+                        const firstBracket = jsonStr.indexOf('[');
+                        const lastBracket = jsonStr.lastIndexOf(']');
+                        if (firstBracket >= 0 && lastBracket > firstBracket) {
+                            const arrStr = jsonStr.substring(firstBracket, lastBracket + 1);
                             try {
-                                const obj = JSON.parse(objMatch[0]);
-                                const arrKey = Object.keys(obj).find(k => Array.isArray(obj[k]));
-                                if (arrKey) questions = obj[arrKey];
-                            } catch(e4) {}
+                                questions = JSON.parse(arrStr);
+                            } catch(e2) {
+                                // 尝试修复：去掉末尾多余逗号
+                                try {
+                                    questions = JSON.parse(arrStr.replace(/,\s*\]/g, ']'));
+                                } catch(e3) {}
+                            }
+                        }
+                        // Step 4: 从文本中提取 { ... } 对象
+                        if (!questions) {
+                            const firstBrace = jsonStr.indexOf('{');
+                            const lastBrace = jsonStr.lastIndexOf('}');
+                            if (firstBrace >= 0 && lastBrace > firstBrace) {
+                                try {
+                                    const obj = JSON.parse(jsonStr.substring(firstBrace, lastBrace + 1));
+                                    const arrKey = Object.keys(obj).find(k => Array.isArray(obj[k]));
+                                    if (arrKey) questions = obj[arrKey];
+                                } catch(e4) {}
+                            }
                         }
                     }
-                    // Last resort: extract lines as questions
-                    if (!questions) {
-                        const lines = result.split(/\n/).map(l => l.replace(/^\s*\d+[\.\)、]\s*/, '').replace(/^["']|["'],?\s*$/g, '').trim()).filter(l => l.length > 3 && !/^[\[{\]}\s]*$/.test(l));
-                        if (lines.length > 0) questions = lines;
+
+                    // Step 5: 确保每个元素都是字符串
+                    if (Array.isArray(questions)) {
+                        questions = questions.map(q => {
+                            if (typeof q === 'string') return q;
+                            if (q && typeof q === 'object') return q.text || q.question || q.latex || q.content || q.problem || JSON.stringify(q);
+                            return String(q);
+                        }).filter(q => q && q.trim().length > 0);
                     }
-                }
-                // Normalize: ensure all items are strings
-                if (Array.isArray(questions)) {
-                    questions = questions.map(q => {
-                        if (typeof q === 'string') return q;
-                        if (q && typeof q === 'object') return q.text || q.question || q.latex || q.content || JSON.stringify(q);
-                        return String(q);
-                    }).filter(q => q && q.trim().length > 0);
+                } catch(e) {
+                    console.error('解析AI返回失败:', e, result);
                 }
 
                 if (!Array.isArray(questions) || questions.length === 0) {
-                    showToast('未识别到题目');
+                    console.error('AI原始返回:', result);
+                    showToast('AI返回格式错误，请重试');
                     return;
                 }
 
@@ -16361,22 +16378,35 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
 
                 let grading;
                 try {
-                    const cleaned = result.replace(/```json\s*|```\s*/g, '').trim().replace(/^\uFEFF/, '');
-                    grading = JSON.parse(cleaned);
-                } catch (e) {
-                    const match = result.match(/\{[\s\S]*\}/);
-                    if (match) {
-                        try { grading = JSON.parse(match[0]); } catch(e2) {
-                            try { grading = JSON.parse(match[0].replace(/,\s*}/g, '}').replace(/'/g, '"')); } catch(e3) {
-                                grading = null;
-                            }
+                    let jsonStr = result;
+                    const codeBlockMatch = result.match(/```(?:json)?\s*\n?([\s\S]*?)```/);
+                    if (codeBlockMatch) jsonStr = codeBlockMatch[1].trim();
+
+                    // 提取 { ... } 对象
+                    const firstBrace = jsonStr.indexOf('{');
+                    const lastBrace = jsonStr.lastIndexOf('}');
+                    if (firstBrace >= 0 && lastBrace > firstBrace) {
+                        try {
+                            grading = JSON.parse(jsonStr.substring(firstBrace, lastBrace + 1));
+                        } catch(e1) {
+                            try {
+                                grading = JSON.parse(jsonStr.substring(firstBrace, lastBrace + 1).replace(/,\s*}/g, '}'));
+                            } catch(e2) {}
                         }
                     }
                     if (!grading) {
-                        // Fallback: extract score from text
-                        const sm = result.match(/(\d+)\s*[\/／]\s*10/);
-                        grading = { score: sm ? parseInt(sm[1]) : 5, correct: !/不正确|错误|incorrect/i.test(result), rigor: '-', structure: '-', comment: result.substring(0, 200) };
+                        grading = JSON.parse(jsonStr);
                     }
+                } catch (e) {
+                    // Fallback: extract score from text
+                    const sm = result.match(/(\d+)\s*[\/／]\s*10/);
+                    grading = {
+                        score: sm ? parseInt(sm[1]) : 5,
+                        correct: !/不正确|错误|incorrect/i.test(result),
+                        rigor: '-',
+                        structure: '-',
+                        comment: result.substring(0, 200)
+                    };
                 }
 
                 const score = Math.min(10, Math.max(0, Math.round(grading.score || 0)));
