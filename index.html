@@ -16379,20 +16379,67 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             titleEl.textContent = `第 ${qIdx + 1} 题`;
             container.appendChild(titleEl);
 
-            // 题目内容——和阅读页面完全一致：renderChatMarkdownLatex + lecture-body 包裹
+            // 题目内容——将文本和公式包裹在同一个容器中统一渲染
             const bodyEl = document.createElement('div');
             bodyEl.className = 'lecture-body';
             bodyEl.style.cssText = 'font-size: 22px; line-height: 1.8; padding: 0;';
-            bodyEl.innerHTML = renderChatMarkdownLatex(latexText || '');
+
+            // 将原始文本按段落拆分，但保持文本和公式在同一个流中
+            const rawText = latexText || '';
+            // 先用renderChatMarkdownLatex处理markdown格式，但需要确保公式和文本在同一个渲染流中
+            // 将块级公式$$...$$临时保护，避免被拆成独立div
+            let processed = rawText;
+            const blockFormulas = [];
+            processed = processed.replace(/\$\$([\s\S]*?)\$\$/g, (match, p1) => {
+                blockFormulas.push(p1.trim());
+                return `%%EXPORTBLOCK${blockFormulas.length - 1}%%`;
+            });
+            const inlineFormulas = [];
+            processed = processed.replace(/\$([^\$\n]+?)\$/g, (match, p1) => {
+                inlineFormulas.push(p1.trim());
+                return `%%EXPORTINLINE${inlineFormulas.length - 1}%%`;
+            });
+
+            // markdown格式化
+            processed = processed
+                .replace(/^### (.*$)/gm, '<h3>$1</h3>')
+                .replace(/^## (.*$)/gm, '<h2>$1</h2>')
+                .replace(/^# (.*$)/gm, '<h1>$1</h1>')
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/^- (.*$)/gm, '<li>$1</li>')
+                .replace(/^(\d+)\. (.*$)/gm, '<li>$2</li>')
+                .replace(/\n\n/g, '</p><p>')
+                .replace(/\n/g, '<br>');
+
+            // 还原公式——块级公式保持在行内流中（用span包裹），不拆分段落
+            processed = processed.replace(/%%EXPORTBLOCK(\d+)%%/g, (match, idx) => {
+                const latex = blockFormulas[parseInt(idx)];
+                return `<span class="katex-export-block">$$${latex}$$</span>`;
+            });
+            processed = processed.replace(/%%EXPORTINLINE(\d+)%%/g, (match, idx) => {
+                const latex = inlineFormulas[parseInt(idx)];
+                return `$${latex}$`;
+            });
+
+            bodyEl.innerHTML = '<p>' + processed + '</p>';
             container.appendChild(bodyEl);
+
+            // 为导出专用的块级公式添加样式（渲染后会被KaTeX替换为display模式，但保持在文本流中）
+            const exportBlockStyle = document.createElement('style');
+            exportBlockStyle.textContent = `
+                .katex-export-block { display: block; margin: 16px 0; text-align: center; }
+                .katex-export-block .katex-display { margin: 0 !important; padding: 12px !important; }
+            `;
+            container.appendChild(exportBlockStyle);
 
             document.body.appendChild(container);
 
-            // 和阅读页面一致：renderLectureMath 渲染 KaTeX
+            // 渲染 KaTeX
             renderLectureMath(bodyEl);
 
             // 等待 KaTeX 字体渲染完毕
-            await new Promise(r => setTimeout(r, 500));
+            await new Promise(r => setTimeout(r, 600));
 
             try {
                 container.style.opacity = '1';
