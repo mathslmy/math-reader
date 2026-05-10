@@ -1667,9 +1667,16 @@
         }
 
         .exercise-doing-question .katex-display { margin: 12px 0; }
+        .exercise-doing-question .lecture-body { padding: 0; }
+        .exercise-doing-question .lecture-body p { margin-bottom: 8px; }
         .exercise-doing-question .latex-display { margin: 12px 0; text-align: center; }
-        .exercise-doing-question .latex-display .katex-display { margin: 0; }
-        .exercise-doing-question p { margin: 0 0 0.3em 0; }
+        .exercise-doing-question .lecture-body .katex-display {
+            margin: 12px 0;
+            padding: 10px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            overflow-x: auto;
+        }
 
         .exercise-doing-canvas-wrap {
             flex: 1;
@@ -7024,63 +7031,6 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
-        }
-
-        // 习题内容渲染：和阅读页面一致的效果
-        // 1. 保护 LaTeX 定界符不被 escapeHtml 破坏
-        // 2. 纯文本部分做 HTML 转义（安全）
-        // 3. 处理换行：\n\n → 段落，\n → <br>
-        // 4. 块级公式 $$...$$ 用 <div class="latex-display"> 包裹（居中显示）
-        function renderExerciseLatex(text) {
-            if (!text) return '';
-            let content = text;
-            const latexBlocks = [];
-            const latexInlines = [];
-
-            // 先提取保护 $$...$$ 块级公式
-            content = content.replace(/\$\$([\s\S]*?)\$\$/g, (match, p1) => {
-                latexBlocks.push(p1);
-                return `%%EXLATEXBLOCK${latexBlocks.length - 1}%%`;
-            });
-
-            // 提取保护 $...$ 行内公式
-            content = content.replace(/\$([^\$\n]+?)\$/g, (match, p1) => {
-                latexInlines.push(p1);
-                return `%%EXLATEXINLINE${latexInlines.length - 1}%%`;
-            });
-
-            // 提取保护 \[...\] 块级公式
-            content = content.replace(/\\\[([\s\S]*?)\\\]/g, (match, p1) => {
-                latexBlocks.push(p1);
-                return `%%EXLATEXBLOCK${latexBlocks.length - 1}%%`;
-            });
-
-            // 提取保护 \(...\) 行内公式
-            content = content.replace(/\\\(([\s\S]*?)\\\)/g, (match, p1) => {
-                latexInlines.push(p1);
-                return `%%EXLATEXINLINE${latexInlines.length - 1}%%`;
-            });
-
-            // 对纯文本部分做 HTML 转义
-            content = escapeHtml(content);
-
-            // 处理换行
-            content = content.replace(/\n\n/g, '</p><p>');
-            content = content.replace(/\n/g, '<br>');
-
-            // 恢复块级公式 → 居中显示的 div
-            content = content.replace(/%%EXLATEXBLOCK(\d+)%%/g, (match, idx) => {
-                const latex = latexBlocks[parseInt(idx)];
-                return `</p><div class="latex-display">$$${latex}$$</div><p>`;
-            });
-
-            // 恢复行内公式
-            content = content.replace(/%%EXLATEXINLINE(\d+)%%/g, (match, idx) => {
-                const latex = latexInlines[parseInt(idx)];
-                return `$${latex}$`;
-            });
-
-            return '<p>' + content + '</p>';
         }
 
         // ==================== Archive ====================
@@ -16389,26 +16339,39 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             });
         }
 
-        // 用和阅读页面一致的渲染方式生成题目截图
-        // 使用 SVG foreignObject 而非 html2canvas，因为 html2canvas 对 KaTeX
-        // 行内公式的复杂 CSS 定位（strut / vertical-align / position:relative）
-        // 截图时会导致公式位置偏移、字号异常。
-        // SVG foreignObject 使用浏览器原生渲染引擎，完全正确。
+        // 用和阅读页面完全一致的渲染管线（renderChatMarkdownLatex + lecture-body + renderLectureMath）生成题目截图
         async function renderQuestionToImage(latexText, qIdx, targetWidth) {
             const renderWidth = Math.round(targetWidth * 2);
 
-            // 创建离屏容器，让浏览器完成布局+KaTeX渲染
+            // 创建离屏容器
             const container = document.createElement('div');
             container.style.cssText = `
-                position: fixed; left: 0; top: 0;
+                position: absolute; left: 0; top: 0;
                 width: ${renderWidth}px;
                 background: white;
                 padding: 28px 32px;
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                 color: #1a1a1a;
-                z-index: 99999;
+                z-index: -9999;
+                opacity: 0;
                 pointer-events: none;
             `;
+
+            // 注入和页面 .lecture-body 一致的CSS（离屏容器不继承页面样式表）
+            const styleEl = document.createElement('style');
+            styleEl.textContent = `
+                .lecture-body p { margin-bottom: 16px; text-align: justify; }
+                .lecture-body li { margin-left: 24px; margin-bottom: 10px; line-height: 1.8; }
+                .lecture-body strong { font-weight: 700; }
+                .lecture-body h1 { font-size: 1.3em; font-weight: 700; margin-top: 20px; margin-bottom: 12px; }
+                .lecture-body h2 { font-size: 1.19em; margin-top: 20px; margin-bottom: 12px; }
+                .lecture-body h3 { font-size: 1.06em; margin-top: 16px; margin-bottom: 10px; }
+                .latex-display { margin: 20px 0; text-align: center; }
+                .lecture-body .katex { font-size: 1.1em; }
+                .lecture-body .katex-display { margin: 24px 0; padding: 16px; background: #f5f5f5; border-radius: 8px; overflow-x: auto; }
+                .lecture-body .katex-display > .katex { font-size: 1.15em; }
+            `;
+            container.appendChild(styleEl);
 
             // 题号
             const titleEl = document.createElement('div');
@@ -16416,127 +16379,35 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             titleEl.textContent = `第 ${qIdx + 1} 题`;
             container.appendChild(titleEl);
 
-            // 题目内容
+            // 题目内容——和阅读页面完全一致：renderChatMarkdownLatex + lecture-body 包裹
             const bodyEl = document.createElement('div');
-            bodyEl.style.cssText = 'font-size: 22px; line-height: 1.8;';
-            const styleTag = `<style>
-                .latex-display { margin: 16px 0; text-align: center; }
-                .latex-display .katex-display { margin: 0; }
-                p { margin: 0 0 0.4em 0; }
-                .katex { font-size: 1.1em !important; }
-                .katex-display > .katex { font-size: 1.15em !important; }
-            </style>`;
-            bodyEl.innerHTML = styleTag + renderExerciseLatex(latexText);
+            bodyEl.className = 'lecture-body';
+            bodyEl.style.cssText = 'font-size: 22px; line-height: 1.8; padding: 0;';
+            bodyEl.innerHTML = renderChatMarkdownLatex(latexText || '');
             container.appendChild(bodyEl);
 
             document.body.appendChild(container);
 
-            // 渲染 KaTeX
-            if (typeof renderMathInElement === 'function') {
-                renderMathInElement(bodyEl, {
-                    delimiters: [
-                        {left: '$$', right: '$$', display: true},
-                        {left: '\\[', right: '\\]', display: true},
-                        {left: '$', right: '$', display: false},
-                        {left: '\\(', right: '\\)', display: false}
-                    ],
-                    throwOnError: false,
-                    strict: false
-                });
-            }
+            // 和阅读页面一致：renderLectureMath 渲染 KaTeX
+            renderLectureMath(bodyEl);
 
-            // 等字体加载
-            if (document.fonts && document.fonts.ready) {
-                await document.fonts.ready;
-            }
-            await new Promise(r => setTimeout(r, 400));
-
-            const w = container.scrollWidth;
-            const h = container.scrollHeight;
+            // 等待 KaTeX 字体渲染完毕
+            await new Promise(r => setTimeout(r, 500));
 
             try {
-                // 收集页面中所有 stylesheet（包含 KaTeX CSS）内联到 SVG 中
-                let cssText = '';
-                for (const sheet of document.styleSheets) {
-                    try {
-                        for (const rule of sheet.cssRules) {
-                            cssText += rule.cssText + '\n';
-                        }
-                    } catch(e) {
-                        // 跨域 stylesheet（如 KaTeX CDN），用 fetch 获取
-                        if (sheet.href) {
-                            try {
-                                const resp = await fetch(sheet.href);
-                                cssText += await resp.text() + '\n';
-                            } catch(e2) {}
-                        }
-                    }
-                }
-
-                // 克隆容器 HTML
-                const clone = container.cloneNode(true);
-                clone.style.cssText = `width:${w}px; background:white; padding:28px 32px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; color:#1a1a1a; margin:0;`;
-
-                const svgNS = 'http://www.w3.org/2000/svg';
-                const xhtmlNS = 'http://www.w3.org/1999/xhtml';
-
-                // 构建 SVG with foreignObject
-                const svgStr = `<svg xmlns="${svgNS}" width="${w}" height="${h}">
-                    <foreignObject width="100%" height="100%">
-                        <div xmlns="${xhtmlNS}" style="width:${w}px;height:${h}px;">
-                            <style>${cssText}</style>
-                            ${clone.outerHTML}
-                        </div>
-                    </foreignObject>
-                </svg>`;
-
-                const svgBlob = new Blob([svgStr], {type: 'image/svg+xml;charset=utf-8'});
-                const svgUrl = URL.createObjectURL(svgBlob);
-
-                const img = new Image();
-                img.width = w;
-                img.height = h;
-
-                const result = await new Promise((resolve, reject) => {
-                    img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        canvas.width = w * 2;
-                        canvas.height = h * 2;
-                        const ctx = canvas.getContext('2d');
-                        ctx.scale(2, 2);
-                        ctx.fillStyle = '#ffffff';
-                        ctx.fillRect(0, 0, w, h);
-                        ctx.drawImage(img, 0, 0, w, h);
-                        URL.revokeObjectURL(svgUrl);
-                        resolve(canvas.toDataURL('image/png'));
-                    };
-                    img.onerror = (e) => {
-                        URL.revokeObjectURL(svgUrl);
-                        reject(e);
-                    };
-                    img.src = svgUrl;
+                container.style.opacity = '1';
+                const canvas = await html2canvas(container, {
+                    scale: 2,
+                    backgroundColor: '#ffffff',
+                    useCORS: true,
+                    logging: false
                 });
-
                 document.body.removeChild(container);
-                return result;
+                return canvas.toDataURL('image/png');
             } catch (err) {
-                console.warn('SVG foreignObject 截图失败，回退 html2canvas:', err);
-                // 回退到 html2canvas
-                try {
-                    await ensureHtml2Canvas();
-                    const canvas = await html2canvas(container, {
-                        scale: 2,
-                        backgroundColor: '#ffffff',
-                        useCORS: true,
-                        logging: false
-                    });
-                    document.body.removeChild(container);
-                    return canvas.toDataURL('image/png');
-                } catch(e2) {
-                    console.warn('html2canvas 也失败:', e2);
-                    document.body.removeChild(container);
-                    return null;
-                }
+                console.warn('html2canvas截图失败:', err);
+                document.body.removeChild(container);
+                return null;
             }
         }
 
@@ -17324,7 +17195,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 // 错题模式：未点重做前，只显示题目和之前的作答结果，隐藏画布
                 const scoreColor = q.score >= 8 ? '#22c55e' : q.score >= 6 ? '#eab308' : '#ef4444';
                 const timeUsedStr = q.timeUsedSeconds ? formatExTime(q.timeUsedSeconds) : '';
-                let html = `<div style="font-size:15px;line-height:1.8;">${renderExerciseLatex(q.latex)}</div>`;
+                let html = `<div class="lecture-body" style="font-size:15px;line-height:1.8;padding:0;">${renderChatMarkdownLatex(q.latex || '')}</div>`;
                 html += `<div class="wrong-exercise-comment" style="background:${scoreColor}15;border-left:3px solid ${scoreColor};">`;
                 html += `<span class="wrong-exercise-score" style="background:${scoreColor};">${q.score}/10</span>`;
                 if (timeUsedStr) {
@@ -17346,7 +17217,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 qDiv.style.maxHeight = 'none';
             } else {
                 // 正常做题 或 错题重做中：只显示题目 + 画布
-                let html = `<div style="font-size:15px;line-height:1.8;">${renderExerciseLatex(q.latex)}</div>`;
+                let html = `<div class="lecture-body" style="font-size:15px;line-height:1.8;padding:0;">${renderChatMarkdownLatex(q.latex || '')}</div>`;
                 qDiv.innerHTML = html;
                 // 显示画布和工具栏
                 canvasWrap.style.display = '';
@@ -17356,18 +17227,8 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 qDiv.style.maxHeight = '';
             }
 
-            // Render KaTeX
-            if (typeof renderMathInElement === 'function') {
-                renderMathInElement(qDiv, {
-                    delimiters: [
-                        {left: '$$', right: '$$', display: true},
-                        {left: '$', right: '$', display: false},
-                        {left: '\\[', right: '\\]', display: true},
-                        {left: '\\(', right: '\\)', display: false}
-                    ],
-                    throwOnError: false
-                });
-            }
+            // Render KaTeX — 和阅读页面完全一致
+            renderLectureMath(qDiv);
 
             // Update buttons
             document.getElementById('exPrevBtn').disabled = questionIndex <= 0;
