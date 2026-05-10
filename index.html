@@ -16340,12 +16340,10 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
         }
 
         // 用和阅读页面完全一致的渲染管线生成题目截图
-        // 关键：html2canvas 对 opacity:0 的元素不渲染字体，必须让容器可见但移出视口
+        // iOS 兼容：截图前内联 KaTeX 元素的计算样式，避免 html2canvas 字体 fallback 问题
         async function renderQuestionToImage(latexText, qIdx, targetWidth) {
             const renderWidth = Math.round(targetWidth * 2);
 
-            // 创建离屏容器——用 left:-9999px 移出视口而非 opacity:0
-            // html2canvas 对不可见元素的字体渲染有严重bug
             const container = document.createElement('div');
             container.style.cssText = `
                 position: fixed; left: -9999px; top: 0;
@@ -16364,7 +16362,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             titleEl.textContent = `第 ${qIdx + 1} 题`;
             container.appendChild(titleEl);
 
-            // 题目内容——用 renderChatMarkdownLatex 处理 markdown + LaTeX 定界符
+            // 题目内容
             const bodyEl = document.createElement('div');
             bodyEl.style.cssText = 'font-size: 22px; line-height: 1.8; text-align: left;';
             bodyEl.innerHTML = renderChatMarkdownLatex(latexText || '');
@@ -16372,17 +16370,66 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
 
             document.body.appendChild(container);
 
-            // 用 renderLectureMath 渲染 KaTeX（和阅读页完全一致，含 strict:false）
+            // 渲染 KaTeX
             renderLectureMath(bodyEl);
 
-            // 等待 KaTeX web 字体完全加载——这是关键！
-            // KaTeX 使用 KaTeX_Main, KaTeX_Math 等 web font
-            // 如果字体没加载完就截图，html2canvas 会用 fallback 字体导致大小错乱
+            // 等待字体加载
             if (document.fonts && document.fonts.ready) {
                 await document.fonts.ready;
             }
-            // 额外等待确保 KaTeX 排版完成
-            await new Promise(r => setTimeout(r, 300));
+
+            // 主动加载 KaTeX 字体族并等待
+            const katexFontFamilies = [
+                'KaTeX_Main', 'KaTeX_Math', 'KaTeX_Size1', 'KaTeX_Size2',
+                'KaTeX_Size3', 'KaTeX_Size4', 'KaTeX_AMS', 'KaTeX_Caligraphic',
+                'KaTeX_Fraktur', 'KaTeX_SansSerif', 'KaTeX_Script', 'KaTeX_Typewriter'
+            ];
+            try {
+                const fontChecks = katexFontFamilies.map(family => {
+                    return document.fonts.load(`22px "${family}"`).catch(() => {});
+                });
+                await Promise.all(fontChecks);
+            } catch(e) {}
+
+            // iOS 上字体加载后需要额外等待浏览器完成排版
+            await new Promise(r => setTimeout(r, 500));
+
+            // 关键修复：遍历所有 KaTeX 渲染的元素，将计算后的关键样式内联
+            // 这样 html2canvas 即使无法加载 web font，也能使用正确的尺寸
+            const katexElements = container.querySelectorAll('.katex, .katex .mord, .katex .mbin, .katex .mrel, .katex .mop, .katex .mopen, .katex .mclose, .katex .mpunct, .katex .minner, .katex .mfrac, .katex .msqrt, .katex .base, .katex .strut, .katex-mathml, .katex .mathnormal, .katex .mathit, .katex .mathbf, .katex .amsrm, .katex .mathbb, .katex .textit, .katex .textrm, .katex .mathdefault, span.mspace, .katex .vlist-t, .katex .vlist-r, .katex .vlist, .katex .sizing, .katex .mtight, .katex .delimsizing');
+            katexElements.forEach(el => {
+                const cs = window.getComputedStyle(el);
+                el.style.fontSize = cs.fontSize;
+                el.style.fontFamily = cs.fontFamily;
+                el.style.lineHeight = cs.lineHeight;
+                el.style.letterSpacing = cs.letterSpacing;
+                if (cs.verticalAlign !== 'baseline') {
+                    el.style.verticalAlign = cs.verticalAlign;
+                }
+                if (cs.marginLeft !== '0px') el.style.marginLeft = cs.marginLeft;
+                if (cs.marginRight !== '0px') el.style.marginRight = cs.marginRight;
+                if (cs.paddingLeft !== '0px') el.style.paddingLeft = cs.paddingLeft;
+                if (cs.paddingRight !== '0px') el.style.paddingRight = cs.paddingRight;
+                if (el.classList.contains('strut')) {
+                    el.style.height = cs.height;
+                }
+            });
+
+            // 强制设置 .katex 下所有文本 span 的宽高为固定值
+            const textSpans = container.querySelectorAll('.katex span');
+            textSpans.forEach(el => {
+                const cs = window.getComputedStyle(el);
+                if (el.children.length === 0 && el.textContent.trim()) {
+                    // 叶子文本节点：锁定尺寸
+                    const rect = el.getBoundingClientRect();
+                    if (rect.width > 0) {
+                        el.style.display = cs.display;
+                        el.style.width = rect.width + 'px';
+                        el.style.fontSize = cs.fontSize;
+                        el.style.fontFamily = cs.fontFamily;
+                    }
+                }
+            });
 
             try {
                 const canvas = await html2canvas(container, {
@@ -16391,7 +16438,6 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     useCORS: true,
                     allowTaint: true,
                     logging: false,
-                    // 强制 html2canvas 使用容器在 DOM 中的真实渲染结果
                     windowWidth: renderWidth + 100,
                     windowHeight: container.scrollHeight + 100
                 });
