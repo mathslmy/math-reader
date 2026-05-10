@@ -1724,17 +1724,20 @@
             border-top: 1px solid var(--border-color);
             background: var(--bg-primary);
             flex-shrink: 0;
+            position: relative;
         }
 
         .ex-score-badge {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
             padding: 4px 10px;
             border-radius: 8px;
             font-size: 12px;
             font-weight: 600;
             color: white;
             cursor: pointer;
-            margin-right: auto;
-            flex-shrink: 0;
         }
 
         .exercise-doing-btn {
@@ -15540,11 +15543,21 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             const data = getExercisesData();
             const idx = data.folders.findIndex(f => f.id === folderId);
             if (idx >= 0) {
-                // Clean up IDB files
                 const folder = data.folders[idx];
                 (folder.tasks || []).forEach(task => {
+                    // 清理源文件
                     (task.sourceFiles || []).forEach(sf => {
                         try { deleteFileData('exercise_' + sf.id); } catch(e) {}
+                    });
+                    // 清理每道题的IndexedDB缓存
+                    (task.questions || []).forEach((q, i) => {
+                        deleteFileData(`exercise_drawing_cache_${task.id}_${i}`).catch(e => {});
+                        deleteFileData(`exercise_timer_${task.id}_${i}`).catch(e => {});
+                        deleteFileData(`exercise_drawing_${task.id}_${i}`).catch(e => {});
+                    });
+                    // 清理内存缓存
+                    (task.questions || []).forEach((q, i) => {
+                        delete exDrawingCache[`${task.id}_${i}`];
                     });
                 });
                 data.folders.splice(idx, 1);
@@ -15639,6 +15652,13 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 showToast('没有找到源文件');
                 return;
             }
+            // 清理每道题的IndexedDB缓存
+            (task.questions || []).forEach((q, i) => {
+                deleteFileData(`exercise_drawing_cache_${taskId}_${i}`).catch(e => {});
+                deleteFileData(`exercise_timer_${taskId}_${i}`).catch(e => {});
+                deleteFileData(`exercise_drawing_${taskId}_${i}`).catch(e => {});
+                delete exDrawingCache[`${taskId}_${i}`];
+            });
             // Clear existing questions
             task.questions = [];
             saveData();
@@ -15668,6 +15688,16 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             (task.sourceFiles || []).forEach(sf => {
                 try { deleteFileData('exercise_' + sf.id); } catch(e) {}
                 triggerSyncOnFileChange(sf.id, 'exercise_delete');
+            });
+            // 清理每道题的IndexedDB缓存（书写、计时、drawing）
+            (task.questions || []).forEach((q, i) => {
+                deleteFileData(`exercise_drawing_cache_${taskId}_${i}`).catch(e => {});
+                deleteFileData(`exercise_timer_${taskId}_${i}`).catch(e => {});
+                deleteFileData(`exercise_drawing_${taskId}_${i}`).catch(e => {});
+            });
+            // 清理内存缓存
+            (task.questions || []).forEach((q, i) => {
+                delete exDrawingCache[`${taskId}_${i}`];
             });
             folder.tasks.splice(taskIdx, 1);
             // Also clean wrong questions for this task
@@ -16622,24 +16652,27 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
 
             // Start timer (only for non-wrong mode)
             if (!isWrong) {
-                if (q.remainingSeconds === undefined || q.remainingSeconds === null) {
-                    q.remainingSeconds = 1200;
-                }
-                if (!q.timeUsedSeconds) q.timeUsedSeconds = 0;
-                exTimerSeconds = q.remainingSeconds;
-                exTimerStartedAt = Date.now();
-                updateExTimerDisplay();
-                if (exTimerInterval) clearInterval(exTimerInterval);
-                exTimerInterval = setInterval(() => {
-                    exTimerSeconds--;
-                    if (exTimerSeconds <= 0) {
-                        exTimerSeconds = 0;
-                        clearInterval(exTimerInterval);
-                        exTimerInterval = null;
-                        showToast('时间到！');
+                // 先从IndexedDB恢复计时（异步，恢复后更新显示）
+                restoreExTimerFromDB(taskId, questionIndex, q).then(() => {
+                    if (q.remainingSeconds === undefined || q.remainingSeconds === null) {
+                        q.remainingSeconds = 1200;
                     }
+                    if (!q.timeUsedSeconds) q.timeUsedSeconds = 0;
+                    exTimerSeconds = q.remainingSeconds;
+                    exTimerStartedAt = Date.now();
                     updateExTimerDisplay();
-                }, 1000);
+                    if (exTimerInterval) clearInterval(exTimerInterval);
+                    exTimerInterval = setInterval(() => {
+                        exTimerSeconds--;
+                        if (exTimerSeconds <= 0) {
+                            exTimerSeconds = 0;
+                            clearInterval(exTimerInterval);
+                            exTimerInterval = null;
+                            showToast('时间到！');
+                        }
+                        updateExTimerDisplay();
+                    }, 1000);
+                });
             } else {
                 document.getElementById('exerciseDoingTimer').textContent = '--:--';
                 exTimerStartedAt = null;
@@ -16698,13 +16731,29 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             if (!task) return;
             const q = task.questions[exDoingState.questionIndex];
             if (!q) return;
-            // Calculate how much time was consumed since timer started
             const elapsed = Math.round((Date.now() - exTimerStartedAt) / 1000);
             q.remainingSeconds = Math.max(0, exTimerSeconds);
             q.timeUsedSeconds = (q.timeUsedSeconds || 0) + elapsed;
             exTimerStartedAt = null;
             if (exTimerInterval) { clearInterval(exTimerInterval); exTimerInterval = null; }
+            // 持久化到IndexedDB
+            const timerKey = `exercise_timer_${exDoingState.taskId}_${exDoingState.questionIndex}`;
+            const timerData = JSON.stringify({ remainingSeconds: q.remainingSeconds, timeUsedSeconds: q.timeUsedSeconds });
+            saveFileData(timerKey, timerData).catch(e => console.warn('保存计时失败:', e));
             saveData();
+        }
+
+        // 从IndexedDB恢复计时数据
+        async function restoreExTimerFromDB(taskId, questionIndex, q) {
+            try {
+                const timerKey = `exercise_timer_${taskId}_${questionIndex}`;
+                const saved = await getFileData(timerKey);
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    if (parsed.remainingSeconds != null) q.remainingSeconds = parsed.remainingSeconds;
+                    if (parsed.timeUsedSeconds != null) q.timeUsedSeconds = parsed.timeUsedSeconds;
+                }
+            } catch(e) {}
         }
 
         function updateExTimerDisplay() {
