@@ -9656,6 +9656,7 @@
                 lectures: stripLectureContent(appData.lectures),
                 drafts: appData.drafts,
                 classroom: stripClassroomData(appData.classroom),
+                exercises: stripExercisesData(appData.exercises),
                 syncedAt: new Date().toISOString()
             };
             
@@ -9692,6 +9693,27 @@
                 });
             });
             return c;
+        }
+
+        // 剔除习题中的 base64 数据（userDrawing等），用于同步
+        function stripExercisesData(exercises) {
+            if (!exercises) return exercises;
+            const e = JSON.parse(JSON.stringify(exercises));
+            (e.folders || []).forEach(folder => {
+                (folder.tasks || []).forEach(task => {
+                    (task.questions || []).forEach(q => { delete q.userDrawing; });
+                    (task.sourceFiles || []).forEach(sf => { delete sf.data; });
+                });
+            });
+            Object.values(e.wrongByFolder || {}).forEach(wrongTasks => {
+                (wrongTasks || []).forEach(wt => {
+                    (wt.questions || []).forEach(q => {
+                        delete q.userDrawing;
+                        (q.redoDrawings || []).forEach(rd => { delete rd.drawing; });
+                    });
+                });
+            });
+            return e;
         }
 
         async function triggerSyncOnFileChange(fileId, action) {
@@ -10249,6 +10271,7 @@
                     lectures: stripLectureContent(appData.lectures),
                     drafts: appData.drafts || {},
                     classroom: stripClassroomData(appData.classroom),
+                    exercises: stripExercisesData(appData.exercises),
                     syncedAt: new Date().toISOString()
                 };
                 
@@ -10315,6 +10338,30 @@
                     }
                 }
                 
+                // 6. 上传习题文件 (从IndexedDB获取)
+                let uploadedExFiles = 0;
+                for (const folder of (appData.exercises?.folders || [])) {
+                    for (const task of (folder.tasks || [])) {
+                        for (const sf of (task.sourceFiles || [])) {
+                            const sfData = await getFileData('exercise_' + sf.id).catch(() => null);
+                            if (sfData) {
+                                await r2PutObject('exercises/' + sf.id, sfData, sf.mimeType || 'application/octet-stream');
+                                uploadedExFiles++;
+                            }
+                        }
+                        // Upload user drawings
+                        for (const q of (task.questions || [])) {
+                            if (q.status === 'done') {
+                                const drawKey = `exercise_drawing_${task.id}_${q.index}`;
+                                const drawData = await getFileData(drawKey).catch(() => null);
+                                if (drawData) {
+                                    await r2PutObject('exercises/drawings/' + drawKey, drawData, 'image/png');
+                                }
+                            }
+                        }
+                    }
+                }
+
                 showToast(`同步完成! 上传了 ${uploadedFiles} 个文件, ${uploadedLectures} 篇讲义, ${uploadedAbstracts} 篇摘要`);
             } catch (err) {
                 console.error('Sync to R2 failed:', err);
@@ -10330,6 +10377,7 @@
             try { renderLibrary(); } catch (e) { console.warn('renderLibrary failed', e); }
             try { renderNotesPage(); } catch (e) { console.warn('renderNotesPage failed', e); }
             try { renderClassroomPage(); } catch (e) { console.warn('renderClassroomPage failed', e); }
+            try { renderExercisesPage(); } catch (e) { console.warn('renderExercisesPage failed', e); }
             // Keep the R2 auto-sync timer consistent with the (possibly new) config
             try { initR2AutoSync(); } catch (e) { console.warn('initR2AutoSync failed', e); }
         }
@@ -10560,6 +10608,11 @@
                     cloudSyncedAtMs
                 );
                 appData.lectureDrafts = metadata.lectureDrafts || appData.lectureDrafts || {};
+                // 合并习题数据：云端覆盖本地（简单策略）
+                if (metadata.exercises) {
+                    appData.exercises = metadata.exercises;
+                }
+                if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {} };
                 // API 设置仅保留本地值，不被云端覆盖
                 appData.settings = { ...metadata.settings, ...localApiSettings, r2Config: localR2Config };
                 saveData();
@@ -10638,14 +10691,37 @@
                     }
                 }
 
-                if (pulledLectures > 0 || pulledAbstracts > 0 || pulledMaterials > 0) {
+                // 后台拉取云端新增的习题文件（本地 IndexedDB 中没有的）
+                let pulledExFiles = 0;
+                for (const folder of (appData.exercises?.folders || [])) {
+                    for (const task of (folder.tasks || [])) {
+                        for (const sf of (task.sourceFiles || [])) {
+                            const localSf = await getFileData('exercise_' + sf.id).catch(() => null);
+                            if (!localSf) {
+                                try {
+                                    const cloudSf = await r2GetObject('exercises/' + sf.id);
+                                    if (cloudSf) {
+                                        await saveFileData('exercise_' + sf.id, cloudSf);
+                                        pulledExFiles++;
+                                    }
+                                } catch(e) {
+                                    console.warn('启动拉取习题文件失败:', sf.id, e);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (pulledLectures > 0 || pulledAbstracts > 0 || pulledMaterials > 0 || pulledExFiles > 0) {
                     const parts = [];
                     if (pulledLectures > 0) parts.push(pulledLectures + ' 篇讲义');
                     if (pulledAbstracts > 0) parts.push(pulledAbstracts + ' 篇摘要');
                     if (pulledMaterials > 0) parts.push(pulledMaterials + ' 个课堂素材');
+                    if (pulledExFiles > 0) parts.push(pulledExFiles + ' 个习题文件');
                     showToast('已从云端恢复 ' + parts.join('、'));
                     renderNotesPage();
                     renderClassroomPage();
+                    renderExercisesPage();
                 }
             } catch (err) {
                 console.warn('Startup auto-sync failed:', err);
@@ -10709,6 +10785,7 @@
                 appData.lectures = metadata.lectures || {};
                 appData.drafts = metadata.drafts || {};
                 appData.classroom = metadata.classroom || { courses: [], seminars: [] };
+                appData.exercises = metadata.exercises || { folders: [], wrongByFolder: {} };
                 appData.settings = { ...metadata.settings, ...localApiSettings, r2Config: localR2Config };
                 
                 saveData();
@@ -10792,8 +10869,27 @@
                     }
                 }
                 
+                // 6. 下载习题文件
+                let downloadedExFiles = 0;
+                for (const folder of (appData.exercises?.folders || [])) {
+                    for (const task of (folder.tasks || [])) {
+                        for (const sf of (task.sourceFiles || [])) {
+                            try {
+                                const sfData = await r2GetObject('exercises/' + sf.id);
+                                if (sfData) {
+                                    await saveFileData('exercise_' + sf.id, sfData);
+                                    downloadedExFiles++;
+                                }
+                            } catch (e) {
+                                console.warn('Failed to download exercise file:', sf.id, e);
+                            }
+                        }
+                    }
+                }
+
                 renderLibrary();
                 renderNotesPage();
+                renderExercisesPage();
                 // Also re-apply settings so avatar / AI name / AI persona / theme
                 // immediately reflect the restored data without needing a refresh.
                 try { applySettings(); } catch (e) { console.warn('applySettings failed', e); }
@@ -15248,22 +15344,18 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 }).join('');
             }
 
-            // Right column: wrong exercises
+            // Right column: wrong exercises (show all folders, highlight those with wrong questions)
             const wrongList = document.getElementById('exerciseWrongList');
-            const wrongFolders = folders.filter(f => {
-                const wrong = data.wrongByFolder[f.id];
-                return wrong && wrong.length > 0 && wrong.some(t => t.questions && t.questions.length > 0);
-            });
-            document.getElementById('exerciseWrongCount').textContent = wrongFolders.length;
-            if (wrongFolders.length === 0) {
+            document.getElementById('exerciseWrongCount').textContent = folders.length;
+            if (folders.length === 0) {
                 wrongList.innerHTML = '<div class="empty-state"><p>暂无错题</p></div>';
             } else {
-                wrongList.innerHTML = wrongFolders.map(f => {
+                wrongList.innerHTML = folders.map(f => {
                     const wrong = data.wrongByFolder[f.id] || [];
                     const totalWrong = wrong.reduce((s, t) => s + (t.questions || []).length, 0);
-                    return `<div class="exercise-folder-card" onclick="event.stopPropagation();enterWrongFolder('${f.id}')">
+                    return `<div class="exercise-folder-card" onclick="event.stopPropagation();enterWrongFolder('${f.id}')" style="${totalWrong === 0 ? 'opacity:0.5;' : ''}">
                         <div class="exercise-folder-card-name">${escapeHtml(f.name)}</div>
-                        <div class="exercise-folder-card-meta">${totalWrong} 道错题</div>
+                        <div class="exercise-folder-card-meta">${totalWrong > 0 ? totalWrong + ' 道错题' : '暂无错题'}</div>
                     </div>`;
                 }).join('');
             }
