@@ -9773,6 +9773,14 @@
                         await r2PutObject(matKey, matData, 'application/octet-stream');
                     }
                 }
+
+                // 如果是上传习题文件，同步习题文件数据
+                if (action === 'exercise_upload' && fileId) {
+                    const exData = await getFileData('exercise_' + fileId).catch(() => null);
+                    if (exData) {
+                        await r2PutObject('exercises/' + fileId, exData, 'application/octet-stream');
+                    }
+                }
                 
                 // 如果是删除文件，删除云端文件
                 if (action === 'delete' && fileId) {
@@ -9788,6 +9796,13 @@
                 if (action === 'classroom_delete' && fileId) {
                     try {
                         await r2DeleteObject('classroom/' + fileId);
+                    } catch (e) {}
+                }
+
+                // 如果是删除习题文件，删除云端习题文件
+                if (action === 'exercise_delete' && fileId) {
+                    try {
+                        await r2DeleteObject('exercises/' + fileId);
                     } catch (e) {}
                 }
 
@@ -9819,6 +9834,8 @@
                 } else if (action === 'abstract_upload') {
                     showToast('摘要已同步到云端');
                     sendNotification('摘要云同步完成', '论文摘要已安全同步到云端');
+                } else if (action === 'exercise_upload') {
+                    showToast('习题文件已同步到云端');
                 } else {
                     showToast('已自动同步到云端');
                 }
@@ -10584,6 +10601,113 @@
             return merged;
         }
 
+        // ==================== Exercises 数据合并 ====================
+        // 智能合并云端和本地的习题数据，参考课堂笔记模块的合并策略
+        function mergeExercisesData(cloudExercises, localExercises, cloudSyncedAtMs) {
+            const cloud = cloudExercises || { folders: [], wrongByFolder: {} };
+            const local = localExercises || { folders: [], wrongByFolder: {} };
+            const baseline = Number(cloudSyncedAtMs) || 0;
+
+            const cloudFolders = cloud.folders || [];
+            const localFolders = local.folders || [];
+            const localFolderMap = {};
+            localFolders.forEach(f => { if (f && f.id) localFolderMap[f.id] = f; });
+            const cloudFolderIds = new Set(cloudFolders.map(f => f && f.id).filter(Boolean));
+
+            // 以云端为基础合并
+            const mergedFolders = cloudFolders.map(cf => {
+                if (!cf || !cf.id) return cf;
+                const lf = localFolderMap[cf.id];
+                if (!lf) return cf;
+                // 合并tasks: 取并集
+                const mergedTasks = mergeExerciseTasks(cf.tasks, lf.tasks, baseline);
+                return { ...cf, tasks: mergedTasks };
+            });
+
+            // 本地有、云端没有的 folder：如果 createdAt > baseline 则视为本地新加
+            localFolders.forEach(lf => {
+                if (!lf || !lf.id || cloudFolderIds.has(lf.id)) return;
+                const createdMs = lf.createdAt ? Date.parse(lf.createdAt) : NaN;
+                if (!isNaN(createdMs) && createdMs > baseline) {
+                    mergedFolders.push(lf);
+                }
+            });
+
+            // 合并wrongByFolder
+            const mergedWrong = { ...(cloud.wrongByFolder || {}) };
+            for (const fid of Object.keys(local.wrongByFolder || {})) {
+                if (!mergedWrong[fid]) {
+                    mergedWrong[fid] = local.wrongByFolder[fid];
+                } else {
+                    // 取并集（按 taskId+questionIndex 去重）
+                    const cloudWTs = mergedWrong[fid] || [];
+                    const localWTs = local.wrongByFolder[fid] || [];
+                    const wtMap = {};
+                    cloudWTs.forEach(wt => { if (wt && wt.taskId) wtMap[wt.taskId] = wt; });
+                    localWTs.forEach(wt => {
+                        if (!wt || !wt.taskId) return;
+                        if (!wtMap[wt.taskId]) {
+                            wtMap[wt.taskId] = wt;
+                        } else {
+                            // 合并同一task下的错题：取并集
+                            const existing = wtMap[wt.taskId];
+                            const existingQIdx = new Set((existing.questions || []).map(q => q.questionIndex));
+                            (wt.questions || []).forEach(q => {
+                                if (!existingQIdx.has(q.questionIndex)) {
+                                    existing.questions.push(q);
+                                }
+                            });
+                        }
+                    });
+                    mergedWrong[fid] = Object.values(wtMap);
+                }
+            }
+
+            return { folders: mergedFolders, wrongByFolder: mergedWrong };
+        }
+
+        function mergeExerciseTasks(cloudTasks, localTasks, baseline) {
+            const ct = cloudTasks || [];
+            const lt = localTasks || [];
+            const localMap = {};
+            lt.forEach(t => { if (t && t.id) localMap[t.id] = t; });
+            const cloudIds = new Set(ct.map(t => t && t.id).filter(Boolean));
+
+            const merged = ct.map(cTask => {
+                if (!cTask || !cTask.id) return cTask;
+                const lTask = localMap[cTask.id];
+                if (!lTask) return cTask;
+                // 合并 sourceFiles 取并集
+                const cloudSfIds = new Set((cTask.sourceFiles || []).map(sf => sf.id));
+                const mergedSf = [...(cTask.sourceFiles || [])];
+                (lTask.sourceFiles || []).forEach(sf => {
+                    if (!cloudSfIds.has(sf.id)) mergedSf.push(sf);
+                });
+                // questions: 云端为准但保留本地做题进度
+                const mergedQ = (cTask.questions || []).map(cq => {
+                    const lq = (lTask.questions || []).find(q => q.index === cq.index);
+                    if (!lq) return cq;
+                    // 如果本地已做、云端未做，保留本地
+                    if (lq.status === 'done' && cq.status !== 'done') {
+                        return { ...cq, status: lq.status, score: lq.score, aiComment: lq.aiComment, timeUsed: lq.timeUsed };
+                    }
+                    return cq;
+                });
+                return { ...cTask, sourceFiles: mergedSf, questions: mergedQ };
+            });
+
+            // 本地有、云端没有的 task
+            lt.forEach(lTask => {
+                if (!lTask || !lTask.id || cloudIds.has(lTask.id)) return;
+                const createdMs = lTask.createdAt ? Date.parse(lTask.createdAt) : NaN;
+                if (!isNaN(createdMs) && createdMs > baseline) {
+                    merged.push(lTask);
+                }
+            });
+
+            return merged;
+        }
+
         async function autoSyncFromR2OnStartup() {
             const config = appData.settings && appData.settings.r2Config;
             if (!config || !config.accessKeyId || !config.autoSyncEnabled) return;
@@ -10630,9 +10754,13 @@
                     cloudSyncedAtMs
                 );
                 appData.lectureDrafts = metadata.lectureDrafts || appData.lectureDrafts || {};
-                // 合并习题数据：云端覆盖本地（简单策略）
+                // 合并习题数据：智能合并，参考课堂笔记模块
                 if (metadata.exercises) {
-                    appData.exercises = metadata.exercises;
+                    appData.exercises = mergeExercisesData(
+                        metadata.exercises,
+                        appData.exercises,
+                        cloudSyncedAtMs
+                    );
                 }
                 if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {} };
                 // API 设置仅保留本地值，不被云端覆盖
@@ -15477,11 +15605,12 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             const data = getExercisesData();
             const idx = data.folders.findIndex(f => f.id === folderId);
             if (idx >= 0) {
-                // Clean up IDB files
+                // Clean up IDB files and sync delete to cloud
                 const folder = data.folders[idx];
                 (folder.tasks || []).forEach(task => {
                     (task.sourceFiles || []).forEach(sf => {
                         try { deleteFileData('exercise_' + sf.id); } catch(e) {}
+                        triggerSyncOnFileChange(sf.id, 'exercise_delete');
                     });
                 });
                 data.folders.splice(idx, 1);
@@ -15490,6 +15619,91 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 debouncedChatSync();
                 renderExercisesPage();
             }
+        }
+
+        // Task long press delete
+        let _exTaskLPTimer = null;
+        function cancelExTaskLongPress() { if (_exTaskLPTimer) { clearTimeout(_exTaskLPTimer); _exTaskLPTimer = null; } }
+        function startExTaskLongPress(e, folderId, taskId) {
+            cancelExTaskLongPress();
+            const t = e.touches ? e.touches[0] : e;
+            const cx = t.clientX, cy = t.clientY;
+            _exTaskLPTimer = setTimeout(() => {
+                _exTaskLPTimer = null;
+                showExTaskMenu({ clientX: cx, clientY: cy }, folderId, taskId);
+            }, 500);
+        }
+
+        function showExTaskMenu(e, folderId, taskId) {
+            closeLongPressMenu();
+            const overlay = document.createElement('div');
+            overlay.className = 'longpress-overlay';
+            overlay.onclick = closeLongPressMenu;
+            const menu = document.createElement('div');
+            menu.className = 'longpress-menu';
+            menu.id = 'longpressMenu';
+            menu.innerHTML = `
+                <button class="longpress-menu-item" onclick="renameExTask('${folderId}','${taskId}')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                    重命名
+                </button>
+                <button class="longpress-menu-item danger" onclick="deleteExTask('${folderId}','${taskId}')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                    删除
+                </button>`;
+            document.body.appendChild(overlay);
+            document.body.appendChild(menu);
+            let x = e.clientX || 100, y = e.clientY || 100;
+            if (x + 140 > window.innerWidth) x = window.innerWidth - 150;
+            if (y + 120 > window.innerHeight) y = window.innerHeight - 130;
+            menu.style.left = x + 'px';
+            menu.style.top = y + 'px';
+        }
+
+        function renameExTask(folderId, taskId) {
+            closeLongPressMenu();
+            const data = getExercisesData();
+            const folder = data.folders.find(f => f.id === folderId);
+            if (!folder) return;
+            const task = folder.tasks.find(t => t.id === taskId);
+            if (!task) return;
+            const newName = prompt('重命名任务：', task.name);
+            if (!newName || !newName.trim()) return;
+            task.name = newName.trim();
+            saveData();
+            debouncedChatSync();
+            renderExerciseFolderContent(folder);
+        }
+
+        function deleteExTask(folderId, taskId) {
+            closeLongPressMenu();
+            if (!confirm('确定删除此习题任务？此操作不可撤销。')) return;
+            const data = getExercisesData();
+            const folder = data.folders.find(f => f.id === folderId);
+            if (!folder) return;
+            const taskIdx = folder.tasks.findIndex(t => t.id === taskId);
+            if (taskIdx < 0) return;
+            const task = folder.tasks[taskIdx];
+            // 清理IDB文件并同步删除云端
+            (task.sourceFiles || []).forEach(sf => {
+                try { deleteFileData('exercise_' + sf.id); } catch(e) {}
+                triggerSyncOnFileChange(sf.id, 'exercise_delete');
+            });
+            // 清理做题drawing
+            (task.questions || []).forEach((q, qi) => {
+                try { deleteFileData(`exercise_drawing_${taskId}_${qi}`); } catch(e) {}
+            });
+            folder.tasks.splice(taskIdx, 1);
+            // 清理对应错题
+            const wrongTasks = data.wrongByFolder[folderId];
+            if (wrongTasks) {
+                const wIdx = wrongTasks.findIndex(wt => wt.taskId === taskId);
+                if (wIdx >= 0) wrongTasks.splice(wIdx, 1);
+            }
+            saveData();
+            debouncedChatSync();
+            renderExerciseFolderContent(folder);
+            showToast('已删除');
         }
 
         function enterExerciseFolder(folderId) {
@@ -15525,7 +15739,9 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     const totalQ = (task.questions || []).length;
                     const doneQ = (task.questions || []).filter(q => q.status === 'done').length;
                     const pct = totalQ > 0 ? Math.round((doneQ / totalQ) * 100) : 0;
-                    html += `<div class="exercise-task-card" onclick="startExerciseTask('${folder.id}','${task.id}')">
+                    html += `<div class="exercise-task-card" onclick="startExerciseTask('${folder.id}','${task.id}')"
+                        oncontextmenu="event.preventDefault();if(!('ontouchstart' in window))showExTaskMenu(event,'${folder.id}','${task.id}')"
+                        ontouchstart="startExTaskLongPress(event,'${folder.id}','${task.id}')" ontouchend="cancelExTaskLongPress()" ontouchmove="cancelExTaskLongPress()">
                         <div class="exercise-task-title">${escapeHtml(task.name)}</div>
                         <div class="exercise-task-progress">
                             <div class="exercise-task-progress-bar"><div class="exercise-task-progress-fill" style="width:${pct}%;background:var(--accent-green);"></div></div>
@@ -15610,6 +15826,9 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     // Send to AI to extract questions
                     await extractExerciseQuestions(folder.id, taskId, dataUrl, isImage, file.type);
 
+                    // 触发云同步上传习题文件
+                    triggerSyncOnFileChange(fileId, 'exercise_upload');
+
                 } catch (err) {
                     console.error('上传习题失败:', err);
                     showToast('上传失败: ' + err.message);
@@ -15674,7 +15893,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 const result = await callAI(systemPrompt, msgContent, { maxTokens: 4096, temperature: 0.3 });
                 if (!result) { showToast('AI解析返回为空'); return; }
 
-                // Parse JSON
+                // Parse JSON - 多重容错
                 let questions;
                 try {
                     const cleaned = result.replace(/```json|```/g, '').trim();
@@ -15683,15 +15902,56 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     // Try to extract array
                     const match = result.match(/\[[\s\S]*\]/);
                     if (match) {
-                        questions = JSON.parse(match[0]);
-                    } else {
-                        showToast('AI返回格式错误');
-                        return;
+                        try {
+                            questions = JSON.parse(match[0]);
+                        } catch (e2) {
+                            // 尝试修复常见JSON错误（末尾多余逗号、未闭合引号等）
+                            let fixStr = match[0].replace(/,\s*\]/, ']').replace(/,\s*\}/, '}');
+                            try {
+                                questions = JSON.parse(fixStr);
+                            } catch (e3) {
+                                questions = null;
+                            }
+                        }
                     }
+                    // 如果还是失败，尝试按行拆分题目
+                    if (!questions) {
+                        const lines = result.split(/\n/).map(l => l.trim()).filter(l => l && !l.startsWith('```'));
+                        const extracted = [];
+                        let current = '';
+                        for (const line of lines) {
+                            // 识别题号开头的行（如 1. 或 (1) 或 第1题 或 题目1）
+                            if (/^(\d+[\.\)、]|[\(（]\d+[\)）]|第\d+题|题目\d+)/.test(line)) {
+                                if (current.trim()) extracted.push(current.trim());
+                                current = line;
+                            } else {
+                                current += '\n' + line;
+                            }
+                        }
+                        if (current.trim()) extracted.push(current.trim());
+                        if (extracted.length > 0) {
+                            questions = extracted;
+                        } else {
+                            showToast('AI返回格式错误，请重试');
+                            return;
+                        }
+                    }
+                }
+
+                // 如果AI返回的是对象数组而非字符串数组，提取文本
+                if (Array.isArray(questions) && questions.length > 0 && typeof questions[0] === 'object') {
+                    questions = questions.map(q => q.question || q.text || q.content || q.latex || q.title || JSON.stringify(q));
                 }
 
                 if (!Array.isArray(questions) || questions.length === 0) {
                     showToast('未识别到题目');
+                    return;
+                }
+
+                // 过滤掉空字符串
+                questions = questions.filter(q => typeof q === 'string' && q.trim().length > 0);
+                if (questions.length === 0) {
+                    showToast('未识别到有效题目');
                     return;
                 }
 
@@ -15704,7 +15964,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
 
                 task.questions = questions.map((q, idx) => ({
                     index: idx,
-                    latex: q,
+                    latex: typeof q === 'string' ? q : String(q),
                     status: 'pending', // pending | done
                     score: null,
                     userDrawing: null,
@@ -15730,18 +15990,51 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 const dataUrl = await getFileData('exercise_' + fileId);
                 if (!dataUrl) { showToast('文件数据未找到'); return; }
                 const overlay = document.createElement('div');
-                overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9000;display:flex;align-items:center;justify-content:center;cursor:pointer;';
-                overlay.onclick = () => overlay.remove();
+                overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9000;display:flex;flex-direction:column;align-items:center;justify-content:center;';
+                // 关闭按钮
+                const closeBtn = document.createElement('button');
+                closeBtn.textContent = '✕';
+                closeBtn.style.cssText = 'position:absolute;top:16px;right:16px;width:36px;height:36px;border-radius:50%;border:none;background:rgba(255,255,255,0.2);color:white;font-size:18px;cursor:pointer;z-index:10;display:flex;align-items:center;justify-content:center;';
+                closeBtn.onclick = () => overlay.remove();
+                overlay.appendChild(closeBtn);
+
                 if (dataUrl.startsWith('data:image')) {
                     const img = document.createElement('img');
                     img.src = dataUrl;
                     img.style.cssText = 'max-width:95%;max-height:90%;object-fit:contain;border-radius:8px;';
                     overlay.appendChild(img);
+                } else if (dataUrl.startsWith('data:application/pdf') || dataUrl.indexOf('pdf') !== -1) {
+                    // PDF预览：使用pdf.js渲染
+                    const pdfContainer = document.createElement('div');
+                    pdfContainer.style.cssText = 'width:95%;height:90%;overflow-y:auto;display:flex;flex-direction:column;align-items:center;gap:8px;-webkit-overflow-scrolling:touch;';
+                    overlay.appendChild(pdfContainer);
+                    // 点击空白关闭
+                    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+                    try {
+                        const base64 = dataUrl.split(',')[1];
+                        const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+                        const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+                        for (let p = 1; p <= pdf.numPages; p++) {
+                            const page = await pdf.getPage(p);
+                            const viewport = page.getViewport({ scale: 2 });
+                            const canvas = document.createElement('canvas');
+                            canvas.width = viewport.width;
+                            canvas.height = viewport.height;
+                            canvas.style.cssText = 'max-width:100%;height:auto;background:white;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,0.3);';
+                            const ctx = canvas.getContext('2d');
+                            await page.render({ canvasContext: ctx, viewport }).promise;
+                            pdfContainer.appendChild(canvas);
+                        }
+                    } catch (pdfErr) {
+                        console.error('PDF预览渲染失败:', pdfErr);
+                        pdfContainer.innerHTML = '<div style="color:white;font-size:16px;padding:20px;">PDF渲染失败</div>';
+                    }
                 } else {
                     const txt = document.createElement('div');
-                    txt.textContent = 'PDF文件预览暂不支持，点击关闭';
+                    txt.textContent = '不支持的文件格式，点击关闭';
                     txt.style.cssText = 'color:white;font-size:16px;';
                     overlay.appendChild(txt);
+                    overlay.onclick = () => overlay.remove();
                 }
                 document.body.appendChild(overlay);
             } catch (e) {
@@ -15810,6 +16103,9 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     const scoreColor = q.score >= 8 ? '#22c55e' : q.score >= 6 ? '#eab308' : '#ef4444';
                     let extraHtml = `<div class="wrong-exercise-comment" style="background:${scoreColor}15;border-left:3px solid ${scoreColor};">`;
                     extraHtml += `<span class="wrong-exercise-score" style="background:${scoreColor};">${q.score}/10</span>`;
+                    if (q.timeUsed) {
+                        extraHtml += `<span style="font-size:12px;color:var(--text-muted);margin-left:8px;">用时 ${formatExTime(q.timeUsed)}</span>`;
+                    }
                     if (q.userDrawing) {
                         extraHtml += `<img class="wrong-exercise-user-drawing" src="${q.userDrawing}" alt="作答">`;
                     }
@@ -15852,12 +16148,23 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             initExCanvas();
 
             // Start timer (only for non-wrong mode)
+            // Fix: 持久化每题的剩余时间，切换题目或退出后回来继续倒计时
+            if (exTimerInterval) clearInterval(exTimerInterval);
             if (!isWrong) {
-                exTimerSeconds = 1200;
+                // 初始化该题的剩余时间（首次为1200秒即20分钟）
+                if (q.remainingTime === undefined || q.remainingTime === null) {
+                    q.remainingTime = 1200;
+                }
+                // 记录本题开始答题的时间戳（用于计算做题用时）
+                exDoingState._questionStartedAt = Date.now();
+                exTimerSeconds = q.remainingTime;
                 updateExTimerDisplay();
-                if (exTimerInterval) clearInterval(exTimerInterval);
                 exTimerInterval = setInterval(() => {
                     exTimerSeconds--;
+                    // 实时更新question对象中的剩余时间
+                    if (exDoingState && exDoingState.questions[exDoingState.questionIndex]) {
+                        exDoingState.questions[exDoingState.questionIndex].remainingTime = exTimerSeconds;
+                    }
                     updateExTimerDisplay();
                     if (exTimerSeconds <= 0) {
                         clearInterval(exTimerInterval);
@@ -15869,6 +16176,32 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             }
         }
 
+        // 切题前保存当前题的剩余时间和累计做题用时
+        function saveCurrentQuestionTimer() {
+            if (!exDoingState || exDoingState.isWrong) return;
+            const q = exDoingState.questions[exDoingState.questionIndex];
+            if (!q) return;
+            // 保存剩余时间
+            q.remainingTime = exTimerSeconds;
+            // 累加本次做题用时
+            if (exDoingState._questionStartedAt) {
+                const elapsed = Math.round((Date.now() - exDoingState._questionStartedAt) / 1000);
+                q.timeUsed = (q.timeUsed || 0) + elapsed;
+                exDoingState._questionStartedAt = null;
+            }
+            // 持久化到数据
+            const data = getExercisesData();
+            const folder = data.folders.find(f => f.id === exDoingState.folderId);
+            if (folder) {
+                const task = folder.tasks.find(t => t.id === exDoingState.taskId);
+                if (task && task.questions[exDoingState.questionIndex]) {
+                    task.questions[exDoingState.questionIndex].remainingTime = q.remainingTime;
+                    task.questions[exDoingState.questionIndex].timeUsed = q.timeUsed;
+                }
+            }
+            saveData();
+        }
+
         function updateExTimerDisplay() {
             const min = Math.floor(exTimerSeconds / 60);
             const sec = exTimerSeconds % 60;
@@ -15877,7 +16210,21 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             timerEl.classList.toggle('warning', exTimerSeconds <= 120);
         }
 
+        // 格式化做题用时（秒 → 可读字符串）
+        function formatExTime(seconds) {
+            if (!seconds || seconds <= 0) return '';
+            if (seconds < 60) return seconds + '秒';
+            const m = Math.floor(seconds / 60);
+            const s = seconds % 60;
+            if (m < 60) return s > 0 ? `${m}分${s}秒` : `${m}分钟`;
+            const h = Math.floor(m / 60);
+            const rm = m % 60;
+            return rm > 0 ? `${h}小时${rm}分` : `${h}小时`;
+        }
+
         function closeExerciseDoing() {
+            // 退出前保存当前题目的计时器状态
+            saveCurrentQuestionTimer();
             document.getElementById('exerciseDoingView').classList.remove('show');
             document.body.classList.remove('exercise-doing-active');
             if (exTimerInterval) { clearInterval(exTimerInterval); exTimerInterval = null; }
@@ -15955,12 +16302,14 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
 
         function exPrevQuestion() {
             if (!exDoingState || exDoingState.questionIndex <= 0) return;
+            saveCurrentQuestionTimer();
             openExerciseDoing(exDoingState.folderId, exDoingState.taskId, exDoingState.questionIndex - 1, exDoingState.isWrong);
         }
 
         function exNextQuestion() {
             if (!exDoingState) return;
             if (exDoingState.questionIndex >= exDoingState.questions.length - 1) return;
+            saveCurrentQuestionTimer();
             openExerciseDoing(exDoingState.folderId, exDoingState.taskId, exDoingState.questionIndex + 1, exDoingState.isWrong);
         }
 
@@ -15976,6 +16325,9 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 openExerciseDoing(folderId, taskId, questionIndex, true);
                 return;
             }
+
+            // 完成前保存计时器状态和做题用时
+            saveCurrentQuestionTimer();
 
             const userDrawing = getExCanvasDataURL();
 
@@ -16016,8 +16368,26 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     grading = JSON.parse(cleaned);
                 } catch (e) {
                     const match = result.match(/\{[\s\S]*\}/);
-                    if (match) grading = JSON.parse(match[0]);
-                    else { showToast('评分格式错误'); return; }
+                    if (match) {
+                        try {
+                            grading = JSON.parse(match[0]);
+                        } catch (e2) {
+                            // 修复常见JSON错误
+                            let fixStr = match[0].replace(/,\s*\}/, '}').replace(/,\s*\]/, ']');
+                            try { grading = JSON.parse(fixStr); } catch (e3) { grading = null; }
+                        }
+                    }
+                    if (!grading) {
+                        // 尝试从文本中提取分数
+                        const scoreMatch = result.match(/(\d+)\s*[\/／]\s*10/);
+                        grading = {
+                            score: scoreMatch ? parseInt(scoreMatch[1]) : 5,
+                            correct: /正确|对/.test(result) && !/不正确|不对|错/.test(result),
+                            rigor: '-',
+                            structure: '-',
+                            comment: result.substring(0, 200)
+                        };
+                    }
                 }
 
                 const score = Math.min(10, Math.max(0, Math.round(grading.score || 0)));
@@ -16044,6 +16414,8 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                         origQ.score = score;
                         origQ.userDrawing = userDrawing;
                         origQ.aiComment = comment;
+                        // 保存做题总用时（秒）
+                        origQ.timeUsed = q.timeUsed || 0;
                     }
 
                     // Save user drawing to IDB
@@ -16063,6 +16435,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                         score,
                         userDrawing,
                         aiComment: comment,
+                        timeUsed: origQ.timeUsed || 0,
                         redoDrawings: []
                     });
                 }
@@ -16109,10 +16482,12 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     <div style="font-size:14px;font-weight:500;margin-bottom:8px;">${escapeHtml(wt.taskName)}</div>`;
                 wt.questions.forEach((q, qIdx) => {
                     const scoreColor = q.score >= 8 ? '#22c55e' : q.score >= 6 ? '#eab308' : '#ef4444';
+                    const timeStr = q.timeUsed ? formatExTime(q.timeUsed) : '';
                     html += `<div class="exercise-task-card" style="border-left:3px solid ${scoreColor};" onclick="openWrongExerciseDoing('${folderId}','${wt.taskId}',${qIdx})">
                         <div class="exercise-task-title" style="font-size:13px;">第${q.questionIndex + 1}题</div>
                         <div style="display:flex;align-items:center;gap:6px;">
                             <span class="wrong-exercise-score" style="background:${scoreColor};font-size:11px;">${q.score}/10</span>
+                            ${timeStr ? `<span style="font-size:11px;color:var(--text-muted);">用时 ${timeStr}</span>` : ''}
                             <span style="font-size:11px;color:var(--text-muted);">点击重做</span>
                         </div>
                     </div>`;
