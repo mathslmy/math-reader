@@ -16021,27 +16021,31 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 return;
             }
 
-            // 收集有书写内容的题目（从缓存或已保存的drawing中获取）
+            // 收集有书写内容的题目（多层查找 + 异步像素检测）
             const toGrade = [];
             for (let i = 0; i < task.questions.length; i++) {
                 const q = task.questions[i];
                 const cacheKey = `${taskId}_${i}`;
-                // 1) 内存缓存
-                let drawing = exDrawingCache[cacheKey];
-                // 2) IndexedDB 书写缓存
-                if (!drawing || isCanvasBlank(drawing)) {
-                    try { drawing = await getFileData(`exercise_drawing_cache_${cacheKey}`); } catch(e) {}
+                let drawing = null;
+
+                const memDraw = exDrawingCache[cacheKey];
+                if (memDraw && !isCanvasBlank(memDraw)) drawing = memDraw;
+
+                if (!drawing) {
+                    try { const d = await getFileData(`exercise_drawing_cache_${cacheKey}`); if (d && !isCanvasBlank(d)) drawing = d; } catch(e) {}
                 }
-                // 3) 已评分的 userDrawing
-                if (!drawing || isCanvasBlank(drawing)) {
+                if (!drawing && q.userDrawing && !isCanvasBlank(q.userDrawing)) {
                     drawing = q.userDrawing;
                 }
-                // 4) IndexedDB 已评分drawing
-                if (!drawing || isCanvasBlank(drawing)) {
-                    try { drawing = await getFileData(`exercise_drawing_${taskId}_${i}`); } catch(e) {}
+                if (!drawing) {
+                    try { const d = await getFileData(`exercise_drawing_${taskId}_${i}`); if (d && !isCanvasBlank(d)) drawing = d; } catch(e) {}
                 }
-                if (drawing && !isCanvasBlank(drawing)) {
-                    toGrade.push({ index: i, question: q, drawing });
+
+                if (drawing) {
+                    const blank = await isCanvasBlankAsync(drawing);
+                    if (!blank) {
+                        toGrade.push({ index: i, question: q, drawing });
+                    }
                 }
             }
 
@@ -16155,36 +16159,46 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
 
             showToast('正在收集已作答题目...');
 
-            // 收集有手写内容的题目——三层查找：内存缓存 → IndexedDB缓存 → 已评分drawing → IndexedDB已评分
+            // 收集有手写内容的题目——三层查找 + 异步像素检测
             const toExport = [];
             for (let i = 0; i < task.questions.length; i++) {
                 const q = task.questions[i];
                 const cacheKey = `${taskId}_${i}`;
 
+                // 按优先级查找drawing数据
+                let drawing = null;
+
                 // 1) 内存缓存
-                let drawing = exDrawingCache[cacheKey];
+                const memDraw = exDrawingCache[cacheKey];
+                if (memDraw && !isCanvasBlank(memDraw)) drawing = memDraw;
 
                 // 2) IndexedDB 书写缓存（未评分但已作答）
-                if (!drawing || isCanvasBlank(drawing)) {
+                if (!drawing) {
                     try {
-                        drawing = await getFileData(`exercise_drawing_cache_${cacheKey}`);
+                        const dbDraw = await getFileData(`exercise_drawing_cache_${cacheKey}`);
+                        if (dbDraw && !isCanvasBlank(dbDraw)) drawing = dbDraw;
                     } catch(e) {}
                 }
 
                 // 3) 题目对象上的 userDrawing（评分后保存的）
-                if (!drawing || isCanvasBlank(drawing)) {
+                if (!drawing && q.userDrawing && !isCanvasBlank(q.userDrawing)) {
                     drawing = q.userDrawing;
                 }
 
                 // 4) IndexedDB 已评分drawing
-                if (!drawing || isCanvasBlank(drawing)) {
+                if (!drawing) {
                     try {
-                        drawing = await getFileData(`exercise_drawing_${taskId}_${i}`);
+                        const dbDraw = await getFileData(`exercise_drawing_${taskId}_${i}`);
+                        if (dbDraw && !isCanvasBlank(dbDraw)) drawing = dbDraw;
                     } catch(e) {}
                 }
 
-                if (drawing && !isCanvasBlank(drawing)) {
-                    toExport.push({ index: i, question: q, drawing });
+                // 最终用异步像素检测确认不是空白画布
+                if (drawing) {
+                    const blank = await isCanvasBlankAsync(drawing);
+                    if (!blank) {
+                        toExport.push({ index: i, question: q, drawing });
+                    }
                 }
             }
 
@@ -16280,17 +16294,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                         console.warn('嵌入手写图片失败:', imgErr);
                     }
 
-                    // 评分信息（如有）
-                    if (q.score !== undefined && q.score !== null) {
-                        const scoreText = `Score: ${q.score}/10`;
-                        page.drawText(scoreText, {
-                            x: width - 120, y: height - margin,
-                            size: 14, font,
-                            color: q.score >= 8 ? PDFLib.rgb(0.13, 0.77, 0.37) :
-                                   q.score >= 6 ? PDFLib.rgb(0.92, 0.7, 0.03) :
-                                   PDFLib.rgb(0.94, 0.27, 0.27)
-                        });
-                    }
+                    // 纯作业导出，不显示评分
                 }
 
                 const pdfBytes = await pdfDoc.save();
@@ -16382,14 +16386,45 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             }
         }
 
-        // 检查canvas图片是否为空白（纯白或纯透明）
+        // 快速同步判断：只检查 null/undefined/极短的明显空值
         function isCanvasBlank(dataUrl) {
-            // 快速判断：如果data URL太短，说明基本是空的
-            // 一个空白的300x300 PNG约为3KB，有内容的通常>5KB
             if (!dataUrl) return true;
-            // base64部分长度
+            if (typeof dataUrl !== 'string') return true;
             const base64Part = dataUrl.split(',')[1] || '';
-            return base64Part.length < 5000;
+            return base64Part.length < 100;
+        }
+
+        // 异步精确判断：解码图片像素，检查是否有实际笔画内容
+        function isCanvasBlankAsync(dataUrl) {
+            return new Promise((resolve) => {
+                if (!dataUrl || typeof dataUrl !== 'string') { resolve(true); return; }
+                const base64Part = dataUrl.split(',')[1] || '';
+                if (base64Part.length < 100) { resolve(true); return; }
+
+                const img = new Image();
+                img.onload = () => {
+                    const sampleW = Math.min(img.width, 100);
+                    const sampleH = Math.min(img.height, 100);
+                    const c = document.createElement('canvas');
+                    c.width = sampleW;
+                    c.height = sampleH;
+                    const ctx = c.getContext('2d');
+                    ctx.drawImage(img, 0, 0, sampleW, sampleH);
+                    const data = ctx.getImageData(0, 0, sampleW, sampleH).data;
+                    let hasContent = false;
+                    for (let i = 0; i < data.length; i += 4) {
+                        const a = data[i+3];
+                        if (a < 10) continue;
+                        const r = data[i], g = data[i+1], b = data[i+2];
+                        if (r > 250 && g > 250 && b > 250) continue;
+                        hasContent = true;
+                        break;
+                    }
+                    resolve(!hasContent);
+                };
+                img.onerror = () => resolve(true);
+                img.src = dataUrl;
+            });
         }
 
         // ---- Source file long press ----
