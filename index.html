@@ -15363,6 +15363,8 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
         let exLastX = 0, exLastY = 0;
         let exCanvasCtx = null;
         let exStrokeHistory = [];
+        // 每道题的书写内容缓存: key = `${taskId}_${questionIndex}`, value = dataURL
+        let exDrawingCache = {};
 
         function getExercisesData() {
             if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {} };
@@ -15573,6 +15575,10 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
                     重命名
                 </button>
+                <button class="longpress-menu-item" onclick="gradeAllExQuestions('${folderId}','${taskId}')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+                    全部评分
+                </button>
                 <button class="longpress-menu-item" onclick="regenerateExTask('${folderId}','${taskId}')">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
                     重新生成
@@ -15655,6 +15661,137 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             debouncedChatSync();
             renderExerciseFolderContent(folder);
             showToast('已删除');
+        }
+
+        // ---- 全部评分：依次发送所有有书写内容的题目给AI评分 ----
+        async function gradeAllExQuestions(folderId, taskId) {
+            closeLongPressMenu();
+            const data = getExercisesData();
+            const folder = data.folders.find(f => f.id === folderId);
+            if (!folder) return;
+            const task = folder.tasks.find(t => t.id === taskId);
+            if (!task || !task.questions || task.questions.length === 0) {
+                showToast('没有题目可评分');
+                return;
+            }
+
+            // 收集有书写内容的题目（从缓存或已保存的drawing中获取）
+            const toGrade = [];
+            for (let i = 0; i < task.questions.length; i++) {
+                const q = task.questions[i];
+                const cacheKey = `${taskId}_${i}`;
+                const cachedDrawing = exDrawingCache[cacheKey];
+                // 优先用缓存，其次用已保存的drawing
+                const drawing = cachedDrawing || q.userDrawing;
+                if (drawing && !isCanvasBlank(drawing)) {
+                    toGrade.push({ index: i, question: q, drawing });
+                }
+            }
+
+            if (toGrade.length === 0) {
+                showToast('没有已作答的题目');
+                return;
+            }
+
+            if (!confirm(`将对 ${toGrade.length} 道已作答题目进行AI评分，确定？`)) return;
+
+            const systemPrompt = `你是一个严格的数学评分助手。请对用户提交的数学题作答进行评分。
+
+评分标准（满分10分）：
+1. 证明/解题是否正确（6分）
+2. 数学用语是否严谨（2分）
+3. 结构是否清晰（2分）
+
+严格要求：只输出一个纯JSON对象，不要输出任何其他文字、解释、markdown标记。
+格式：{"score":数字,"correct":true或false,"rigor":"评价","structure":"评价","comment":"综合评价"}`;
+
+            let graded = 0;
+            let failed = 0;
+
+            for (const item of toGrade) {
+                const { index: qIdx, question: q, drawing } = item;
+                showToast(`评分中... (${graded + 1}/${toGrade.length}) 第${qIdx + 1}题`);
+
+                try {
+                    const msgContent = [{
+                        role: 'user',
+                        content: [
+                            { type: 'image_url', image_url: { url: drawing } },
+                            { type: 'text', text: `题目：${q.latex}\n\n请对上面图片中用户的手写作答进行评分。` }
+                        ]
+                    }];
+
+                    const result = await callAI(systemPrompt, msgContent, { maxTokens: 2048, temperature: 0.3 });
+                    if (!result) { failed++; continue; }
+
+                    let grading;
+                    try {
+                        grading = robustParseJSONObject(result);
+                    } catch (e) {
+                        const scoreMatch = result.match(/(\d+)\s*[\/／]\s*10/);
+                        grading = {
+                            score: scoreMatch ? parseInt(scoreMatch[1]) : 5,
+                            correct: !/不正确|错误|incorrect/i.test(result),
+                            rigor: '-', structure: '-',
+                            comment: result.replace(/```json|```/g, '').trim().substring(0, 500)
+                        };
+                    }
+
+                    const score = Math.min(10, Math.max(0, Math.round(grading.score || 0)));
+                    const comment = `正确性: ${grading.correct ? '✓' : '✗'}\n严谨性: ${grading.rigor || '-'}\n结构: ${grading.structure || '-'}\n综合: ${grading.comment || '-'}`;
+
+                    // 更新题目数据
+                    q.status = 'done';
+                    q.score = score;
+                    q.userDrawing = drawing;
+                    q.aiComment = comment;
+
+                    // Save drawing to IDB
+                    const drawKey = `exercise_drawing_${taskId}_${qIdx}`;
+                    await saveFileData(drawKey, drawing);
+
+                    // Add to wrong folder
+                    if (!data.wrongByFolder[folderId]) data.wrongByFolder[folderId] = [];
+                    let wrongTask = data.wrongByFolder[folderId].find(t => t.taskId === taskId);
+                    if (!wrongTask) {
+                        wrongTask = { taskId, taskName: task.name, questions: [] };
+                        data.wrongByFolder[folderId].push(wrongTask);
+                    }
+                    // 避免重复添加
+                    if (!wrongTask.questions.find(wq => wq.questionIndex === qIdx)) {
+                        wrongTask.questions.push({
+                            questionIndex: qIdx,
+                            latex: q.latex,
+                            score,
+                            userDrawing: drawing,
+                            aiComment: comment,
+                            timeUsedSeconds: q.timeUsedSeconds || 0,
+                            redoDrawings: []
+                        });
+                    }
+
+                    graded++;
+                    saveData();
+
+                } catch (err) {
+                    console.error(`第${qIdx + 1}题评分失败:`, err);
+                    failed++;
+                }
+            }
+
+            debouncedChatSync();
+            renderExerciseFolderContent(folder);
+            showToast(`评分完成: ${graded} 道成功${failed > 0 ? '，' + failed + ' 道失败' : ''}`);
+        }
+
+        // 检查canvas图片是否为空白（纯白或纯透明）
+        function isCanvasBlank(dataUrl) {
+            // 快速判断：如果data URL太短，说明基本是空的
+            // 一个空白的300x300 PNG约为3KB，有内容的通常>5KB
+            if (!dataUrl) return true;
+            // base64部分长度
+            const base64Part = dataUrl.split(',')[1] || '';
+            return base64Part.length < 5000;
         }
 
         // ---- Source file long press ----
@@ -16375,6 +16512,12 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
 
             if (questionIndex < 0 || questionIndex >= questions.length) return;
 
+            // 切题前，保存当前题目的书写内容到缓存
+            saveCurrentDrawingToCache();
+
+            // Save current question timer state before switching
+            saveCurrentExTimer();
+
             exDoingState = { folderId, taskId, questionIndex, isWrong, questions };
 
             // Setup UI
@@ -16386,32 +16529,52 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             const q = questions[questionIndex];
             const qDiv = document.getElementById('exerciseDoingQuestion');
 
-            if (isWrong) {
-                // In wrong mode, show question + hide previous drawing/comment until redo
-                qDiv.innerHTML = `<div style="font-size:15px;line-height:1.8;">${escapeHtml(q.latex)}</div>`;
-                // Hide previous answer and comment (will show after grading or if user hasn't started redo)
-                if (q._redoing) {
-                    // User is actively redoing, hide old content
-                } else {
-                    // Show old score, drawing, comment
+            // 画布/工具栏引用
+            const canvasWrap = document.querySelector('.exercise-doing-canvas-wrap');
+            const toolbar = document.querySelector('.exercise-doing-toolbar');
+
+            if (isWrong && !q._redoing) {
+                // 错题模式：未点重做前，只显示题目和之前的作答结果，隐藏画布
+                const scoreColor = q.score >= 8 ? '#22c55e' : q.score >= 6 ? '#eab308' : '#ef4444';
+                const timeUsedStr = q.timeUsedSeconds ? formatExTime(q.timeUsedSeconds) : '';
+                let html = `<div style="font-size:15px;line-height:1.8;">${escapeHtml(q.latex)}</div>`;
+                html += `<div class="wrong-exercise-comment" style="background:${scoreColor}15;border-left:3px solid ${scoreColor};">`;
+                html += `<span class="wrong-exercise-score" style="background:${scoreColor};">${q.score}/10</span>`;
+                if (timeUsedStr) {
+                    html += `<span style="font-size:12px;color:var(--text-muted);margin-left:8px;">⏱ 用时 ${timeUsedStr}</span>`;
+                }
+                if (q.userDrawing) {
+                    html += `<img class="wrong-exercise-user-drawing" src="${q.userDrawing}" alt="作答">`;
+                }
+                if (q.aiComment) {
+                    html += `<div style="margin-top:6px;">${escapeHtml(q.aiComment)}</div>`;
+                }
+                html += `</div>`;
+                qDiv.innerHTML = html;
+                // 隐藏画布和工具栏
+                canvasWrap.style.display = 'none';
+                toolbar.style.display = 'none';
+            } else {
+                // 正常做题 或 错题重做中：显示题目 + 画布
+                let html = `<div style="font-size:15px;line-height:1.8;">${escapeHtml(q.latex)}</div>`;
+                // 已完成的正常题目也显示分数和评语
+                if (!isWrong && q.status === 'done' && q.score != null) {
                     const scoreColor = q.score >= 8 ? '#22c55e' : q.score >= 6 ? '#eab308' : '#ef4444';
                     const timeUsedStr = q.timeUsedSeconds ? formatExTime(q.timeUsedSeconds) : '';
-                    let extraHtml = `<div class="wrong-exercise-comment" style="background:${scoreColor}15;border-left:3px solid ${scoreColor};">`;
-                    extraHtml += `<span class="wrong-exercise-score" style="background:${scoreColor};">${q.score}/10</span>`;
+                    html += `<div class="wrong-exercise-comment" style="background:${scoreColor}15;border-left:3px solid ${scoreColor};">`;
+                    html += `<span class="wrong-exercise-score" style="background:${scoreColor};">${q.score}/10</span>`;
                     if (timeUsedStr) {
-                        extraHtml += `<span style="font-size:12px;color:var(--text-muted);margin-left:8px;">⏱ 用时 ${timeUsedStr}</span>`;
-                    }
-                    if (q.userDrawing) {
-                        extraHtml += `<img class="wrong-exercise-user-drawing" src="${q.userDrawing}" alt="作答">`;
+                        html += `<span style="font-size:12px;color:var(--text-muted);margin-left:8px;">⏱ 用时 ${timeUsedStr}</span>`;
                     }
                     if (q.aiComment) {
-                        extraHtml += `<div style="margin-top:6px;">${escapeHtml(q.aiComment)}</div>`;
+                        html += `<div style="margin-top:6px;">${escapeHtml(q.aiComment)}</div>`;
                     }
-                    extraHtml += `</div>`;
-                    qDiv.innerHTML += extraHtml;
+                    html += `</div>`;
                 }
-            } else {
-                qDiv.innerHTML = `<div style="font-size:15px;line-height:1.8;">${escapeHtml(q.latex)}</div>`;
+                qDiv.innerHTML = html;
+                // 显示画布和工具栏
+                canvasWrap.style.display = '';
+                toolbar.style.display = '';
             }
 
             // Render KaTeX
@@ -16439,19 +16602,17 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 document.getElementById('exCompleteBtn').textContent = '完成';
             }
 
-            // Setup canvas
-            initExCanvas();
-
-            // Save current question timer state before switching
-            saveCurrentExTimer();
+            // Setup canvas and restore drawing
+            if (!isWrong || q._redoing) {
+                initExCanvas();
+                restoreDrawingFromCache();
+            }
 
             // Start timer (only for non-wrong mode)
             if (!isWrong) {
-                // Use per-question remaining time, default 1200 (20 min)
                 if (q.remainingSeconds === undefined || q.remainingSeconds === null) {
                     q.remainingSeconds = 1200;
                 }
-                // Initialize timeUsedSeconds if not set
                 if (!q.timeUsedSeconds) q.timeUsedSeconds = 0;
                 exTimerSeconds = q.remainingSeconds;
                 exTimerStartedAt = Date.now();
@@ -16470,6 +16631,38 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             } else {
                 document.getElementById('exerciseDoingTimer').textContent = '--:--';
                 exTimerStartedAt = null;
+            }
+        }
+
+        // 保存当前题目画布到缓存
+        function saveCurrentDrawingToCache() {
+            if (!exDoingState) return;
+            const { taskId, questionIndex, isWrong, questions } = exDoingState;
+            // 错题未进入重做模式时没有画布，不保存
+            if (isWrong && questions && questions[questionIndex] && !questions[questionIndex]._redoing) return;
+            const canvas = document.getElementById('exerciseDoingCanvas');
+            if (!canvas || !exCanvasCtx) return;
+            const key = `${taskId}_${questionIndex}`;
+            exDrawingCache[key] = canvas.toDataURL('image/png');
+        }
+
+        // 从缓存恢复画布
+        function restoreDrawingFromCache() {
+            if (!exDoingState) return;
+            const { taskId, questionIndex } = exDoingState;
+            const key = `${taskId}_${questionIndex}`;
+            const cached = exDrawingCache[key];
+            if (cached) {
+                const canvas = document.getElementById('exerciseDoingCanvas');
+                const img = new Image();
+                img.onload = () => {
+                    // canvas已经被initExCanvas重置并scale(2,2)过了，需要用原始尺寸绘制
+                    exCanvasCtx.save();
+                    exCanvasCtx.setTransform(1, 0, 0, 1, 0, 0); // 重置变换
+                    exCanvasCtx.drawImage(img, 0, 0);
+                    exCanvasCtx.restore();
+                };
+                img.src = cached;
             }
         }
 
@@ -16501,6 +16694,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
         }
 
         function closeExerciseDoing() {
+            saveCurrentDrawingToCache();
             saveCurrentExTimer();
             document.getElementById('exerciseDoingView').classList.remove('show');
             document.body.classList.remove('exercise-doing-active');
@@ -16577,6 +16771,11 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             if (!exCanvasCtx) return;
             const canvas = document.getElementById('exerciseDoingCanvas');
             exCanvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+            // 同时清除缓存
+            if (exDoingState) {
+                const key = `${exDoingState.taskId}_${exDoingState.questionIndex}`;
+                delete exDrawingCache[key];
+            }
         }
 
         function getExCanvasDataURL() {
@@ -16586,14 +16785,12 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
 
         function exPrevQuestion() {
             if (!exDoingState || exDoingState.questionIndex <= 0) return;
-            saveCurrentExTimer();
             openExerciseDoing(exDoingState.folderId, exDoingState.taskId, exDoingState.questionIndex - 1, exDoingState.isWrong);
         }
 
         function exNextQuestion() {
             if (!exDoingState) return;
             if (exDoingState.questionIndex >= exDoingState.questions.length - 1) return;
-            saveCurrentExTimer();
             openExerciseDoing(exDoingState.folderId, exDoingState.taskId, exDoingState.questionIndex + 1, exDoingState.isWrong);
         }
 
