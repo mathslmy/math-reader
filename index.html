@@ -15879,59 +15879,92 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
 4. 严格按照原题内容，不要修改或补充
 5. 返回格式为JSON数组，每个元素是一道题的LaTeX文本
 
-返回格式（只返回JSON，不要其他内容）：
-["题目1的LaTeX文本", "题目2的LaTeX文本", ...]`;
+重要：你的回复必须只包含一个JSON数组，不要包含任何其他文字、解释或markdown标记。
+示例：["1. 求证 $a^2+b^2 \\geq 2ab$", "2. 计算 $\\int_0^1 x^2 dx$"]`;
 
             try {
                 let msgContent;
                 if (isImage) {
+                    // 对图片，先尝试视觉识别；如果API不支持视觉，回退到提示用户
                     msgContent = [{
                         role: 'user',
                         content: [
                             { type: 'image_url', image_url: { url: dataUrl } },
-                            { type: 'text', text: '请识别并拆解这张图片中的所有数学题目，按要求返回JSON数组。' }
+                            { type: 'text', text: '请识别并拆解这张图片中的所有数学题目，只返回JSON数组，不要其他内容。' }
                         ]
                     }];
                 } else {
-                    // PDF: extract text first
+                    // PDF: extract text first, then also try sending as image pages for better recognition
                     const base64 = dataUrl.split(',')[1];
                     const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
                     let pdfText = '';
+                    let pdfPageImages = [];
                     try {
                         const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
-                        for (let p = 1; p <= pdf.numPages; p++) {
+                        for (let p = 1; p <= Math.min(pdf.numPages, 20); p++) {
                             const page = await pdf.getPage(p);
                             const tc = await page.getTextContent();
-                            pdfText += tc.items.map(it => it.str).join(' ') + '\n';
+                            const pageText = tc.items.map(it => it.str).join(' ').trim();
+                            pdfText += pageText + '\n';
                         }
-                    } catch (e) { pdfText = '[PDF文本提取失败]'; }
-                    msgContent = [{
-                        role: 'user',
-                        content: '以下是习题PDF的文本内容，请拆解其中的每道题目：\n\n' + pdfText
-                    }];
+                        // If text extraction produced very little text, render pages as images for vision
+                        const cleanedText = pdfText.replace(/\s+/g, '').trim();
+                        if (cleanedText.length < 50 && pdf.numPages <= 10) {
+                            for (let p = 1; p <= pdf.numPages; p++) {
+                                try {
+                                    const page = await pdf.getPage(p);
+                                    const viewport = page.getViewport({ scale: 2 });
+                                    const canvas = document.createElement('canvas');
+                                    canvas.width = viewport.width;
+                                    canvas.height = viewport.height;
+                                    const ctx = canvas.getContext('2d');
+                                    await page.render({ canvasContext: ctx, viewport }).promise;
+                                    pdfPageImages.push(canvas.toDataURL('image/jpeg', 0.85));
+                                } catch(re) { /* ignore render errors */ }
+                            }
+                        }
+                    } catch (e) { pdfText = ''; }
+
+                    if (pdfPageImages.length > 0) {
+                        // Send as images (scanned PDF or PDF with little extractable text)
+                        const contentParts = [];
+                        pdfPageImages.forEach((imgUrl, i) => {
+                            contentParts.push({ type: 'image_url', image_url: { url: imgUrl } });
+                        });
+                        contentParts.push({ type: 'text', text: '请识别以上PDF页面中的所有数学题目，只返回JSON数组，不要其他内容。' });
+                        msgContent = [{ role: 'user', content: contentParts }];
+                    } else if (pdfText.replace(/\s+/g, '').length >= 20) {
+                        msgContent = [{
+                            role: 'user',
+                            content: '以下是习题PDF的文本内容，请拆解其中的每道题目，只返回JSON数组：\n\n' + pdfText
+                        }];
+                    } else {
+                        showToast('PDF内容提取失败，请尝试上传图片格式');
+                        return;
+                    }
                 }
 
                 const result = await callAI(systemPrompt, msgContent, { maxTokens: 4096, temperature: 0.3 });
                 if (!result) { showToast('AI解析返回为空'); return; }
 
-                // Parse JSON
-                let questions;
-                try {
-                    const cleaned = result.replace(/```json|```/g, '').trim();
-                    questions = JSON.parse(cleaned);
-                } catch (e) {
-                    // Try to extract array
-                    const match = result.match(/\[[\s\S]*\]/);
-                    if (match) {
-                        questions = JSON.parse(match[0]);
-                    } else {
-                        showToast('AI返回格式错误');
-                        return;
-                    }
+                // Robust JSON array extraction
+                const questions = extractJsonArray(result);
+                if (!questions) {
+                    console.error('AI返回内容无法解析为JSON数组:', result.substring(0, 500));
+                    showToast('AI返回格式无法解析，请重试');
+                    return;
                 }
 
-                if (!Array.isArray(questions) || questions.length === 0) {
+                if (questions.length === 0) {
                     showToast('未识别到题目');
+                    return;
+                }
+
+                // Ensure all items are strings
+                const validQuestions = questions.map(q => typeof q === 'string' ? q : JSON.stringify(q)).filter(q => q.trim());
+
+                if (validQuestions.length === 0) {
+                    showToast('未识别到有效题目');
                     return;
                 }
 
@@ -15942,10 +15975,10 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 const task = folder.tasks.find(t => t.id === taskId);
                 if (!task) return;
 
-                task.questions = questions.map((q, idx) => ({
+                task.questions = validQuestions.map((q, idx) => ({
                     index: idx,
                     latex: q,
-                    status: 'pending', // pending | done
+                    status: 'pending',
                     score: null,
                     userDrawing: null,
                     aiComment: null
@@ -15953,7 +15986,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
 
                 saveData();
                 debouncedChatSync();
-                showToast(`已识别 ${questions.length} 道题目`);
+                showToast(`已识别 ${validQuestions.length} 道题目`);
 
                 if (currentExerciseFolder && currentExerciseFolder.folderId === folderId) {
                     renderExerciseFolderContent(folder);
@@ -15963,6 +15996,89 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 console.error('AI解析习题失败:', err);
                 showToast('解析失败: ' + err.message);
             }
+        }
+
+        // Robust JSON extraction: handles thinking tags, markdown fences, preamble text, etc.
+        function extractJsonArray(text) {
+            if (!text) return null;
+            // Strip common wrapper patterns
+            let s = text;
+            // Remove <think>...</think> or <thinking>...</thinking> blocks
+            s = s.replace(/<think(?:ing)?[\s\S]*?<\/think(?:ing)?>/gi, '');
+            // Remove markdown code fences (```json ... ```, ``` ... ```, ~~~ ... ~~~)
+            s = s.replace(/```(?:json|JSON)?\s*\n?([\s\S]*?)```/g, '$1');
+            s = s.replace(/~~~(?:json|JSON)?\s*\n?([\s\S]*?)~~~/g, '$1');
+            s = s.trim();
+            // Try direct parse
+            try {
+                const parsed = JSON.parse(s);
+                if (Array.isArray(parsed)) return parsed;
+            } catch(e) {}
+            // Try to find the outermost [...] with balanced brackets
+            let depth = 0, start = -1;
+            for (let i = 0; i < s.length; i++) {
+                if (s[i] === '[') {
+                    if (depth === 0) start = i;
+                    depth++;
+                } else if (s[i] === ']') {
+                    depth--;
+                    if (depth === 0 && start >= 0) {
+                        try {
+                            const parsed = JSON.parse(s.substring(start, i + 1));
+                            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+                        } catch(e) {}
+                        // Reset and keep looking
+                        start = -1;
+                    }
+                }
+            }
+            // Last resort: try a greedy regex
+            const match = s.match(/\[[\s\S]*\]/);
+            if (match) {
+                try {
+                    const parsed = JSON.parse(match[0]);
+                    if (Array.isArray(parsed)) return parsed;
+                } catch(e) {}
+            }
+            return null;
+        }
+
+        // Robust JSON object extraction (for grading responses)
+        function extractJsonObject(text) {
+            if (!text) return null;
+            let s = text;
+            s = s.replace(/<think(?:ing)?[\s\S]*?<\/think(?:ing)?>/gi, '');
+            s = s.replace(/```(?:json|JSON)?\s*\n?([\s\S]*?)```/g, '$1');
+            s = s.replace(/~~~(?:json|JSON)?\s*\n?([\s\S]*?)~~~/g, '$1');
+            s = s.trim();
+            // Try direct parse
+            try {
+                const parsed = JSON.parse(s);
+                if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+            } catch(e) {}
+            // Find outermost {...} with balanced braces
+            let depth = 0, start = -1;
+            for (let i = 0; i < s.length; i++) {
+                if (s[i] === '{') {
+                    if (depth === 0) start = i;
+                    depth++;
+                } else if (s[i] === '}') {
+                    depth--;
+                    if (depth === 0 && start >= 0) {
+                        try {
+                            const parsed = JSON.parse(s.substring(start, i + 1));
+                            if (parsed && typeof parsed === 'object') return parsed;
+                        } catch(e) {}
+                        start = -1;
+                    }
+                }
+            }
+            // Last resort greedy regex
+            const match = s.match(/\{[\s\S]*\}/);
+            if (match) {
+                try { return JSON.parse(match[0]); } catch(e) {}
+            }
+            return null;
         }
 
         async function viewExerciseSource(folderId, taskId, fileId) {
@@ -16338,14 +16454,11 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 const result = await callAI(systemPrompt, msgContent, { maxTokens: 2048, temperature: 0.3 });
                 if (!result) { showToast('AI返回为空'); return; }
 
-                let grading;
-                try {
-                    const cleaned = result.replace(/```json|```/g, '').trim();
-                    grading = JSON.parse(cleaned);
-                } catch (e) {
-                    const match = result.match(/\{[\s\S]*\}/);
-                    if (match) grading = JSON.parse(match[0]);
-                    else { showToast('评分格式错误'); return; }
+                const grading = extractJsonObject(result);
+                if (!grading) {
+                    console.error('AI评分返回无法解析:', result.substring(0, 500));
+                    showToast('评分返回格式异常，请重试');
+                    return;
                 }
 
                 const score = Math.min(10, Math.max(0, Math.round(grading.score || 0)));
