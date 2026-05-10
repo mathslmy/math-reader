@@ -1717,11 +1717,23 @@
         .exercise-doing-footer {
             display: flex;
             justify-content: center;
+            align-items: center;
             gap: 10px;
             padding: 8px 12px;
             padding-bottom: max(8px, env(safe-area-inset-bottom, 0px));
             border-top: 1px solid var(--border-color);
             background: var(--bg-primary);
+            flex-shrink: 0;
+        }
+
+        .ex-score-badge {
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            color: white;
+            cursor: pointer;
+            margin-right: auto;
             flex-shrink: 0;
         }
 
@@ -4410,6 +4422,7 @@
             <canvas class="exercise-doing-canvas" id="exerciseDoingCanvas"></canvas>
         </div>
         <div class="exercise-doing-footer">
+            <span class="ex-score-badge" id="exScoreBadge" style="display:none;" onclick="onExScoreBadgeClick()"></span>
             <button class="exercise-doing-btn" id="exPrevBtn" onclick="exPrevQuestion()">上一题</button>
             <button class="exercise-doing-btn primary" id="exCompleteBtn" onclick="exCompleteQuestion()">完成</button>
             <button class="exercise-doing-btn" id="exNextBtn" onclick="exNextQuestion()">下一题</button>
@@ -5286,7 +5299,11 @@
 
             // 页面隐藏或关闭前：立刻把当前阅读进度写回（绕开 100ms 防抖），
             // 防止用户快速翻到新页后立刻退出 app 导致进度丢失。
-            const flushOnHide = () => { try { flushCurrentPageNow(); } catch (e) {} };
+            const flushOnHide = () => {
+                try { flushCurrentPageNow(); } catch (e) {}
+                try { saveCurrentExTimer(); } catch (e) {}
+                try { saveCurrentDrawingToCache(); } catch (e) {}
+            };
             window.addEventListener('pagehide', flushOnHide);
             window.addEventListener('beforeunload', flushOnHide);
             document.addEventListener('visibilitychange', () => {
@@ -16547,7 +16564,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     html += `<img class="wrong-exercise-user-drawing" src="${q.userDrawing}" alt="作答">`;
                 }
                 if (q.aiComment) {
-                    html += `<div style="margin-top:6px;">${escapeHtml(q.aiComment)}</div>`;
+                    html += `<div class="ex-ai-comment" style="margin-top:6px;line-height:1.6;font-size:14px;">${renderChatMarkdownLatex(q.aiComment)}</div>`;
                 }
                 html += `</div>`;
                 qDiv.innerHTML = html;
@@ -16593,6 +16610,9 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             } else {
                 document.getElementById('exCompleteBtn').textContent = '完成';
             }
+
+            // 更新左下角评分徽标
+            updateExScoreBadge(q, isWrong, folderId, taskId, questionIndex);
 
             // Setup canvas and restore drawing
             if (!isWrong || q._redoing) {
@@ -16708,6 +16728,57 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 const data = getExercisesData();
                 const folder = data.folders.find(f => f.id === currentExerciseFolder.folderId);
                 if (folder) renderExerciseFolderContent(folder);
+            }
+        }
+
+        // 左下角评分徽标
+        let _exScoreBadgeTarget = null; // { action, folderId, taskId, questionIndex }
+
+        function updateExScoreBadge(q, isWrong, folderId, taskId, questionIndex) {
+            const badge = document.getElementById('exScoreBadge');
+            if (!badge) return;
+
+            if (isWrong && q.score != null) {
+                // 错题模式：显示评分，点击跳转回习题集对应题
+                const scoreColor = q.score >= 8 ? '#22c55e' : q.score >= 6 ? '#eab308' : '#ef4444';
+                badge.textContent = q.score + '/10';
+                badge.style.background = scoreColor;
+                badge.style.display = '';
+                // 找到原始题目的questionIndex
+                const origQIdx = q.questionIndex != null ? q.questionIndex : questionIndex;
+                _exScoreBadgeTarget = { action: 'goToExercise', folderId, taskId, questionIndex: origQIdx };
+            } else if (!isWrong && q.status === 'done' && q.score != null) {
+                // 习题模式已评分：显示评分，点击跳转错题集对应错题
+                const scoreColor = q.score >= 8 ? '#22c55e' : q.score >= 6 ? '#eab308' : '#ef4444';
+                badge.textContent = q.score + '/10';
+                badge.style.background = scoreColor;
+                badge.style.display = '';
+                _exScoreBadgeTarget = { action: 'goToWrong', folderId, taskId, questionIndex };
+            } else {
+                badge.style.display = 'none';
+                _exScoreBadgeTarget = null;
+            }
+        }
+
+        function onExScoreBadgeClick() {
+            if (!_exScoreBadgeTarget) return;
+            const { action, folderId, taskId, questionIndex } = _exScoreBadgeTarget;
+
+            if (action === 'goToWrong') {
+                // 从习题跳转到错题集对应的错题
+                const data = getExercisesData();
+                const wrongTasks = data.wrongByFolder[folderId] || [];
+                const wTask = wrongTasks.find(t => t.taskId === taskId);
+                if (!wTask || !wTask.questions) { showToast('未找到对应错题'); return; }
+                // 找到 wrongTask.questions 中 questionIndex 匹配的错题
+                const wqIdx = wTask.questions.findIndex(wq => wq.questionIndex === questionIndex);
+                if (wqIdx < 0) { showToast('未找到对应错题'); return; }
+                closeExerciseDoing();
+                setTimeout(() => openExerciseDoing(folderId, taskId, wqIdx, true), 100);
+            } else if (action === 'goToExercise') {
+                // 从错题跳转回习题集对应题
+                closeExerciseDoing();
+                setTimeout(() => openExerciseDoing(folderId, taskId, questionIndex, false), 100);
             }
         }
 
