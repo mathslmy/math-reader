@@ -4427,8 +4427,28 @@
         <div class="exercise-doing-footer">
             <span class="ex-score-badge" id="exScoreBadge" style="display:none;" onclick="onExScoreBadgeClick()"></span>
             <button class="exercise-doing-btn" id="exPrevBtn" onclick="exPrevQuestion()">上一题</button>
+            <button class="exercise-doing-btn" id="exAskAIBtn" onclick="openExerciseChat()" style="display:none;">问AI</button>
             <button class="exercise-doing-btn primary" id="exCompleteBtn" onclick="exCompleteQuestion()">完成</button>
             <button class="exercise-doing-btn" id="exNextBtn" onclick="exNextQuestion()">下一题</button>
+        </div>
+    </div>
+
+    <!-- Exercise AI Chat Modal -->
+    <div class="modal-overlay" id="exerciseChatModal" onclick="hideModal('exerciseChatModal')">
+        <div class="modal-content chat-modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <span class="modal-title" id="exerciseChatTitle">AI 助手</span>
+                <div class="chat-header-actions">
+                    <button class="modal-close" onclick="hideModal('exerciseChatModal')">&times;</button>
+                </div>
+            </div>
+            <div class="chat-container" id="exerciseChatContainer">
+                <!-- 动态生成聊天消息 -->
+            </div>
+            <div class="chat-input-area">
+                <input type="text" id="exerciseChatInput" class="chat-input" placeholder="关于这道题问点什么..." onkeypress="if(event.key==='Enter')sendExerciseChatMessage()">
+                <button class="chat-send-btn" onclick="sendExerciseChatMessage()">发送</button>
+            </div>
         </div>
     </div>
 
@@ -5272,10 +5292,6 @@
             await migrateLectureContentToIDB();
             // 将 localStorage 中残留的论文摘要迁移到 IndexedDB
             await migrateAbstractsToIDB();
-            // 将 localStorage 中残留的标注大数据、草稿画布、截图迁移到 IndexedDB
-            await migrateAnnotationsToIDB();
-            // 从 IndexedDB 恢复标注大数据、草稿画布、截图到内存
-            await restoreBlobsFromIDB();
             // 如果localStorage被iOS清理导致API设置丢失，从IndexedDB恢复
             if (!appData.settings.aiApiKey && !appData.settings.aiApiUrl) {
                 const backup = await restoreApiSettingsFromIDB();
@@ -5636,217 +5652,6 @@
             }
         }
 
-        // ==================== 标注大数据存储 (IndexedDB) ====================
-        // annotations 中的 drawing data 和 note canvasData 是 base64 大数据，
-        // 迁移到 IndexedDB，localStorage 中仅保留元数据（page, type, x, y, text, createdAt）
-
-        function annoKey(docId) { return 'annotations_' + docId; }
-        function draftCanvasKey(docId) { return 'draft_canvas_' + docId; }
-        function screenshotKey(docId) { return 'screenshot_' + docId; }
-
-        // 保存单个文档的标注大数据到 IDB
-        async function saveAnnotationBlobsToIDB(docId, annotations) {
-            if (!annotations || annotations.length === 0) return;
-            // 提取大数据：{ index -> { data?, canvasData? } }
-            const blobs = {};
-            annotations.forEach((a, i) => {
-                if (a.data || a.canvasData) {
-                    blobs[i] = {};
-                    if (a.data) blobs[i].data = a.data;
-                    if (a.canvasData) blobs[i].canvasData = a.canvasData;
-                }
-            });
-            if (Object.keys(blobs).length > 0) {
-                await saveFileData(annoKey(docId), JSON.stringify(blobs));
-            }
-        }
-
-        // 从 IDB 恢复标注大数据到内存中的 doc.annotations
-        async function restoreAnnotationBlobsFromIDB(docId, annotations) {
-            if (!annotations || annotations.length === 0) return;
-            try {
-                const raw = await getFileData(annoKey(docId));
-                if (!raw) return;
-                const blobs = JSON.parse(raw);
-                annotations.forEach((a, i) => {
-                    if (blobs[i]) {
-                        if (blobs[i].data && !a.data) a.data = blobs[i].data;
-                        if (blobs[i].canvasData && !a.canvasData) a.canvasData = blobs[i].canvasData;
-                    }
-                });
-            } catch(e) {
-                console.warn('[restoreAnnotationBlobs] 失败:', docId, e);
-            }
-        }
-
-        // 保存草稿画布到 IDB
-        async function saveDraftCanvasToIDB(docId, canvasDataUrl) {
-            if (!canvasDataUrl) return;
-            await saveFileData(draftCanvasKey(docId), canvasDataUrl);
-        }
-
-        // 从 IDB 加载草稿画布
-        async function getDraftCanvasFromIDB(docId) {
-            return await getFileData(draftCanvasKey(docId));
-        }
-
-        // 保存截图到 IDB
-        async function saveScreenshotToIDB(docId, screenshotData) {
-            if (!screenshotData) return;
-            await saveFileData(screenshotKey(docId), screenshotData);
-        }
-
-        // 从 IDB 加载截图
-        async function getScreenshotFromIDB(docId) {
-            return await getFileData(screenshotKey(docId));
-        }
-
-        // 启动时迁移：将 localStorage 中残留的标注大数据、草稿画布、截图迁移到 IndexedDB
-        async function migrateAnnotationsToIDB() {
-            let migrated = false;
-            const allDocs = [...(appData.books || []), ...(appData.papers || []), ...(appData.archived || [])];
-            for (const doc of allDocs) {
-                // 迁移标注大数据
-                if (doc.annotations && doc.annotations.length > 0 && doc.id) {
-                    const hasBlobs = doc.annotations.some(a => a.data || a.canvasData);
-                    if (hasBlobs) {
-                        try {
-                            await saveAnnotationBlobsToIDB(doc.id, doc.annotations);
-                            migrated = true;
-                        } catch(e) {
-                            console.warn('[migrate] 标注迁移失败:', doc.id, e);
-                        }
-                    }
-                }
-                // 迁移截图
-                if (doc.screenshot && doc.id) {
-                    try {
-                        await saveScreenshotToIDB(doc.id, doc.screenshot);
-                        migrated = true;
-                    } catch(e) {
-                        console.warn('[migrate] 截图迁移失败:', doc.id, e);
-                    }
-                }
-            }
-            // 迁移草稿画布
-            if (appData.drafts) {
-                for (const docId of Object.keys(appData.drafts)) {
-                    const draft = appData.drafts[docId];
-                    if (draft && draft.canvas) {
-                        try {
-                            await saveDraftCanvasToIDB(docId, draft.canvas);
-                            migrated = true;
-                        } catch(e) {
-                            console.warn('[migrate] 草稿画布迁移失败:', docId, e);
-                        }
-                    }
-                }
-            }
-            if (migrated) {
-                // saveData 中会自动剔除这些大数据后再写 localStorage
-                saveData();
-                console.log('[migrate] 标注/草稿画布/截图已从 localStorage 迁移到 IndexedDB');
-            }
-        }
-
-        // 启动时从 IDB 恢复标注大数据、草稿画布、截图到内存
-        async function restoreBlobsFromIDB() {
-            const allDocs = [...(appData.books || []), ...(appData.papers || []), ...(appData.archived || [])];
-            for (const doc of allDocs) {
-                if (doc.annotations && doc.annotations.length > 0 && doc.id) {
-                    // 只恢复缺失 data/canvasData 的（说明已迁移到 IDB）
-                    const needRestore = doc.annotations.some(a =>
-                        (a.type === 'drawing' && !a.data) ||
-                        (a.type === 'note' && !a.canvasData && a._hasCanvasData)
-                    );
-                    if (needRestore || !doc.annotations.some(a => a.data || a.canvasData)) {
-                        await restoreAnnotationBlobsFromIDB(doc.id, doc.annotations);
-                    }
-                }
-                // 恢复截图
-                if (!doc.screenshot && doc.id) {
-                    try {
-                        const ss = await getScreenshotFromIDB(doc.id);
-                        if (ss) doc.screenshot = ss;
-                    } catch(e) {}
-                }
-            }
-            // 恢复草稿画布
-            if (appData.drafts) {
-                for (const docId of Object.keys(appData.drafts)) {
-                    const draft = appData.drafts[docId];
-                    if (draft && !draft.canvas) {
-                        try {
-                            const cv = await getDraftCanvasFromIDB(docId);
-                            if (cv) draft.canvas = cv;
-                        } catch(e) {}
-                    }
-                }
-            }
-        }
-
-        // 从 toSave 对象中剔除标注大数据、草稿画布、截图（saveData 时调用）
-        function stripBlobsFromSaveData(toSave) {
-            // 剔除标注中的 drawing data 和 note canvasData
-            const stripDocAnnotations = (doc) => {
-                if (doc.annotations) {
-                    doc.annotations = doc.annotations.map(a => {
-                        const stripped = { ...a };
-                        if (stripped.data) {
-                            delete stripped.data;
-                        }
-                        if (stripped.canvasData) {
-                            stripped._hasCanvasData = true;
-                            delete stripped.canvasData;
-                        }
-                        return stripped;
-                    });
-                }
-                // 截图
-                delete doc.screenshot;
-            };
-            (toSave.books || []).forEach(stripDocAnnotations);
-            (toSave.papers || []).forEach(stripDocAnnotations);
-            (toSave.archived || []).forEach(stripDocAnnotations);
-            // 剔除草稿画布
-            if (toSave.drafts) {
-                for (const docId of Object.keys(toSave.drafts)) {
-                    if (toSave.drafts[docId]) {
-                        delete toSave.drafts[docId].canvas;
-                    }
-                }
-            }
-        }
-
-        // saveData 时异步保存标注大数据到 IDB
-        async function saveBlobsToIDB() {
-            const allDocs = [...(appData.books || []), ...(appData.papers || []), ...(appData.archived || [])];
-            for (const doc of allDocs) {
-                if (doc.annotations && doc.annotations.length > 0 && doc.id) {
-                    try {
-                        await saveAnnotationBlobsToIDB(doc.id, doc.annotations);
-                    } catch(e) {
-                        console.warn('[saveBlobsToIDB] 标注保存失败:', doc.id, e);
-                    }
-                }
-                if (doc.screenshot && doc.id) {
-                    try {
-                        await saveScreenshotToIDB(doc.id, doc.screenshot);
-                    } catch(e) {}
-                }
-            }
-            if (appData.drafts) {
-                for (const docId of Object.keys(appData.drafts)) {
-                    const draft = appData.drafts[docId];
-                    if (draft && draft.canvas) {
-                        try {
-                            await saveDraftCanvasToIDB(docId, draft.canvas);
-                        } catch(e) {}
-                    }
-                }
-            }
-        }
-
         function loadData() {
             const saved = localStorage.getItem('mathReader');
             if (saved) {
@@ -5966,8 +5771,6 @@
             // 剔除论文AI摘要（大文本已在 IndexedDB）
             toBackup.papers.forEach(p => { delete p.aiAbstract; delete p._abstractCache; });
             toBackup.archived.forEach(a => { delete a.aiAbstract; delete a._abstractCache; });
-            // 剔除标注大数据、草稿画布、截图（已在 IndexedDB）
-            stripBlobsFromSaveData(toBackup);
             // 习题数据已单独存 IndexedDB，备份中不再包含
             delete toBackup.exercises;
             saveFileData('__appdata_backup__', JSON.stringify(toBackup)).catch(e => {
@@ -6005,8 +5808,6 @@
             // 剔除论文AI摘要（大文本存在IndexedDB）
             toSave.papers.forEach(p => { delete p.aiAbstract; delete p._abstractCache; });
             toSave.archived.forEach(a => { delete a.aiAbstract; delete a._abstractCache; });
-            // 剔除标注大数据、草稿画布、截图（已迁移到 IndexedDB）
-            stripBlobsFromSaveData(toSave);
             // 习题数据完全存入 IndexedDB，不放 localStorage
             const exercisesToIDB = toSave.exercises ? JSON.parse(JSON.stringify(toSave.exercises)) : null;
             delete toSave.exercises;
@@ -6034,12 +5835,18 @@
                 localStorage.setItem('mathReader', JSON.stringify(toSave));
             } catch (e) {
                 console.error('[saveData] localStorage 写入失败:', e);
-                showToast('存储空间不足，数据可能未保存');
+                // QuotaExceeded 时尝试清理 screenshot 等大字段后重试
+                try {
+                    toSave.books.forEach(b => delete b.screenshot);
+                    toSave.papers.forEach(p => delete p.screenshot);
+                    toSave.archived.forEach(a => delete a.screenshot);
+                    localStorage.setItem('mathReader', JSON.stringify(toSave));
+                    console.log('[saveData] 清理 screenshot 后重试成功');
+                } catch (e2) {
+                    console.error('[saveData] 重试仍失败:', e2);
+                    showToast('存储空间不足，数据可能未保存');
+                }
             }
-            // 异步保存标注大数据、草稿画布、截图到 IndexedDB
-            saveBlobsToIDB().catch(e => {
-                console.warn('[saveData] blobs 写入 IndexedDB 失败:', e);
-            });
             // 异步备份到 IndexedDB（双保险）
             backupAppDataToIDB();
         }
@@ -7162,10 +6969,6 @@
             
             // 删除IndexedDB中的文件数据
             deleteFileData(id);
-            // 删除标注大数据、草稿画布、截图（IndexedDB）
-            deleteFileData(annoKey(id)).catch(() => {});
-            deleteFileData(draftCanvasKey(id)).catch(() => {});
-            deleteFileData(screenshotKey(id)).catch(() => {});
             
             saveData();
             renderLibrary();
@@ -12096,6 +11899,156 @@ stage2:用户针对你的回答提出问题，你针对问题给出回答（禁�
             URL.revokeObjectURL(url);
         }
 
+        // ==================== 错题问AI ====================
+        let exerciseChatHistory = [];
+        let exerciseChatContext = null; // { question, drawing, score, aiComment }
+
+        function openExerciseChat() {
+            if (!exDoingState) { showToast('请先选择题目'); return; }
+            const { folderId, taskId, questionIndex, isWrong, questions } = exDoingState;
+            if (!isWrong) return;
+            const q = questions[questionIndex];
+
+            // 构建上下文
+            exerciseChatContext = {
+                latex: q.latex || '',
+                score: q.score,
+                aiComment: q.aiComment || '',
+                userDrawing: q.userDrawing || null,
+                questionIndex: questionIndex
+            };
+
+            const titleText = `AI - 第${(q.questionIndex !== undefined ? q.questionIndex : questionIndex) + 1}题`;
+            document.getElementById('exerciseChatTitle').textContent = titleText;
+
+            // 初始化聊天历史
+            let greeting = `你好！这道题你得了 ${q.score}/10 分。`;
+            if (q.aiComment) {
+                greeting += `\n\nAI评语：${q.aiComment}`;
+            }
+            greeting += '\n\n你可以问我关于这道题的任何问题，比如解题思路、知识点讲解、或者如何改正错误。';
+
+            exerciseChatHistory = [{ role: 'assistant', content: greeting }];
+            renderExerciseChatHistory();
+            showModal('exerciseChatModal');
+            setTimeout(() => document.getElementById('exerciseChatInput').focus(), 300);
+        }
+
+        function renderExerciseChatHistory() {
+            const container = document.getElementById('exerciseChatContainer');
+            const _aiAvatar = getAIAvatar();
+            const _aiName = getAIName();
+            const _userName = getUserName();
+            const _userAvatar = getUserAvatar();
+            container.innerHTML = exerciseChatHistory.map((msg, idx) => {
+                if (msg.role === 'assistant') {
+                    const avatarHtml = _aiAvatar
+                        ? `<div class="chat-avatar"><img src="${_aiAvatar}" alt="${escapeHtml(_aiName)}"></div>`
+                        : `<div class="chat-avatar">${(_aiName || 'AI').charAt(0).toUpperCase()}</div>`;
+                    return `<div class="chat-message ai">
+                        <div class="chat-sender">${avatarHtml}<span class="chat-sender-name">${escapeHtml(_aiName || 'AI')}</span></div>
+                        <div class="chat-bubble">${renderChatMarkdownLatex(msg.content)}</div>
+                    </div>`;
+                } else {
+                    const avatarHtml = _userAvatar
+                        ? `<div class="chat-avatar"><img src="${_userAvatar}" alt="${escapeHtml(_userName)}"></div>`
+                        : `<div class="chat-avatar">${(_userName || '我').charAt(0)}</div>`;
+                    return `<div class="chat-message user">
+                        <div class="chat-sender">${avatarHtml}<span class="chat-sender-name">${escapeHtml(_userName || '我')}</span></div>
+                        <div class="chat-bubble">${renderChatMarkdownLatex(msg.content)}</div>
+                    </div>`;
+                }
+            }).join('');
+            // 渲染 KaTeX
+            if (typeof renderMathInElement === 'function') {
+                renderMathInElement(container, {
+                    delimiters: [
+                        {left: '$$', right: '$$', display: true},
+                        {left: '$', right: '$', display: false},
+                        {left: '\\[', right: '\\]', display: true},
+                        {left: '\\(', right: '\\)', display: false}
+                    ],
+                    throwOnError: false
+                });
+            }
+            container.scrollTop = container.scrollHeight;
+        }
+
+        async function sendExerciseChatMessage() {
+            const input = document.getElementById('exerciseChatInput');
+            const message = input.value.trim();
+            if (!message || !exerciseChatContext) return;
+            input.value = '';
+
+            exerciseChatHistory.push({ role: 'user', content: message });
+            renderExerciseChatHistory();
+
+            // 构建 system prompt
+            const ctx = exerciseChatContext;
+            const systemPrompt = `你是一个数学AI助手，专门帮助学生理解错题和改正错误。
+
+题目内容：${ctx.latex}
+学生得分：${ctx.score}/10
+AI评分评语：${ctx.aiComment}
+
+请根据学生的问题给出帮助。要求：
+1. 简洁、准确、数学专业
+2. 如果学生问解题思路，给出清晰的分步骤解答
+3. 如果学生问知识点，给出相关定义和定理
+4. 鼓励学生思考，而不是直接给出完整答案
+5. 禁用比喻和物理解释`;
+
+            // 构建消息（第一条用户消息附带手写图片）
+            const apiMessages = exerciseChatHistory.map((h, idx) => {
+                if (idx === 1 && h.role === 'user' && ctx.userDrawing) {
+                    // 第一条用户消息附带手写图片
+                    return {
+                        role: 'user',
+                        content: [
+                            { type: 'image_url', image_url: { url: ctx.userDrawing } },
+                            { type: 'text', text: `上面是我的手写作答图片。\n\n${h.content}` }
+                        ]
+                    };
+                }
+                return { role: h.role, content: h.content };
+            });
+
+            // 显示加载
+            const container = document.getElementById('exerciseChatContainer');
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'chat-message ai';
+            loadingDiv.id = 'exerciseChatLoading';
+            const _aiAvatar = getAIAvatar();
+            const _aiName = getAIName();
+            const avatarHtml = _aiAvatar
+                ? `<div class="chat-avatar"><img src="${_aiAvatar}" alt="${escapeHtml(_aiName)}"></div>`
+                : `<div class="chat-avatar">${(_aiName || 'AI').charAt(0).toUpperCase()}</div>`;
+            loadingDiv.innerHTML = `
+                <div class="chat-sender">${avatarHtml}<span class="chat-sender-name">${escapeHtml(_aiName || 'AI')}</span></div>
+                <div class="chat-bubble">
+                    <div class="chat-typing"><span></span><span></span><span></span></div>
+                </div>
+            `;
+            container.appendChild(loadingDiv);
+            container.scrollTop = container.scrollHeight;
+
+            try {
+                const result = await callAI(systemPrompt, apiMessages, { maxTokens: 4096, temperature: 0.5 });
+                document.getElementById('exerciseChatLoading')?.remove();
+                if (result) {
+                    exerciseChatHistory.push({ role: 'assistant', content: result });
+                } else {
+                    exerciseChatHistory.push({ role: 'assistant', content: '抱歉，请先在设置中配置 API。' });
+                }
+                renderExerciseChatHistory();
+            } catch(e) {
+                console.error('Exercise chat error:', e);
+                document.getElementById('exerciseChatLoading')?.remove();
+                exerciseChatHistory.push({ role: 'assistant', content: '请求失败: ' + (e.message || '未知错误') });
+                renderExerciseChatHistory();
+            }
+        }
+
         // ==================== AI Modal ====================
         function showAIModal() {
             const userName = getUserName();
@@ -15875,6 +15828,10 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
                     重命名
                 </button>
+                <button class="longpress-menu-item" onclick="exportExTaskPDF('${folderId}','${taskId}')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                    导出作业
+                </button>
                 <button class="longpress-menu-item" onclick="gradeAllExQuestions('${folderId}','${taskId}')">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
                     全部评分
@@ -15909,6 +15866,203 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             saveData();
             debouncedChatSync();
             renderExerciseFolderContent(folder);
+        }
+
+        // 导出作业为 PDF：仅导出手写内容非空的题目
+        async function exportExTaskPDF(folderId, taskId) {
+            closeLongPressMenu();
+            const data = getExercisesData();
+            const folder = data.folders.find(f => f.id === folderId);
+            if (!folder) { showToast('找不到文件夹'); return; }
+            const task = folder.tasks.find(t => t.id === taskId);
+            if (!task || !task.questions || task.questions.length === 0) {
+                showToast('没有题目可导出');
+                return;
+            }
+
+            showToast('正在生成 PDF...');
+
+            try {
+                // 收集有手写内容的题目
+                const exportItems = [];
+                for (let i = 0; i < task.questions.length; i++) {
+                    const q = task.questions[i];
+                    // 优先从 IDB 加载缓存的手写 / 已提交的手写
+                    let drawing = q.userDrawing || null;
+                    if (!drawing) {
+                        try {
+                            drawing = await getFileData(`exercise_drawing_${taskId}_${i}`);
+                        } catch(e) {}
+                    }
+                    if (!drawing) {
+                        try {
+                            drawing = await getFileData(`exercise_drawing_cache_${taskId}_${i}`);
+                        } catch(e) {}
+                    }
+                    // 也检查 exDrawingCache 内存缓存
+                    if (!drawing && exDrawingCache[`${taskId}_${i}`]) {
+                        drawing = exDrawingCache[`${taskId}_${i}`];
+                    }
+                    if (drawing && !isCanvasBlank(drawing)) {
+                        exportItems.push({ index: i, question: q, drawing });
+                    }
+                }
+
+                if (exportItems.length === 0) {
+                    showToast('没有已作答的题目可导出');
+                    return;
+                }
+
+                // 使用 pdf-lib 生成 PDF
+                const { PDFDocument, rgb, StandardFonts } = PDFLib;
+                const pdfDoc = await PDFDocument.create();
+                const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+                const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+                const pageWidth = 595.28;  // A4
+                const pageHeight = 841.89;
+                const margin = 40;
+                const contentWidth = pageWidth - margin * 2;
+
+                for (const item of exportItems) {
+                    const page = pdfDoc.addPage([pageWidth, pageHeight]);
+                    let yPos = pageHeight - margin;
+
+                    // 标题行
+                    const titleText = `${task.name} - Q${item.index + 1}`;
+                    page.drawText(titleText, {
+                        x: margin, y: yPos,
+                        size: 14, font: fontBold, color: rgb(0, 0, 0),
+                        maxWidth: contentWidth
+                    });
+                    yPos -= 24;
+
+                    // 分数（如有）
+                    if (item.question.score !== undefined && item.question.score !== null) {
+                        const scoreText = `Score: ${item.question.score}/10`;
+                        const scoreColor = item.question.score >= 8 ? rgb(0.13, 0.77, 0.37) :
+                                           item.question.score >= 6 ? rgb(0.92, 0.70, 0.03) : rgb(0.94, 0.27, 0.27);
+                        page.drawText(scoreText, {
+                            x: margin, y: yPos,
+                            size: 11, font: fontBold, color: scoreColor
+                        });
+                        yPos -= 18;
+                    }
+
+                    // 题目文本（LaTeX 原文）
+                    const latexText = item.question.latex || '';
+                    if (latexText) {
+                        // 简单折行
+                        const lines = wrapTextLines(latexText, font, 10, contentWidth);
+                        for (const line of lines) {
+                            if (yPos < margin + 20) break;
+                            page.drawText(line, {
+                                x: margin, y: yPos,
+                                size: 10, font: font, color: rgb(0.1, 0.1, 0.1),
+                                maxWidth: contentWidth
+                            });
+                            yPos -= 14;
+                        }
+                        yPos -= 8;
+                    }
+
+                    // 嵌入手写图片
+                    try {
+                        const imgBytes = base64ToUint8Array(item.drawing.split(',')[1]);
+                        const pngImage = await pdfDoc.embedPng(imgBytes);
+                        const imgDims = pngImage.scale(1);
+                        const scale = Math.min(contentWidth / imgDims.width, (yPos - margin) / imgDims.height, 1);
+                        const drawWidth = imgDims.width * scale;
+                        const drawHeight = imgDims.height * scale;
+                        page.drawImage(pngImage, {
+                            x: margin,
+                            y: yPos - drawHeight,
+                            width: drawWidth,
+                            height: drawHeight
+                        });
+                        yPos -= drawHeight + 12;
+                    } catch(imgErr) {
+                        console.warn('嵌入图片失败:', imgErr);
+                        page.drawText('[Image failed to embed]', {
+                            x: margin, y: yPos, size: 10, font, color: rgb(0.6, 0.6, 0.6)
+                        });
+                        yPos -= 16;
+                    }
+
+                    // AI 评语（如有）
+                    if (item.question.aiComment) {
+                        yPos -= 4;
+                        const commentLines = wrapTextLines(item.question.aiComment, font, 9, contentWidth);
+                        for (const line of commentLines) {
+                            if (yPos < margin) break;
+                            page.drawText(line, {
+                                x: margin, y: yPos,
+                                size: 9, font: font, color: rgb(0.4, 0.4, 0.4),
+                                maxWidth: contentWidth
+                            });
+                            yPos -= 12;
+                        }
+                    }
+                }
+
+                // 下载
+                const pdfBytes = await pdfDoc.save();
+                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${task.name}_作业.pdf`;
+                a.click();
+                setTimeout(() => URL.revokeObjectURL(url), 5000);
+                showToast(`已导出 ${exportItems.length} 道题`);
+
+            } catch(err) {
+                console.error('导出PDF失败:', err);
+                showToast('导出失败: ' + err.message);
+            }
+        }
+
+        // 辅助：文本折行
+        function wrapTextLines(text, font, fontSize, maxWidth) {
+            const lines = [];
+            const rawLines = text.split('\n');
+            for (const rawLine of rawLines) {
+                if (!rawLine.trim()) { lines.push(''); continue; }
+                let current = '';
+                const words = rawLine.split('');
+                for (const ch of words) {
+                    const test = current + ch;
+                    try {
+                        const w = font.widthOfTextAtSize(test, fontSize);
+                        if (w > maxWidth && current) {
+                            lines.push(current);
+                            current = ch;
+                        } else {
+                            current = test;
+                        }
+                    } catch(e) {
+                        // 无法测量的字符（中文等），按估算宽度
+                        if (current.length * fontSize * 0.6 > maxWidth && current) {
+                            lines.push(current);
+                            current = ch;
+                        } else {
+                            current = test;
+                        }
+                    }
+                }
+                if (current) lines.push(current);
+            }
+            return lines;
+        }
+
+        // 辅助：base64 → Uint8Array
+        function base64ToUint8Array(base64) {
+            const binary = atob(base64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            return bytes;
         }
 
         async function regenerateExTask(folderId, taskId) {
@@ -16907,8 +17061,11 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 document.getElementById('exCompleteBtn').textContent = q._redoing ? '完成' : '重做';
                 document.getElementById('exPrevBtn').textContent = '上一题';
                 document.getElementById('exNextBtn').textContent = '下一题';
+                // 错题查看模式（非重做中）显示"问AI"按钮
+                document.getElementById('exAskAIBtn').style.display = (!q._redoing) ? '' : 'none';
             } else {
                 document.getElementById('exCompleteBtn').textContent = '完成';
+                document.getElementById('exAskAIBtn').style.display = 'none';
             }
 
             // 更新左下角评分徽标
