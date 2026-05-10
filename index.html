@@ -16554,6 +16554,9 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 // 隐藏画布和工具栏
                 canvasWrap.style.display = 'none';
                 toolbar.style.display = 'none';
+                // question区域撑满画布位置，footer保持底部
+                qDiv.style.flex = '1';
+                qDiv.style.maxHeight = 'none';
             } else {
                 // 正常做题 或 错题重做中：只显示题目 + 画布
                 let html = `<div style="font-size:15px;line-height:1.8;">${escapeHtml(q.latex)}</div>`;
@@ -16561,6 +16564,9 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 // 显示画布和工具栏
                 canvasWrap.style.display = '';
                 toolbar.style.display = '';
+                // 恢复question区域原始样式
+                qDiv.style.flex = '';
+                qDiv.style.maxHeight = '';
             }
 
             // Render KaTeX
@@ -16620,31 +16626,41 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             }
         }
 
-        // 保存当前题目画布到缓存
+        // 保存当前题目画布到IndexedDB持久化
         function saveCurrentDrawingToCache() {
             if (!exDoingState) return;
             const { taskId, questionIndex, isWrong, questions } = exDoingState;
-            // 错题未进入重做模式时没有画布，不保存
             if (isWrong && questions && questions[questionIndex] && !questions[questionIndex]._redoing) return;
             const canvas = document.getElementById('exerciseDoingCanvas');
             if (!canvas || !exCanvasCtx) return;
             const key = `${taskId}_${questionIndex}`;
-            exDrawingCache[key] = canvas.toDataURL('image/png');
+            const dataUrl = canvas.toDataURL('image/png');
+            exDrawingCache[key] = dataUrl;
+            // 持久化到IndexedDB
+            const dbKey = `exercise_drawing_cache_${key}`;
+            saveFileData(dbKey, dataUrl).catch(e => console.warn('保存书写缓存失败:', e));
         }
 
-        // 从缓存恢复画布
-        function restoreDrawingFromCache() {
+        // 从缓存恢复画布（先查内存，再查IndexedDB）
+        async function restoreDrawingFromCache() {
             if (!exDoingState) return;
             const { taskId, questionIndex } = exDoingState;
             const key = `${taskId}_${questionIndex}`;
-            const cached = exDrawingCache[key];
+            let cached = exDrawingCache[key];
+            // 内存没有则从IndexedDB读取
+            if (!cached) {
+                try {
+                    const dbKey = `exercise_drawing_cache_${key}`;
+                    cached = await getFileData(dbKey);
+                    if (cached) exDrawingCache[key] = cached;
+                } catch(e) {}
+            }
             if (cached) {
                 const canvas = document.getElementById('exerciseDoingCanvas');
                 const img = new Image();
                 img.onload = () => {
-                    // canvas已经被initExCanvas重置并scale(2,2)过了，需要用原始尺寸绘制
                     exCanvasCtx.save();
-                    exCanvasCtx.setTransform(1, 0, 0, 1, 0, 0); // 重置变换
+                    exCanvasCtx.setTransform(1, 0, 0, 1, 0, 0);
                     exCanvasCtx.drawImage(img, 0, 0);
                     exCanvasCtx.restore();
                 };
@@ -16757,10 +16773,11 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             if (!exCanvasCtx) return;
             const canvas = document.getElementById('exerciseDoingCanvas');
             exCanvasCtx.clearRect(0, 0, canvas.width, canvas.height);
-            // 同时清除缓存
             if (exDoingState) {
                 const key = `${exDoingState.taskId}_${exDoingState.questionIndex}`;
                 delete exDrawingCache[key];
+                const dbKey = `exercise_drawing_cache_${key}`;
+                deleteFileData(dbKey).catch(e => {});
             }
         }
 
