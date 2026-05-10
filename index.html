@@ -11416,6 +11416,46 @@
             renderLectureMath(container);
         }
 
+        // 自动为混合文本中裸露的LaTeX表达式添加$定界符
+        // 处理如 "(-1)^{i+j}" 或 "\det(A)" 等未用$包裹的LaTeX
+        function autoWrapBareLatex(text) {
+            if (!text) return text;
+            // 先保护已有的 $$...$$ 和 $...$
+            const preserved = [];
+            let s = text.replace(/\$\$([\s\S]*?)\$\$/g, (m) => {
+                preserved.push(m); return `%%PRSV${preserved.length - 1}%%`;
+            });
+            s = s.replace(/\$([^\$\n]+?)\$/g, (m) => {
+                preserved.push(m); return `%%PRSV${preserved.length - 1}%%`;
+            });
+            // 也保护 \[...\] 和 \(...\)
+            s = s.replace(/\\\[([\s\S]*?)\\\]/g, (m) => {
+                preserved.push(m); return `%%PRSV${preserved.length - 1}%%`;
+            });
+            s = s.replace(/\\\(([\s\S]*?)\\\)/g, (m) => {
+                preserved.push(m); return `%%PRSV${preserved.length - 1}%%`;
+            });
+
+            // 匹配裸露的LaTeX片段：含有反斜杠命令、上下标花括号等
+            // 模式1: \command{...} 或 \command 系列
+            s = s.replace(/(?<![\\$%])((\\(?:frac|sqrt|sum|int|prod|lim|infty|partial|nabla|det|dim|ker|deg|min|max|sup|inf|gcd|lcm|binom|sin|cos|tan|log|ln|exp|text|mathbf|mathrm|mathcal|mathbb|vec|hat|bar|overline|underline|alpha|beta|gamma|delta|epsilon|zeta|eta|theta|lambda|mu|nu|xi|pi|rho|sigma|tau|phi|chi|psi|omega|Gamma|Delta|Theta|Lambda|Sigma|Phi|Psi|Omega|cdot|times|div|pm|mp|leq|geq|neq|approx|equiv|subset|supset|subseteq|supseteq|in|notin|cup|cap|forall|exists|neg|rightarrow|leftarrow|Rightarrow|Leftarrow|to|mapsto|implies|iff|left|right|begin|end)(?:\{[^}]*\}|[^a-zA-Z]|$)(?:[^\s,，。；：！\n]*(?:\{[^}]*\})*[^\s,，。；：！\n]*)*))/g, (m, p1) => {
+                const trimmed = p1.trim();
+                if (!trimmed) return m;
+                return '$' + trimmed + '$';
+            });
+
+            // 模式2: 含有^{...} 或 _{...} 的表达式，如 (-1)^{i+j}、a_{ij}
+            s = s.replace(/(?<!\$)(\(?[a-zA-Z0-9()\-]+(?:[\^_]\{[^}]*\})+[a-zA-Z0-9()\-\^_{}]*\)?)(?!\$)/g, (m, p1) => {
+                // 避免重复包裹
+                if (/%%PRSV\d+%%/.test(p1)) return m;
+                return '$' + p1 + '$';
+            });
+
+            // 恢复已保护的内容
+            s = s.replace(/%%PRSV(\d+)%%/g, (m, idx) => preserved[parseInt(idx)]);
+            return s;
+        }
+
         function renderChatMarkdownLatex(text) {
             if (!text) return '';
             let content = text;
@@ -16208,6 +16248,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
 3. 结构是否清晰（2分）
 
 严格要求：只输出一个纯JSON对象，不要输出任何其他文字、解释、markdown标记。
+重要：评价文本中如果涉及任何数学公式、符号、变量、表达式，必须用LaTeX定界符包裹：行内公式用 $...$ 包裹，例如 $(-1)^{i+j}$、$\\det(A)$、$a_{ij}$。不要写裸露的LaTeX命令。
 格式：{"score":数字,"correct":true或false,"rigor":"评价","structure":"评价","comment":"综合评价"}`;
 
             let graded = 0;
@@ -17355,7 +17396,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     html += `<img class="wrong-exercise-user-drawing" src="${q.userDrawing}" alt="作答">`;
                 }
                 if (q.aiComment) {
-                    html += `<div class="ex-ai-comment" style="margin-top:6px;line-height:1.6;font-size:14px;">${renderChatMarkdownLatex(q.aiComment)}</div>`;
+                    html += `<div class="ex-ai-comment" style="margin-top:6px;line-height:1.6;font-size:14px;">${renderChatMarkdownLatex(autoWrapBareLatex(q.aiComment))}</div>`;
                 }
                 html += `</div>`;
                 qDiv.innerHTML = html;
@@ -17697,6 +17738,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
 3. 结构是否清晰（2分）
 
 严格要求：只输出一个纯JSON对象，不要输出任何其他文字、解释、markdown标记。
+重要：评价文本中如果涉及任何数学公式、符号、变量、表达式，必须用LaTeX定界符包裹：行内公式用 $...$ 包裹，例如 $(-1)^{i+j}$、$\\det(A)$、$a_{ij}$。不要写裸露的LaTeX命令。
 格式：{"score":数字,"correct":true或false,"rigor":"评价","structure":"评价","comment":"综合评价"}`;
 
             try {
