@@ -9818,15 +9818,17 @@
 
                 // 如果是上传习题文件，同步到云端
                 if (action === 'exercise_upload' && fileId) {
-                    const sfData = await getFileData('exercise_' + fileId).catch(() => null);
-                    if (sfData) {
-                        await r2PutObject('exercises/' + fileId, sfData, 'application/octet-stream');
+                    const exData = await getFileData('exercise_' + fileId).catch(() => null);
+                    if (exData) {
+                        await r2PutObject('exercises/' + fileId, exData, 'application/octet-stream');
                     }
                 }
 
-                // 如果是删除习题文件，删除云端文件
+                // 如果是删除习题文件，删除云端
                 if (action === 'exercise_delete' && fileId) {
-                    try { await r2DeleteObject('exercises/' + fileId); } catch (e) {}
+                    try {
+                        await r2DeleteObject('exercises/' + fileId);
+                    } catch (e) {}
                 }
                 
                 // 更新上次同步时间
@@ -9841,8 +9843,10 @@
                 } else if (action === 'abstract_upload') {
                     showToast('摘要已同步到云端');
                     sendNotification('摘要云同步完成', '论文摘要已安全同步到云端');
-                } else if (action === 'exercise_upload' || action === 'exercise_delete') {
-                    showToast('习题文件已同步');
+                } else if (action === 'exercise_upload') {
+                    showToast('习题文件已同步到云端');
+                } else if (action === 'exercise_delete') {
+                    showToast('习题文件已从云端删除');
                 } else {
                     showToast('已自动同步到云端');
                 }
@@ -10608,93 +10612,6 @@
             return merged;
         }
 
-        // ==================== Exercises 数据合并 ====================
-        function mergeExercisesData(cloudEx, localEx, cloudSyncedAtMs) {
-            const cloud = cloudEx || { folders: [], wrongByFolder: {} };
-            const local = localEx || { folders: [], wrongByFolder: {} };
-            const baseline = Number(cloudSyncedAtMs) || 0;
-
-            // Merge folders
-            const cf = cloud.folders || [];
-            const lf = local.folders || [];
-            const lfMap = {};
-            lf.forEach(f => { if (f && f.id) lfMap[f.id] = f; });
-            const cfIds = new Set(cf.map(f => f && f.id).filter(Boolean));
-
-            const mergedFolders = cf.map(cFolder => {
-                if (!cFolder || !cFolder.id) return cFolder;
-                const lFolder = lfMap[cFolder.id];
-                if (!lFolder) return cFolder;
-                // Merge tasks
-                const cTasks = cFolder.tasks || [];
-                const lTasks = lFolder.tasks || [];
-                const ltMap = {};
-                lTasks.forEach(t => { if (t && t.id) ltMap[t.id] = t; });
-                const ctIds = new Set(cTasks.map(t => t && t.id).filter(Boolean));
-                const mergedTasks = cTasks.map(ct => {
-                    const lt = ltMap[ct.id];
-                    if (!lt) return ct;
-                    // Merge sourceFiles by union
-                    const csfIds = new Set((ct.sourceFiles || []).map(s => s.id));
-                    const mergedSF = [...(ct.sourceFiles || [])];
-                    (lt.sourceFiles || []).forEach(sf => { if (!csfIds.has(sf.id)) mergedSF.push(sf); });
-                    // Merge questions: prefer done over pending, higher score
-                    const cq = ct.questions || [];
-                    const lq = lt.questions || [];
-                    const maxLen = Math.max(cq.length, lq.length);
-                    const mergedQ = [];
-                    for (let i = 0; i < maxLen; i++) {
-                        const c = cq[i], l = lq[i];
-                        if (!c) { mergedQ.push(l); continue; }
-                        if (!l) { mergedQ.push(c); continue; }
-                        if (l.status === 'done' && c.status !== 'done') mergedQ.push(l);
-                        else if (c.status === 'done' && l.status !== 'done') mergedQ.push(c);
-                        else if ((l.score || 0) > (c.score || 0)) mergedQ.push(l);
-                        else mergedQ.push({ ...c, timeSpent: Math.max(c.timeSpent || 0, l.timeSpent || 0) });
-                    }
-                    return { ...ct, sourceFiles: mergedSF, questions: mergedQ };
-                });
-                // Local-only tasks newer than baseline
-                lTasks.forEach(lt => {
-                    if (!lt || !lt.id || ctIds.has(lt.id)) return;
-                    const ms = lt.createdAt ? Date.parse(lt.createdAt) : NaN;
-                    if (!isNaN(ms) && ms > baseline) mergedTasks.push(lt);
-                });
-                return { ...cFolder, tasks: mergedTasks, archived: cFolder.archived || lFolder.archived };
-            });
-            // Local-only folders newer than baseline
-            lf.forEach(lFolder => {
-                if (!lFolder || !lFolder.id || cfIds.has(lFolder.id)) return;
-                const ms = lFolder.createdAt ? Date.parse(lFolder.createdAt) : NaN;
-                if (!isNaN(ms) && ms > baseline) mergedFolders.push(lFolder);
-            });
-
-            // Merge wrongByFolder
-            const mergedWrong = {};
-            const allFids = new Set([...mergedFolders.map(f => f.id), ...Object.keys(cloud.wrongByFolder || {}), ...Object.keys(local.wrongByFolder || {})]);
-            allFids.forEach(fid => {
-                const cw = (cloud.wrongByFolder || {})[fid] || [];
-                const lw = (local.wrongByFolder || {})[fid] || [];
-                const tMap = {};
-                [...cw, ...lw].forEach(wt => {
-                    if (!wt || !wt.taskId) return;
-                    if (!tMap[wt.taskId]) { tMap[wt.taskId] = { ...wt, questions: [...(wt.questions || [])] }; return; }
-                    const existing = tMap[wt.taskId];
-                    const idxSet = new Set(existing.questions.map(q => q.questionIndex));
-                    (wt.questions || []).forEach(q => {
-                        if (!idxSet.has(q.questionIndex)) existing.questions.push(q);
-                        else {
-                            const ei = existing.questions.findIndex(eq => eq.questionIndex === q.questionIndex);
-                            if (ei >= 0 && (q.score || 0) > (existing.questions[ei].score || 0)) existing.questions[ei] = q;
-                        }
-                    });
-                });
-                mergedWrong[fid] = Object.values(tMap);
-            });
-
-            return { folders: mergedFolders, wrongByFolder: mergedWrong };
-        }
-
         async function autoSyncFromR2OnStartup() {
             const config = appData.settings && appData.settings.r2Config;
             if (!config || !config.accessKeyId || !config.autoSyncEnabled) return;
@@ -10741,8 +10658,10 @@
                     cloudSyncedAtMs
                 );
                 appData.lectureDrafts = metadata.lectureDrafts || appData.lectureDrafts || {};
-                // 合并习题数据：按 folder/task 级别合并（参考 classroom 合并策略）
-                appData.exercises = mergeExercisesData(metadata.exercises, appData.exercises, cloudSyncedAtMs);
+                // 合并习题数据：云端覆盖本地（简单策略）
+                if (metadata.exercises) {
+                    appData.exercises = metadata.exercises;
+                }
                 if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {} };
                 // API 设置仅保留本地值，不被云端覆盖
                 appData.settings = { ...metadata.settings, ...localApiSettings, r2Config: localR2Config };
@@ -15432,8 +15351,8 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
         let currentExerciseTask = null;   // { folderId, taskId }
         let exDoingState = null;          // { folderId, taskId, questionIndex, isWrong, wrongFolderId }
         let exTimerInterval = null;
-        let exTimerSeconds = 1200; // 20 min per question
-        let exQuestionOpenedAt = null; // timestamp when current question was opened
+        let exTimerSeconds = 1200; // 20 min
+        let exTimerStartedAt = null; // Date.now() when timer started for current question
         let exPenColor = '#000000';
         let exDrawing = false;
         let exLastX = 0, exLastY = 0;
@@ -15445,6 +15364,16 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             if (!appData.exercises.folders) appData.exercises.folders = [];
             if (!appData.exercises.wrongByFolder) appData.exercises.wrongByFolder = {};
             return appData.exercises;
+        }
+
+        // Format seconds to mm:ss or hh:mm:ss
+        function formatExTime(totalSeconds) {
+            if (!totalSeconds || totalSeconds <= 0) return '0:00';
+            const h = Math.floor(totalSeconds / 3600);
+            const m = Math.floor((totalSeconds % 3600) / 60);
+            const s = totalSeconds % 60;
+            if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+            return `${m}:${String(s).padStart(2,'0')}`;
         }
 
         function renderExercisesPage() {
@@ -15620,8 +15549,12 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             cancelExTaskLongPress();
             const t = e.touches ? e.touches[0] : e;
             const cx = t.clientX, cy = t.clientY;
-            _exTaskLPTimer = setTimeout(() => { _exTaskLPTimer = null; showExTaskMenu({ clientX: cx, clientY: cy }, folderId, taskId); }, 500);
+            _exTaskLPTimer = setTimeout(() => {
+                _exTaskLPTimer = null;
+                showExTaskMenu({ clientX: cx, clientY: cy }, folderId, taskId);
+            }, 500);
         }
+
         function showExTaskMenu(e, folderId, taskId) {
             closeLongPressMenu();
             const overlay = document.createElement('div');
@@ -15630,35 +15563,91 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             const menu = document.createElement('div');
             menu.className = 'longpress-menu';
             menu.id = 'longpressMenu';
-            menu.innerHTML = `<button class="longpress-menu-item danger" onclick="deleteExTask('${folderId}','${taskId}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>删除任务</button>`;
+            menu.innerHTML = `
+                <button class="longpress-menu-item" onclick="renameExTask('${folderId}','${taskId}')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                    重命名
+                </button>
+                <button class="longpress-menu-item" onclick="regenerateExTask('${folderId}','${taskId}')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+                    重新生成
+                </button>
+                <button class="longpress-menu-item danger" onclick="deleteExTask('${folderId}','${taskId}')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                    删除
+                </button>`;
             document.body.appendChild(overlay);
             document.body.appendChild(menu);
             let x = e.clientX || 100, y = e.clientY || 100;
             if (x + 140 > window.innerWidth) x = window.innerWidth - 150;
-            if (y + 80 > window.innerHeight) y = window.innerHeight - 90;
-            menu.style.left = x + 'px'; menu.style.top = y + 'px';
+            if (y + 160 > window.innerHeight) y = window.innerHeight - 170;
+            menu.style.left = x + 'px';
+            menu.style.top = y + 'px';
         }
+
+        function renameExTask(folderId, taskId) {
+            closeLongPressMenu();
+            const data = getExercisesData();
+            const folder = data.folders.find(f => f.id === folderId);
+            if (!folder) return;
+            const task = folder.tasks.find(t => t.id === taskId);
+            if (!task) return;
+            const newName = prompt('重命名任务：', task.name);
+            if (!newName || !newName.trim()) return;
+            task.name = newName.trim();
+            saveData();
+            debouncedChatSync();
+            renderExerciseFolderContent(folder);
+        }
+
+        async function regenerateExTask(folderId, taskId) {
+            closeLongPressMenu();
+            if (!confirm('重新生成将清空当前题目和作答记录，确定？')) return;
+            const data = getExercisesData();
+            const folder = data.folders.find(f => f.id === folderId);
+            if (!folder) return;
+            const task = folder.tasks.find(t => t.id === taskId);
+            if (!task || !task.sourceFiles || task.sourceFiles.length === 0) {
+                showToast('没有找到源文件');
+                return;
+            }
+            // Clear existing questions
+            task.questions = [];
+            saveData();
+            renderExerciseFolderContent(folder);
+            // Re-extract from first source file
+            const sf = task.sourceFiles[0];
+            try {
+                const dataUrl = await getFileData('exercise_' + sf.id);
+                if (!dataUrl) { showToast('源文件数据未找到'); return; }
+                const isImage = sf.type === 'image';
+                await extractExerciseQuestions(folderId, taskId, dataUrl, isImage, sf.mimeType || '');
+            } catch (err) {
+                showToast('重新生成失败: ' + err.message);
+            }
+        }
+
         function deleteExTask(folderId, taskId) {
             closeLongPressMenu();
             if (!confirm('确定删除此习题任务？')) return;
             const data = getExercisesData();
             const folder = data.folders.find(f => f.id === folderId);
             if (!folder) return;
-            const ti = (folder.tasks || []).findIndex(t => t.id === taskId);
-            if (ti < 0) return;
-            const task = folder.tasks[ti];
+            const taskIdx = folder.tasks.findIndex(t => t.id === taskId);
+            if (taskIdx < 0) return;
+            const task = folder.tasks[taskIdx];
+            // Clean up IDB files
             (task.sourceFiles || []).forEach(sf => {
                 try { deleteFileData('exercise_' + sf.id); } catch(e) {}
                 triggerSyncOnFileChange(sf.id, 'exercise_delete');
             });
-            (task.questions || []).forEach((q, qi) => {
-                try { deleteFileData(`exercise_drawing_${taskId}_${qi}`); } catch(e) {}
-            });
-            folder.tasks.splice(ti, 1);
-            if (data.wrongByFolder[folderId]) {
-                data.wrongByFolder[folderId] = data.wrongByFolder[folderId].filter(w => w.taskId !== taskId);
-            }
-            saveData(); debouncedChatSync();
+            folder.tasks.splice(taskIdx, 1);
+            // Also clean wrong questions for this task
+            const wrongTasks = data.wrongByFolder[folderId] || [];
+            const wtIdx = wrongTasks.findIndex(wt => wt.taskId === taskId);
+            if (wtIdx >= 0) wrongTasks.splice(wtIdx, 1);
+            saveData();
+            debouncedChatSync();
             renderExerciseFolderContent(folder);
             showToast('已删除');
         }
@@ -15670,8 +15659,12 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             cancelExFileLongPress();
             const t = e.touches ? e.touches[0] : e;
             const cx = t.clientX, cy = t.clientY;
-            _exFileLPTimer = setTimeout(() => { _exFileLPTimer = null; showExFileMenu({ clientX: cx, clientY: cy }, folderId, taskId, fileId); }, 500);
+            _exFileLPTimer = setTimeout(() => {
+                _exFileLPTimer = null;
+                showExFileMenu({ clientX: cx, clientY: cy }, folderId, taskId, fileId);
+            }, 500);
         }
+
         function showExFileMenu(e, folderId, taskId, fileId) {
             closeLongPressMenu();
             const overlay = document.createElement('div');
@@ -15680,30 +15673,59 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             const menu = document.createElement('div');
             menu.className = 'longpress-menu';
             menu.id = 'longpressMenu';
-            menu.innerHTML = `<button class="longpress-menu-item danger" onclick="deleteExFile('${folderId}','${taskId}','${fileId}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>删除文件</button>`;
+            menu.innerHTML = `
+                <button class="longpress-menu-item" onclick="renameExFile('${folderId}','${taskId}','${fileId}')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                    重命名
+                </button>
+                <button class="longpress-menu-item danger" onclick="deleteExFile('${folderId}','${taskId}','${fileId}')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                    删除
+                </button>`;
             document.body.appendChild(overlay);
             document.body.appendChild(menu);
             let x = e.clientX || 100, y = e.clientY || 100;
             if (x + 140 > window.innerWidth) x = window.innerWidth - 150;
-            if (y + 80 > window.innerHeight) y = window.innerHeight - 90;
-            menu.style.left = x + 'px'; menu.style.top = y + 'px';
+            if (y + 120 > window.innerHeight) y = window.innerHeight - 130;
+            menu.style.left = x + 'px';
+            menu.style.top = y + 'px';
         }
-        function deleteExFile(folderId, taskId, fileId) {
+
+        function renameExFile(folderId, taskId, fileId) {
             closeLongPressMenu();
-            if (!confirm('确定删除此习题文件？')) return;
             const data = getExercisesData();
             const folder = data.folders.find(f => f.id === folderId);
             if (!folder) return;
-            const task = (folder.tasks || []).find(t => t.id === taskId);
+            const task = folder.tasks.find(t => t.id === taskId);
             if (!task) return;
-            const si = (task.sourceFiles || []).findIndex(sf => sf.id === fileId);
-            if (si < 0) return;
-            try { deleteFileData('exercise_' + fileId); } catch(e) {}
-            triggerSyncOnFileChange(fileId, 'exercise_delete');
-            task.sourceFiles.splice(si, 1);
-            saveData(); debouncedChatSync();
+            const sf = (task.sourceFiles || []).find(s => s.id === fileId);
+            if (!sf) return;
+            const newName = prompt('重命名文件：', sf.name);
+            if (!newName || !newName.trim()) return;
+            sf.name = newName.trim();
+            saveData();
+            debouncedChatSync();
             renderExerciseFolderContent(folder);
-            showToast('已删除');
+        }
+
+        function deleteExFile(folderId, taskId, fileId) {
+            closeLongPressMenu();
+            if (!confirm('确定删除此文件？')) return;
+            const data = getExercisesData();
+            const folder = data.folders.find(f => f.id === folderId);
+            if (!folder) return;
+            const task = folder.tasks.find(t => t.id === taskId);
+            if (!task) return;
+            const sfIdx = (task.sourceFiles || []).findIndex(s => s.id === fileId);
+            if (sfIdx >= 0) {
+                try { deleteFileData('exercise_' + fileId); } catch(e) {}
+                triggerSyncOnFileChange(fileId, 'exercise_delete');
+                task.sourceFiles.splice(sfIdx, 1);
+                saveData();
+                debouncedChatSync();
+                renderExerciseFolderContent(folder);
+                showToast('已删除');
+            }
         }
 
         function renderExerciseFolderContent(folder) {
@@ -15795,9 +15817,6 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     // Save to IndexedDB
                     await saveFileData('exercise_' + fileId, dataUrl);
 
-                    // Sync to cloud
-                    triggerSyncOnFileChange(fileId, 'exercise_upload');
-
                     // Create task
                     const taskId = 'extask_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
                     const task = {
@@ -15828,6 +15847,17 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
 
             e.target.value = '';
             debouncedChatSync();
+            // 同步每个新上传的习题文件到云端
+            if (currentExerciseFolder) {
+                const syncFolder = data.folders.find(f => f.id === currentExerciseFolder.folderId);
+                if (syncFolder) {
+                    for (const task of (syncFolder.tasks || [])) {
+                        for (const sf of (task.sourceFiles || [])) {
+                            triggerSyncOnFileChange(sf.id, 'exercise_upload');
+                        }
+                    }
+                }
+            }
         }
 
         function readFileAsDataURL(file) {
@@ -15884,71 +15914,24 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 const result = await callAI(systemPrompt, msgContent, { maxTokens: 4096, temperature: 0.3 });
                 if (!result) { showToast('AI解析返回为空'); return; }
 
-                // Parse JSON from AI response
+                // Parse JSON
                 let questions;
                 try {
-                    // Step 1: 尝试提取代码块内容
-                    let jsonStr = result;
-                    const codeBlockMatch = result.match(/```(?:json)?\s*\n?([\s\S]*?)```/);
-                    if (codeBlockMatch) {
-                        jsonStr = codeBlockMatch[1].trim();
+                    const cleaned = result.replace(/```json|```/g, '').trim();
+                    questions = JSON.parse(cleaned);
+                } catch (e) {
+                    // Try to extract array
+                    const match = result.match(/\[[\s\S]*\]/);
+                    if (match) {
+                        questions = JSON.parse(match[0]);
+                    } else {
+                        showToast('AI返回格式错误');
+                        return;
                     }
-
-                    // Step 2: 尝试直接解析
-                    try {
-                        const parsed = JSON.parse(jsonStr);
-                        if (Array.isArray(parsed)) {
-                            questions = parsed;
-                        } else if (parsed && typeof parsed === 'object') {
-                            // 可能是 {"questions": [...]} 这种格式
-                            const arrKey = Object.keys(parsed).find(k => Array.isArray(parsed[k]));
-                            if (arrKey) questions = parsed[arrKey];
-                        }
-                    } catch(e1) {
-                        // Step 3: 从文本中提取JSON数组
-                        // 找到最外层的 [ ... ]，用贪婪匹配
-                        const firstBracket = jsonStr.indexOf('[');
-                        const lastBracket = jsonStr.lastIndexOf(']');
-                        if (firstBracket >= 0 && lastBracket > firstBracket) {
-                            const arrStr = jsonStr.substring(firstBracket, lastBracket + 1);
-                            try {
-                                questions = JSON.parse(arrStr);
-                            } catch(e2) {
-                                // 尝试修复：去掉末尾多余逗号
-                                try {
-                                    questions = JSON.parse(arrStr.replace(/,\s*\]/g, ']'));
-                                } catch(e3) {}
-                            }
-                        }
-                        // Step 4: 从文本中提取 { ... } 对象
-                        if (!questions) {
-                            const firstBrace = jsonStr.indexOf('{');
-                            const lastBrace = jsonStr.lastIndexOf('}');
-                            if (firstBrace >= 0 && lastBrace > firstBrace) {
-                                try {
-                                    const obj = JSON.parse(jsonStr.substring(firstBrace, lastBrace + 1));
-                                    const arrKey = Object.keys(obj).find(k => Array.isArray(obj[k]));
-                                    if (arrKey) questions = obj[arrKey];
-                                } catch(e4) {}
-                            }
-                        }
-                    }
-
-                    // Step 5: 确保每个元素都是字符串
-                    if (Array.isArray(questions)) {
-                        questions = questions.map(q => {
-                            if (typeof q === 'string') return q;
-                            if (q && typeof q === 'object') return q.text || q.question || q.latex || q.content || q.problem || JSON.stringify(q);
-                            return String(q);
-                        }).filter(q => q && q.trim().length > 0);
-                    }
-                } catch(e) {
-                    console.error('解析AI返回失败:', e, result);
                 }
 
                 if (!Array.isArray(questions) || questions.length === 0) {
-                    console.error('AI原始返回:', result);
-                    showToast('AI返回格式错误，请重试');
+                    showToast('未识别到题目');
                     return;
                 }
 
@@ -15987,60 +15970,60 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 const dataUrl = await getFileData('exercise_' + fileId);
                 if (!dataUrl) { showToast('文件数据未找到'); return; }
                 const overlay = document.createElement('div');
-                overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9000;display:flex;flex-direction:column;';
+                overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9000;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;overflow-y:auto;-webkit-overflow-scrolling:touch;';
                 // Close button
-                const topBar = document.createElement('div');
-                topBar.style.cssText = 'display:flex;justify-content:flex-end;padding:10px 14px;flex-shrink:0;';
                 const closeBtn = document.createElement('button');
                 closeBtn.innerHTML = '✕';
-                closeBtn.style.cssText = 'width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.2);color:white;border:none;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;';
+                closeBtn.style.cssText = 'position:fixed;top:12px;right:12px;z-index:9001;width:36px;height:36px;border-radius:50%;border:none;background:rgba(255,255,255,0.2);color:white;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;';
                 closeBtn.onclick = () => overlay.remove();
-                topBar.appendChild(closeBtn);
-                overlay.appendChild(topBar);
-
-                const scrollArea = document.createElement('div');
-                scrollArea.style.cssText = 'flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 12px 40px;';
-                scrollArea.onclick = (e) => { if (e.target === scrollArea) overlay.remove(); };
-                overlay.appendChild(scrollArea);
+                overlay.appendChild(closeBtn);
 
                 if (dataUrl.startsWith('data:image')) {
                     const img = document.createElement('img');
                     img.src = dataUrl;
-                    img.style.cssText = 'max-width:95%;max-height:90vh;object-fit:contain;border-radius:8px;';
-                    scrollArea.appendChild(img);
-                } else {
-                    // PDF preview
+                    img.style.cssText = 'max-width:95%;max-height:90%;object-fit:contain;border-radius:8px;margin-top:48px;';
+                    overlay.appendChild(img);
+                } else if (dataUrl.startsWith('data:application/pdf') || dataUrl.includes('pdf')) {
+                    // PDF preview using pdf.js
+                    const pdfContainer = document.createElement('div');
+                    pdfContainer.style.cssText = 'width:100%;padding:12px;display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:48px;';
+                    overlay.appendChild(pdfContainer);
                     const loadingEl = document.createElement('div');
-                    loadingEl.textContent = 'PDF加载中...';
-                    loadingEl.style.cssText = 'color:white;font-size:15px;padding:40px;';
-                    scrollArea.appendChild(loadingEl);
+                    loadingEl.textContent = '加载PDF中...';
+                    loadingEl.style.cssText = 'color:white;font-size:14px;margin:20px 0;';
+                    pdfContainer.appendChild(loadingEl);
                     try {
                         const base64 = dataUrl.split(',')[1];
-                        const pdfBytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
-                        const pdf = await pdfjsLib.getDocument({ data: pdfBytes }).promise;
-                        scrollArea.removeChild(loadingEl);
-                        const maxW = Math.min(window.innerWidth - 24, 800);
+                        const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+                        const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+                        loadingEl.remove();
+                        const containerWidth = Math.min(window.innerWidth - 24, 800);
                         for (let p = 1; p <= pdf.numPages; p++) {
                             const page = await pdf.getPage(p);
-                            const vp = page.getViewport({ scale: 1 });
-                            const scale = maxW / vp.width;
-                            const svp = page.getViewport({ scale });
-                            const cvs = document.createElement('canvas');
-                            cvs.width = svp.width * 2;
-                            cvs.height = svp.height * 2;
-                            cvs.style.cssText = `width:${svp.width}px;height:${svp.height}px;background:white;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,0.3);`;
-                            const ctx = cvs.getContext('2d');
+                            const viewport = page.getViewport({ scale: 1 });
+                            const scale = containerWidth / viewport.width;
+                            const scaledViewport = page.getViewport({ scale });
+                            const canvas = document.createElement('canvas');
+                            canvas.width = scaledViewport.width * 2;
+                            canvas.height = scaledViewport.height * 2;
+                            canvas.style.cssText = `width:${scaledViewport.width}px;height:${scaledViewport.height}px;background:white;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,0.3);`;
+                            pdfContainer.appendChild(canvas);
+                            const ctx = canvas.getContext('2d');
                             ctx.scale(2, 2);
-                            await page.render({ canvasContext: ctx, viewport: svp }).promise;
-                            scrollArea.appendChild(cvs);
-                            const lbl = document.createElement('div');
-                            lbl.textContent = `${p} / ${pdf.numPages}`;
-                            lbl.style.cssText = 'color:rgba(255,255,255,0.5);font-size:11px;margin-bottom:4px;';
-                            scrollArea.appendChild(lbl);
+                            await page.render({ canvasContext: ctx, viewport: scaledViewport }).promise;
                         }
+                        // Add bottom padding
+                        const spacer = document.createElement('div');
+                        spacer.style.height = '40px';
+                        pdfContainer.appendChild(spacer);
                     } catch (pdfErr) {
                         loadingEl.textContent = 'PDF渲染失败: ' + pdfErr.message;
                     }
+                } else {
+                    const txt = document.createElement('div');
+                    txt.textContent = '不支持的文件格式，点击关闭';
+                    txt.style.cssText = 'color:white;font-size:16px;margin-top:48px;';
+                    overlay.appendChild(txt);
                 }
                 document.body.appendChild(overlay);
             } catch (e) {
@@ -16067,9 +16050,6 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
         }
 
         function openExerciseDoing(folderId, taskId, questionIndex, isWrong) {
-            // 切题前：先保存上一道题的已用时间（必须在exDoingState更新之前）
-            _saveExQuestionTime();
-
             const data = getExercisesData();
             let questions, title;
 
@@ -16110,9 +16090,12 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 } else {
                     // Show old score, drawing, comment
                     const scoreColor = q.score >= 8 ? '#22c55e' : q.score >= 6 ? '#eab308' : '#ef4444';
-                    const tStr = q.timeSpent ? (' · 用时' + formatTimeSpent(q.timeSpent)) : '';
+                    const timeUsedStr = q.timeUsedSeconds ? formatExTime(q.timeUsedSeconds) : '';
                     let extraHtml = `<div class="wrong-exercise-comment" style="background:${scoreColor}15;border-left:3px solid ${scoreColor};">`;
-                    extraHtml += `<span class="wrong-exercise-score" style="background:${scoreColor};">${q.score}/10${tStr}</span>`;
+                    extraHtml += `<span class="wrong-exercise-score" style="background:${scoreColor};">${q.score}/10</span>`;
+                    if (timeUsedStr) {
+                        extraHtml += `<span style="font-size:12px;color:var(--text-muted);margin-left:8px;">⏱ 用时 ${timeUsedStr}</span>`;
+                    }
                     if (q.userDrawing) {
                         extraHtml += `<img class="wrong-exercise-user-drawing" src="${q.userDrawing}" alt="作答">`;
                     }
@@ -16154,31 +16137,54 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             // Setup canvas
             initExCanvas();
 
-            // 每道题独立计时器
-            if (exTimerInterval) { clearInterval(exTimerInterval); exTimerInterval = null; }
+            // Save current question timer state before switching
+            saveCurrentExTimer();
 
+            // Start timer (only for non-wrong mode)
             if (!isWrong) {
-                // 读取这道题已用的秒数，算出剩余
-                const timerUsed = q.timerUsed || 0;
-                exTimerSeconds = Math.max(0, 1200 - timerUsed);
-                updateExTimerDisplay();
-                exQuestionOpenedAt = Date.now();
-
-                if (exTimerSeconds > 0) {
-                    exTimerInterval = setInterval(() => {
-                        exTimerSeconds--;
-                        updateExTimerDisplay();
-                        if (exTimerSeconds <= 0) {
-                            clearInterval(exTimerInterval);
-                            exTimerInterval = null;
-                            showToast('时间到！');
-                        }
-                    }, 1000);
+                // Use per-question remaining time, default 1200 (20 min)
+                if (q.remainingSeconds === undefined || q.remainingSeconds === null) {
+                    q.remainingSeconds = 1200;
                 }
+                // Initialize timeUsedSeconds if not set
+                if (!q.timeUsedSeconds) q.timeUsedSeconds = 0;
+                exTimerSeconds = q.remainingSeconds;
+                exTimerStartedAt = Date.now();
+                updateExTimerDisplay();
+                if (exTimerInterval) clearInterval(exTimerInterval);
+                exTimerInterval = setInterval(() => {
+                    exTimerSeconds--;
+                    if (exTimerSeconds <= 0) {
+                        exTimerSeconds = 0;
+                        clearInterval(exTimerInterval);
+                        exTimerInterval = null;
+                        showToast('时间到！');
+                    }
+                    updateExTimerDisplay();
+                }, 1000);
             } else {
-                exQuestionOpenedAt = Date.now();
                 document.getElementById('exerciseDoingTimer').textContent = '--:--';
+                exTimerStartedAt = null;
             }
+        }
+
+        // Save the elapsed time back to the question before switching/closing
+        function saveCurrentExTimer() {
+            if (!exDoingState || exDoingState.isWrong || !exTimerStartedAt) return;
+            const data = getExercisesData();
+            const folder = data.folders.find(f => f.id === exDoingState.folderId);
+            if (!folder) return;
+            const task = folder.tasks.find(t => t.id === exDoingState.taskId);
+            if (!task) return;
+            const q = task.questions[exDoingState.questionIndex];
+            if (!q) return;
+            // Calculate how much time was consumed since timer started
+            const elapsed = Math.round((Date.now() - exTimerStartedAt) / 1000);
+            q.remainingSeconds = Math.max(0, exTimerSeconds);
+            q.timeUsedSeconds = (q.timeUsedSeconds || 0) + elapsed;
+            exTimerStartedAt = null;
+            if (exTimerInterval) { clearInterval(exTimerInterval); exTimerInterval = null; }
+            saveData();
         }
 
         function updateExTimerDisplay() {
@@ -16189,43 +16195,14 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             timerEl.classList.toggle('warning', exTimerSeconds <= 120);
         }
 
-        function formatTimeSpent(seconds) {
-            if (!seconds || seconds <= 0) return '';
-            if (seconds < 60) return seconds + '秒';
-            const m = Math.floor(seconds / 60);
-            const s = seconds % 60;
-            if (m < 60) return s > 0 ? `${m}分${s}秒` : `${m}分`;
-            const h = Math.floor(m / 60);
-            const rm = m % 60;
-            return rm > 0 ? `${h}时${rm}分` : `${h}时`;
-        }
-
-        // Save the time spent on the currently open question
-        function _saveExQuestionTime() {
-            if (!exDoingState || !exQuestionOpenedAt) return;
-            const elapsed = Math.round((Date.now() - exQuestionOpenedAt) / 1000);
-            exQuestionOpenedAt = null;
-            if (elapsed <= 0) return;
-            const { folderId, taskId, questionIndex, isWrong } = exDoingState;
-            if (isWrong) return;
-            const data = getExercisesData();
-            const folder = data.folders.find(f => f.id === folderId);
-            if (!folder) return;
-            const task = folder.tasks.find(t => t.id === taskId);
-            if (!task || !task.questions || !task.questions[questionIndex]) return;
-            const q = task.questions[questionIndex];
-            q.timeSpent = (q.timeSpent || 0) + elapsed;
-            q.timerUsed = (q.timerUsed || 0) + elapsed;
-            saveData();
-        }
-
         function closeExerciseDoing() {
-            _saveExQuestionTime();
+            saveCurrentExTimer();
             document.getElementById('exerciseDoingView').classList.remove('show');
             document.body.classList.remove('exercise-doing-active');
             if (exTimerInterval) { clearInterval(exTimerInterval); exTimerInterval = null; }
-            exQuestionOpenedAt = null;
             exDoingState = null;
+            exTimerStartedAt = null;
+            // Refresh folder view to show updated state
             if (currentExerciseFolder) {
                 const data = getExercisesData();
                 const folder = data.folders.find(f => f.id === currentExerciseFolder.folderId);
@@ -16304,12 +16281,14 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
 
         function exPrevQuestion() {
             if (!exDoingState || exDoingState.questionIndex <= 0) return;
+            saveCurrentExTimer();
             openExerciseDoing(exDoingState.folderId, exDoingState.taskId, exDoingState.questionIndex - 1, exDoingState.isWrong);
         }
 
         function exNextQuestion() {
             if (!exDoingState) return;
             if (exDoingState.questionIndex >= exDoingState.questions.length - 1) return;
+            saveCurrentExTimer();
             openExerciseDoing(exDoingState.folderId, exDoingState.taskId, exDoingState.questionIndex + 1, exDoingState.isWrong);
         }
 
@@ -16321,14 +16300,10 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             if (isWrong && !q._redoing) {
                 // Start redo mode
                 q._redoing = true;
-                exQuestionOpenedAt = Date.now();
                 // Re-render to hide old comment
                 openExerciseDoing(folderId, taskId, questionIndex, true);
                 return;
             }
-
-            // Save elapsed time before grading
-            _saveExQuestionTime();
 
             const userDrawing = getExCanvasDataURL();
 
@@ -16365,35 +16340,12 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
 
                 let grading;
                 try {
-                    let jsonStr = result;
-                    const codeBlockMatch = result.match(/```(?:json)?\s*\n?([\s\S]*?)```/);
-                    if (codeBlockMatch) jsonStr = codeBlockMatch[1].trim();
-
-                    // 提取 { ... } 对象
-                    const firstBrace = jsonStr.indexOf('{');
-                    const lastBrace = jsonStr.lastIndexOf('}');
-                    if (firstBrace >= 0 && lastBrace > firstBrace) {
-                        try {
-                            grading = JSON.parse(jsonStr.substring(firstBrace, lastBrace + 1));
-                        } catch(e1) {
-                            try {
-                                grading = JSON.parse(jsonStr.substring(firstBrace, lastBrace + 1).replace(/,\s*}/g, '}'));
-                            } catch(e2) {}
-                        }
-                    }
-                    if (!grading) {
-                        grading = JSON.parse(jsonStr);
-                    }
+                    const cleaned = result.replace(/```json|```/g, '').trim();
+                    grading = JSON.parse(cleaned);
                 } catch (e) {
-                    // Fallback: extract score from text
-                    const sm = result.match(/(\d+)\s*[\/／]\s*10/);
-                    grading = {
-                        score: sm ? parseInt(sm[1]) : 5,
-                        correct: !/不正确|错误|incorrect/i.test(result),
-                        rigor: '-',
-                        structure: '-',
-                        comment: result.substring(0, 200)
-                    };
+                    const match = result.match(/\{[\s\S]*\}/);
+                    if (match) grading = JSON.parse(match[0]);
+                    else { showToast('评分格式错误'); return; }
                 }
 
                 const score = Math.min(10, Math.max(0, Math.round(grading.score || 0)));
@@ -16408,6 +16360,19 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     if (!q.redoDrawings) q.redoDrawings = [];
                     q.redoDrawings.push({ drawing: userDrawing, score, comment, time: new Date().toISOString() });
                 } else {
+                    // Finalize timer: save elapsed time for this question
+                    let finalTimeUsed = 0;
+                    if (exTimerStartedAt) {
+                        const elapsed = Math.round((Date.now() - exTimerStartedAt) / 1000);
+                        finalTimeUsed = (q.timeUsedSeconds || 0) + elapsed;
+                        q.timeUsedSeconds = finalTimeUsed;
+                        q.remainingSeconds = Math.max(0, exTimerSeconds);
+                        exTimerStartedAt = null;
+                        if (exTimerInterval) { clearInterval(exTimerInterval); exTimerInterval = null; }
+                    } else {
+                        finalTimeUsed = q.timeUsedSeconds || 0;
+                    }
+
                     // Update original task question
                     const data = getExercisesData();
                     const folder = data.folders.find(f => f.id === folderId);
@@ -16420,6 +16385,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                         origQ.score = score;
                         origQ.userDrawing = userDrawing;
                         origQ.aiComment = comment;
+                        origQ.timeUsedSeconds = finalTimeUsed;
                     }
 
                     // Save user drawing to IDB
@@ -16439,7 +16405,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                         score,
                         userDrawing,
                         aiComment: comment,
-                        timeSpent: origQ.timeSpent || 0,
+                        timeUsedSeconds: finalTimeUsed,
                         redoDrawings: []
                     });
                 }
@@ -16486,12 +16452,13 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     <div style="font-size:14px;font-weight:500;margin-bottom:8px;">${escapeHtml(wt.taskName)}</div>`;
                 wt.questions.forEach((q, qIdx) => {
                     const scoreColor = q.score >= 8 ? '#22c55e' : q.score >= 6 ? '#eab308' : '#ef4444';
-                    const tStr = q.timeSpent ? (' · 用时' + formatTimeSpent(q.timeSpent)) : '';
+                    const timeUsed = q.timeUsedSeconds ? formatExTime(q.timeUsedSeconds) : '';
                     html += `<div class="exercise-task-card" style="border-left:3px solid ${scoreColor};" onclick="openWrongExerciseDoing('${folderId}','${wt.taskId}',${qIdx})">
                         <div class="exercise-task-title" style="font-size:13px;">第${q.questionIndex + 1}题</div>
                         <div style="display:flex;align-items:center;gap:6px;">
                             <span class="wrong-exercise-score" style="background:${scoreColor};font-size:11px;">${q.score}/10</span>
-                            <span style="font-size:11px;color:var(--text-muted);">${tStr ? tStr + ' · ' : ''}点击重做</span>
+                            ${timeUsed ? `<span style="font-size:11px;color:var(--text-muted);">⏱ ${timeUsed}</span>` : ''}
+                            <span style="font-size:11px;color:var(--text-muted);margin-left:auto;">点击重做</span>
                         </div>
                     </div>`;
                 });
