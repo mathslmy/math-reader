@@ -1610,6 +1610,7 @@
             padding: 8px 12px;
             border-bottom: 1px solid var(--border-color);
             gap: 10px;
+            flex-shrink: 0;
         }
 
         .exercise-doing-back {
@@ -1651,14 +1652,16 @@
             padding: 16px;
             border-bottom: 1px solid var(--border-color);
             overflow-y: auto;
-            max-height: 40%;
+            max-height: 35%;
             line-height: 1.8;
+            flex-shrink: 0;
         }
 
         .exercise-doing-question .katex-display { margin: 12px 0; }
 
         .exercise-doing-canvas-wrap {
             flex: 1;
+            min-height: 0;
             position: relative;
             overflow: hidden;
             background: white;
@@ -1678,6 +1681,7 @@
             padding: 4px 12px;
             border-top: 1px solid var(--border-color);
             background: var(--bg-primary);
+            flex-shrink: 0;
         }
 
         .exercise-doing-toolbar .pen-color {
