@@ -1661,22 +1661,29 @@
             padding: 16px;
             border-bottom: 1px solid var(--border-color);
             overflow-y: auto;
-            max-height: 35%;
-            line-height: 1.8;
+            max-height: 40%;
+            line-height: 2;
             flex-shrink: 0;
+            -webkit-overflow-scrolling: touch;
         }
 
-        .exercise-doing-question .katex-display { margin: 12px 0; }
         .exercise-doing-question .lecture-body { padding: 0; }
-        .exercise-doing-question .lecture-body p { margin-bottom: 8px; }
-        .exercise-doing-question .latex-display { margin: 12px 0; text-align: center; }
+        .exercise-doing-question .lecture-body p { margin-bottom: 16px; text-align: justify; }
+        .exercise-doing-question .lecture-body li { margin-left: 24px; margin-bottom: 10px; line-height: 1.8; }
+        .exercise-doing-question .lecture-body strong { font-weight: 700; }
+        .exercise-doing-question .lecture-body h1 { font-size: 1.375em; margin-top: 20px; margin-bottom: 12px; }
+        .exercise-doing-question .lecture-body h2 { font-size: 1.1875em; margin-top: 20px; margin-bottom: 12px; }
+        .exercise-doing-question .lecture-body h3 { font-size: 1.0625em; margin-top: 16px; margin-bottom: 10px; }
+        .exercise-doing-question .latex-display { margin: 20px 0; text-align: center; }
+        .exercise-doing-question .lecture-body .katex { font-size: 1.1em; }
         .exercise-doing-question .lecture-body .katex-display {
-            margin: 12px 0;
-            padding: 10px;
+            margin: 24px 0;
+            padding: 16px;
             background: var(--bg-secondary);
             border-radius: 8px;
             overflow-x: auto;
         }
+        .exercise-doing-question .lecture-body .katex-display > .katex { font-size: 1.15em; }
 
         .exercise-doing-canvas-wrap {
             flex: 1;
@@ -3445,6 +3452,7 @@
             background: var(--bg-secondary);
             border-radius: 8px;
             overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
         }
 
         .lecture-body .katex-display > .katex {
@@ -7388,17 +7396,48 @@
             const viewportTop = scrollTop - containerRect.height;
             const viewportBottom = scrollTop + containerRect.height * 2;
 
+            // iOS 内存紧张：回收距离视口过远的已渲染页面 canvas，释放 GPU/内存
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+            const unloadBuffer = containerRect.height * (isIOS ? 3 : 5);
+
             for (let i = 1; i <= totalPages; i++) {
                 const pageData = pageElements[i];
-                if (!pageData || pageData.rendered) continue;
+                if (!pageData) continue;
 
                 const placeholder = pageData.placeholder;
                 const pageTop = placeholder.offsetTop;
                 const pageBottom = pageTop + placeholder.offsetHeight;
 
-                // 渲染可见范围内的页面（包括上下各一屏的缓冲区）
                 if (pageBottom >= viewportTop && pageTop <= viewportBottom) {
-                    await renderSinglePage(i);
+                    // 在可视范围内，渲染
+                    if (!pageData.rendered) {
+                        await renderSinglePage(i);
+                    }
+                } else if (pageData.rendered && isIOS) {
+                    // iOS：回收距视口过远的页面 canvas 释放内存
+                    const distTop = viewportTop - pageBottom;
+                    const distBottom = pageTop - viewportBottom;
+                    if (distTop > unloadBuffer || distBottom > unloadBuffer) {
+                        // 保存批注数据再回收
+                        if (pageData.annoCanvas && currentDoc) {
+                            const annoData = pageData.annoCanvas.toDataURL('image/png');
+                            // 只保存非空白批注
+                            const base64Part = annoData.split(',')[1] || '';
+                            if (base64Part.length > 100) {
+                                setDocAnnotation(currentDoc.id, i, 'drawing', annoData);
+                            }
+                        }
+                        // 清空 canvas 并标记为未渲染
+                        placeholder.innerHTML = '';
+                        placeholder.style.width = pageData.viewport.width + 'px';
+                        placeholder.style.height = pageData.viewport.height + 'px';
+                        placeholder.style.background = '#fff';
+                        placeholder.className = 'pdf-page-placeholder';
+                        pageData.rendered = false;
+                        pageData.annoCanvas = null;
+                        pageData.annoCtx = null;
+                        renderedPages.delete(i);
+                    }
                 }
             }
         }
@@ -7412,8 +7451,13 @@
             const placeholder = pageData.placeholder;
 
             // 限制canvas实际像素，zoom大时降低DPR避免内存爆炸
-            const maxCanvasPixels = 4096 * 4096; // ~16M pixels
+            // iOS Safari 对 canvas 有严格的像素上限（iPhone ~4096*4096，iPad ~8192*4096），
+            // 超出会导致 canvas 白屏。用保守值确保兼容。
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+            const maxCanvasPixels = isIOS ? 4096 * 2048 : 4096 * 4096;
             let dpr = window.devicePixelRatio || 1;
+            // iOS 上进一步限制 DPR，避免高分屏下超限
+            if (isIOS) dpr = Math.min(dpr, 2);
             const rawPixels = viewport.width * dpr * viewport.height * dpr;
             if (rawPixels > maxCanvasPixels) {
                 dpr = Math.sqrt(maxCanvasPixels / (viewport.width * viewport.height));
@@ -14462,10 +14506,12 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             // 记住焦点页面在视口中的相对位置
             const focusEl = pageElements[focusPageNum];
             let focusOffsetRatio = 0;
-            if (focusEl) {
+            if (focusEl && focusEl.placeholder) {
                 const containerRect = container.getBoundingClientRect();
-                const elRect = focusEl.getBoundingClientRect();
-                focusOffsetRatio = (containerRect.top - elRect.top) / elRect.height;
+                const elRect = focusEl.placeholder.getBoundingClientRect();
+                if (elRect.height > 0) {
+                    focusOffsetRatio = (containerRect.top - elRect.top) / elRect.height;
+                }
             }
 
             // 重新渲染（会重建所有 placeholder 尺寸）
@@ -14478,10 +14524,12 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
 
             // 恢复滚动位置：把焦点页面放回视口中原来的相对位置
             const newFocusEl = pageElements[focusPageNum];
-            if (newFocusEl) {
-                const newElTop = newFocusEl.offsetTop;
-                const newElHeight = newFocusEl.offsetHeight;
-                container.scrollTop = newElTop + focusOffsetRatio * newElHeight * -1;
+            if (newFocusEl && newFocusEl.placeholder) {
+                const newElTop = newFocusEl.placeholder.offsetTop;
+                const newElHeight = newFocusEl.placeholder.offsetHeight;
+                if (newElHeight > 0) {
+                    container.scrollTop = newElTop + focusOffsetRatio * newElHeight * -1;
+                }
             }
             currentPage = savedPage;
             document.getElementById('pageInfo').textContent = `${currentPage} / ${totalPages}`;
@@ -16360,12 +16408,13 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             // 注入和页面 .lecture-body 一致的CSS（离屏容器不继承页面样式表）
             const styleEl = document.createElement('style');
             styleEl.textContent = `
+                .lecture-body { line-height: 2; word-wrap: break-word; }
                 .lecture-body p { margin-bottom: 16px; text-align: justify; }
                 .lecture-body li { margin-left: 24px; margin-bottom: 10px; line-height: 1.8; }
-                .lecture-body strong { font-weight: 700; }
-                .lecture-body h1 { font-size: 1.3em; font-weight: 700; margin-top: 20px; margin-bottom: 12px; }
-                .lecture-body h2 { font-size: 1.19em; margin-top: 20px; margin-bottom: 12px; }
-                .lecture-body h3 { font-size: 1.06em; margin-top: 16px; margin-bottom: 10px; }
+                .lecture-body strong { font-weight: 700; color: #000; }
+                .lecture-body h1 { font-size: 1.375em; font-weight: 700; margin-top: 32px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #000; }
+                .lecture-body h2 { font-size: 1.1875em; margin-top: 28px; margin-bottom: 16px; color: #000; }
+                .lecture-body h3 { font-size: 1.0625em; margin-top: 24px; margin-bottom: 12px; }
                 .latex-display { margin: 20px 0; text-align: center; }
                 .lecture-body .katex { font-size: 1.1em; }
                 .lecture-body .katex-display { margin: 24px 0; padding: 16px; background: #f5f5f5; border-radius: 8px; overflow-x: auto; }
@@ -16379,67 +16428,20 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             titleEl.textContent = `第 ${qIdx + 1} 题`;
             container.appendChild(titleEl);
 
-            // 题目内容——将文本和公式包裹在同一个容器中统一渲染
+            // 题目内容——和阅读页面完全一致：renderChatMarkdownLatex + lecture-body 包裹
             const bodyEl = document.createElement('div');
             bodyEl.className = 'lecture-body';
-            bodyEl.style.cssText = 'font-size: 22px; line-height: 1.8; padding: 0;';
-
-            // 将原始文本按段落拆分，但保持文本和公式在同一个流中
-            const rawText = latexText || '';
-            // 先用renderChatMarkdownLatex处理markdown格式，但需要确保公式和文本在同一个渲染流中
-            // 将块级公式$$...$$临时保护，避免被拆成独立div
-            let processed = rawText;
-            const blockFormulas = [];
-            processed = processed.replace(/\$\$([\s\S]*?)\$\$/g, (match, p1) => {
-                blockFormulas.push(p1.trim());
-                return `%%EXPORTBLOCK${blockFormulas.length - 1}%%`;
-            });
-            const inlineFormulas = [];
-            processed = processed.replace(/\$([^\$\n]+?)\$/g, (match, p1) => {
-                inlineFormulas.push(p1.trim());
-                return `%%EXPORTINLINE${inlineFormulas.length - 1}%%`;
-            });
-
-            // markdown格式化
-            processed = processed
-                .replace(/^### (.*$)/gm, '<h3>$1</h3>')
-                .replace(/^## (.*$)/gm, '<h2>$1</h2>')
-                .replace(/^# (.*$)/gm, '<h1>$1</h1>')
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                .replace(/^- (.*$)/gm, '<li>$1</li>')
-                .replace(/^(\d+)\. (.*$)/gm, '<li>$2</li>')
-                .replace(/\n\n/g, '</p><p>')
-                .replace(/\n/g, '<br>');
-
-            // 还原公式——块级公式保持在行内流中（用span包裹），不拆分段落
-            processed = processed.replace(/%%EXPORTBLOCK(\d+)%%/g, (match, idx) => {
-                const latex = blockFormulas[parseInt(idx)];
-                return `<span class="katex-export-block">$$${latex}$$</span>`;
-            });
-            processed = processed.replace(/%%EXPORTINLINE(\d+)%%/g, (match, idx) => {
-                const latex = inlineFormulas[parseInt(idx)];
-                return `$${latex}$`;
-            });
-
-            bodyEl.innerHTML = '<p>' + processed + '</p>';
+            bodyEl.style.cssText = 'font-size: 22px; line-height: 2; padding: 0;';
+            bodyEl.innerHTML = renderChatMarkdownLatex(latexText || '');
             container.appendChild(bodyEl);
-
-            // 为导出专用的块级公式添加样式（渲染后会被KaTeX替换为display模式，但保持在文本流中）
-            const exportBlockStyle = document.createElement('style');
-            exportBlockStyle.textContent = `
-                .katex-export-block { display: block; margin: 16px 0; text-align: center; }
-                .katex-export-block .katex-display { margin: 0 !important; padding: 12px !important; }
-            `;
-            container.appendChild(exportBlockStyle);
 
             document.body.appendChild(container);
 
-            // 渲染 KaTeX
+            // 和阅读页面一致：renderLectureMath 渲染 KaTeX
             renderLectureMath(bodyEl);
 
             // 等待 KaTeX 字体渲染完毕
-            await new Promise(r => setTimeout(r, 600));
+            await new Promise(r => setTimeout(r, 500));
 
             try {
                 container.style.opacity = '1';
@@ -17242,7 +17244,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 // 错题模式：未点重做前，只显示题目和之前的作答结果，隐藏画布
                 const scoreColor = q.score >= 8 ? '#22c55e' : q.score >= 6 ? '#eab308' : '#ef4444';
                 const timeUsedStr = q.timeUsedSeconds ? formatExTime(q.timeUsedSeconds) : '';
-                let html = `<div class="lecture-body" style="font-size:15px;line-height:1.8;padding:0;">${renderChatMarkdownLatex(q.latex || '')}</div>`;
+                let html = `<div class="lecture-body" style="padding:0;">${renderChatMarkdownLatex(q.latex || '')}</div>`;
                 html += `<div class="wrong-exercise-comment" style="background:${scoreColor}15;border-left:3px solid ${scoreColor};">`;
                 html += `<span class="wrong-exercise-score" style="background:${scoreColor};">${q.score}/10</span>`;
                 if (timeUsedStr) {
@@ -17252,7 +17254,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     html += `<img class="wrong-exercise-user-drawing" src="${q.userDrawing}" alt="作答">`;
                 }
                 if (q.aiComment) {
-                    html += `<div class="ex-ai-comment" style="margin-top:6px;line-height:1.6;font-size:14px;">${renderChatMarkdownLatex(q.aiComment)}</div>`;
+                    html += `<div class="ex-ai-comment lecture-body" style="margin-top:6px;font-size:14px;padding:0;">${renderChatMarkdownLatex(q.aiComment)}</div>`;
                 }
                 html += `</div>`;
                 qDiv.innerHTML = html;
@@ -17264,7 +17266,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 qDiv.style.maxHeight = 'none';
             } else {
                 // 正常做题 或 错题重做中：只显示题目 + 画布
-                let html = `<div class="lecture-body" style="font-size:15px;line-height:1.8;padding:0;">${renderChatMarkdownLatex(q.latex || '')}</div>`;
+                let html = `<div class="lecture-body" style="padding:0;">${renderChatMarkdownLatex(q.latex || '')}</div>`;
                 qDiv.innerHTML = html;
                 // 显示画布和工具栏
                 canvasWrap.style.display = '';
