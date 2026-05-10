@@ -15879,50 +15879,133 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
         function robustParseJSONArray(text) {
             if (!text || typeof text !== 'string') throw new Error('空文本');
 
-            // Strategy 1: 去掉markdown代码块后直接解析
-            let cleaned = text.replace(/```(?:json|JSON|js|javascript)?\s*/g, '').replace(/```/g, '').trim();
+            // 预处理：去掉markdown代码块标记
+            let cleaned = text.replace(/```(?:json|JSON|js|javascript)?\s*\n?/g, '').replace(/```/g, '').trim();
+
+            // Strategy 1: 直接解析
             try { const r = JSON.parse(cleaned); if (Array.isArray(r)) return r; } catch(e) {}
 
-            // Strategy 2: 提取最外层的 [...] 并解析
+            // Strategy 2: 提取最外层 [...] 并解析
             const arrMatch = text.match(/\[[\s\S]*\]/);
             if (arrMatch) {
                 try { const r = JSON.parse(arrMatch[0]); if (Array.isArray(r)) return r; } catch(e) {}
-                // Strategy 2b: 修复常见问题（尾部多余逗号，单引号）
+
+                // Strategy 2b: 修复常见问题后重试
                 try {
-                    let fixed = arrMatch[0]
-                        .replace(/,\s*\]/g, ']')           // 尾部多余逗号
-                        .replace(/,\s*,/g, ',')             // 连续逗号
-                        .replace(/\n/g, '\\n')              // 未转义换行
-                        .replace(/\t/g, '\\t');             // 未转义tab
+                    let fixed = arrMatch[0];
+                    fixed = fixed.replace(/,\s*\]/g, ']');     // 尾部多余逗号
+                    fixed = fixed.replace(/,\s*,+/g, ',');     // 连续逗号
+                    const r = JSON.parse(fixed);
+                    if (Array.isArray(r)) return r;
+                } catch(e) {}
+
+                // Strategy 2c: JSON字符串值内含未转义的换行——逐字符修复
+                try {
+                    const fixed = fixUnescapedNewlinesInJSON(arrMatch[0]);
                     const r = JSON.parse(fixed);
                     if (Array.isArray(r)) return r;
                 } catch(e) {}
             }
 
-            // Strategy 3: 逐个提取被引号包裹的字符串（"..."）
+            // Strategy 3: 手动逐项提取 —— 用状态机遍历，找出数组内的每个字符串值
             try {
-                const items = [];
-                // 匹配所有 "..." 字符串（处理转义引号）
-                const strRegex = /"((?:[^"\\]|\\.)*)"/g;
-                let m;
-                // 先确认文本中有数组结构
-                const arraySection = arrMatch ? arrMatch[0] : text;
-                while ((m = strRegex.exec(arraySection)) !== null) {
-                    const val = m[1]
-                        .replace(/\\n/g, '\n')
-                        .replace(/\\t/g, '\t')
-                        .replace(/\\"/g, '"')
-                        .replace(/\\\\/g, '\\');
-                    if (val.length > 5) items.push(val); // 过滤太短的（可能是key名）
-                }
+                const src = arrMatch ? arrMatch[0] : cleaned;
+                const items = extractJSONStringValues(src);
                 if (items.length > 0) return items;
             } catch(e) {}
 
-            // Strategy 4: 按编号分割
+            // Strategy 4: 按题号分割纯文本
             const byNumber = splitQuestionsByNumber(text);
             if (byNumber.length > 0) return byNumber;
 
             throw new Error('无法解析JSON数组');
+        }
+
+        // 修复JSON字符串值内未转义的真实换行符（AI常见错误）
+        function fixUnescapedNewlinesInJSON(jsonStr) {
+            let result = '';
+            let inString = false;
+            let escaped = false;
+            for (let i = 0; i < jsonStr.length; i++) {
+                const ch = jsonStr[i];
+                if (escaped) {
+                    result += ch;
+                    escaped = false;
+                    continue;
+                }
+                if (ch === '\\') {
+                    result += ch;
+                    escaped = true;
+                    continue;
+                }
+                if (ch === '"') {
+                    inString = !inString;
+                    result += ch;
+                    continue;
+                }
+                if (inString && ch === '\n') {
+                    result += '\\n';
+                    continue;
+                }
+                if (inString && ch === '\t') {
+                    result += '\\t';
+                    continue;
+                }
+                if (inString && ch === '\r') {
+                    continue; // 跳过\r
+                }
+                result += ch;
+            }
+            return result;
+        }
+
+        // 从JSON文本中按状态机提取所有顶层字符串值（跳过key）
+        function extractJSONStringValues(src) {
+            const items = [];
+            let i = 0;
+            // 找到 [ 开始
+            while (i < src.length && src[i] !== '[') i++;
+            i++; // 跳过 [
+
+            while (i < src.length) {
+                // 跳过空白和逗号
+                while (i < src.length && /[\s,]/.test(src[i])) i++;
+                if (i >= src.length || src[i] === ']') break;
+
+                if (src[i] === '"') {
+                    // 提取一个完整的字符串
+                    let str = '';
+                    i++; // 跳过开头 "
+                    while (i < src.length) {
+                        if (src[i] === '\\' && i + 1 < src.length) {
+                            const next = src[i + 1];
+                            if (next === '"') { str += '"'; i += 2; }
+                            else if (next === 'n') { str += '\n'; i += 2; }
+                            else if (next === 't') { str += '\t'; i += 2; }
+                            else if (next === '\\') { str += '\\'; i += 2; }
+                            else if (next === '/') { str += '/'; i += 2; }
+                            else { str += src[i]; i++; }
+                        } else if (src[i] === '"') {
+                            i++; // 跳过结尾 "
+                            break;
+                        } else if (src[i] === '\n' || src[i] === '\r') {
+                            // 未转义的换行，当作内容
+                            if (src[i] === '\n') str += '\n';
+                            i++;
+                        } else {
+                            str += src[i];
+                            i++;
+                        }
+                    }
+                    if (str.trim().length > 0) {
+                        items.push(str);
+                    }
+                } else {
+                    // 不是字符串，跳过这个token（可能是数字、null等）
+                    while (i < src.length && src[i] !== ',' && src[i] !== ']') i++;
+                }
+            }
+            return items;
         }
 
         function robustParseJSONObject(text) {
@@ -15967,11 +16050,18 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
         function splitQuestionsByNumber(text) {
             // 按中文/阿拉伯数字题号分割：1. / 1、/ 1） / （1） / 一、 等
             const cleaned = text.replace(/```(?:json|JSON)?\s*/g, '').replace(/```/g, '').trim();
-            const parts = cleaned.split(/(?=(?:^|\n)\s*(?:\d+\s*[.、．）\)]\s*|[（\(]\s*\d+\s*[）\)]\s*|[一二三四五六七八九十]+\s*[、.]\s*))/m);
+            // 先按题号模式分割
+            const splitPattern = /(?=(?:^|\n)\s*(?:\d+\s*[.、．）\)]\s*|[（\(]\s*\d+\s*[）\)]\s*|[一二三四五六七八九十]+\s*[、.．]\s*))/m;
+            const parts = cleaned.split(splitPattern);
             const questions = [];
             for (const part of parts) {
                 const trimmed = part.trim();
-                if (trimmed.length > 3 && /[\d一二三四五六七八九十]/.test(trimmed.charAt(0)) || /^[（\(]/.test(trimmed)) {
+                if (trimmed.length <= 3) continue;
+                // 必须以题号开头
+                const isNumbered = /^\d+\s*[.、．）\)]/.test(trimmed) ||
+                                   /^[（\(]\s*\d+\s*[）\)]/.test(trimmed) ||
+                                   /^[一二三四五六七八九十]+\s*[、.．]/.test(trimmed);
+                if (isNumbered) {
                     questions.push(trimmed);
                 }
             }
