@@ -16339,12 +16339,13 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             });
         }
 
-        // 用 foreignObject SVG 方案生成题目截图
-        // 绕过 html2canvas 在 iOS 上的 KaTeX web font 渲染 bug
+        // 用和阅读页面完全一致的渲染管线生成题目截图
+        // 关键：html2canvas 对 opacity:0 的元素不渲染字体，必须让容器可见但移出视口
         async function renderQuestionToImage(latexText, qIdx, targetWidth) {
             const renderWidth = Math.round(targetWidth * 2);
 
-            // 创建离屏容器用于测量高度
+            // 创建离屏容器——用 left:-9999px 移出视口而非 opacity:0
+            // html2canvas 对不可见元素的字体渲染有严重bug
             const container = document.createElement('div');
             container.style.cssText = `
                 position: fixed; left: -9999px; top: 0;
@@ -16363,7 +16364,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             titleEl.textContent = `第 ${qIdx + 1} 题`;
             container.appendChild(titleEl);
 
-            // 题目内容
+            // 题目内容——用 renderChatMarkdownLatex 处理 markdown + LaTeX 定界符
             const bodyEl = document.createElement('div');
             bodyEl.style.cssText = 'font-size: 22px; line-height: 1.8; text-align: left;';
             bodyEl.innerHTML = renderChatMarkdownLatex(latexText || '');
@@ -16371,111 +16372,35 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
 
             document.body.appendChild(container);
 
-            // 渲染 KaTeX
+            // 用 renderLectureMath 渲染 KaTeX（和阅读页完全一致，含 strict:false）
             renderLectureMath(bodyEl);
 
-            // 等待字体加载
+            // 等待 KaTeX web 字体完全加载——这是关键！
+            // KaTeX 使用 KaTeX_Main, KaTeX_Math 等 web font
+            // 如果字体没加载完就截图，html2canvas 会用 fallback 字体导致大小错乱
             if (document.fonts && document.fonts.ready) {
                 await document.fonts.ready;
             }
+            // 额外等待确保 KaTeX 排版完成
             await new Promise(r => setTimeout(r, 300));
 
             try {
-                // 收集所有需要内联的 CSS（包括 KaTeX 样式表）
-                let inlinedCSS = '';
-                for (const sheet of document.styleSheets) {
-                    try {
-                        for (const rule of sheet.cssRules) {
-                            inlinedCSS += rule.cssText + '\n';
-                        }
-                    } catch(e) {
-                        // 跨域样式表无法读取 cssRules，需要 fetch
-                        if (sheet.href) {
-                            try {
-                                const resp = await fetch(sheet.href);
-                                if (resp.ok) {
-                                    let cssText = await resp.text();
-                                    // 将 KaTeX 字体的相对 url() 转为绝对路径
-                                    if (sheet.href.includes('KaTeX')) {
-                                        const baseUrl = sheet.href.substring(0, sheet.href.lastIndexOf('/') + 1);
-                                        cssText = cssText.replace(/url\((?:'|")?(?!data:|https?:\/\/)([^'")]+)(?:'|")?\)/g, (match, p1) => {
-                                            return `url('${baseUrl}${p1}')`;
-                                        });
-                                    }
-                                    inlinedCSS += cssText + '\n';
-                                }
-                            } catch(fe) {}
-                        }
-                    }
-                }
-
-                const contentH = container.scrollHeight;
-                const contentW = container.scrollWidth;
-
-                // 序列化容器 HTML
-                const htmlContent = container.outerHTML;
-
-                // 构建 SVG foreignObject
-                const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" width="${contentW}" height="${contentH}">
-                    <foreignObject width="100%" height="100%">
-                        <div xmlns="http://www.w3.org/1999/xhtml">
-                            <style>${inlinedCSS}</style>
-                            ${htmlContent}
-                        </div>
-                    </foreignObject>
-                </svg>`;
-
-                document.body.removeChild(container);
-
-                const svgBlob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
-                const svgUrl = URL.createObjectURL(svgBlob);
-
-                const img = new Image();
-                img.crossOrigin = 'anonymous';
-
-                const pngDataUrl = await new Promise((resolve, reject) => {
-                    img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        canvas.width = contentW * 2;
-                        canvas.height = contentH * 2;
-                        const ctx = canvas.getContext('2d');
-                        ctx.scale(2, 2);
-                        ctx.fillStyle = '#ffffff';
-                        ctx.fillRect(0, 0, contentW, contentH);
-                        ctx.drawImage(img, 0, 0, contentW, contentH);
-                        URL.revokeObjectURL(svgUrl);
-                        resolve(canvas.toDataURL('image/png'));
-                    };
-                    img.onerror = (e) => {
-                        URL.revokeObjectURL(svgUrl);
-                        reject(new Error('SVG 渲染失败'));
-                    };
-                    img.src = svgUrl;
+                const canvas = await html2canvas(container, {
+                    scale: 2,
+                    backgroundColor: '#ffffff',
+                    useCORS: true,
+                    allowTaint: true,
+                    logging: false,
+                    // 强制 html2canvas 使用容器在 DOM 中的真实渲染结果
+                    windowWidth: renderWidth + 100,
+                    windowHeight: container.scrollHeight + 100
                 });
-
-                return pngDataUrl;
+                document.body.removeChild(container);
+                return canvas.toDataURL('image/png');
             } catch (err) {
-                console.warn('SVG渲染截图失败，回退到html2canvas:', err);
-                // 回退到 html2canvas
-                try {
-                    if (!container.parentNode) document.body.appendChild(container);
-                    await ensureHtml2Canvas();
-                    const canvas = await html2canvas(container, {
-                        scale: 2,
-                        backgroundColor: '#ffffff',
-                        useCORS: true,
-                        allowTaint: true,
-                        logging: false,
-                        windowWidth: renderWidth + 100,
-                        windowHeight: container.scrollHeight + 100
-                    });
-                    document.body.removeChild(container);
-                    return canvas.toDataURL('image/png');
-                } catch (fallbackErr) {
-                    console.warn('html2canvas回退也失败:', fallbackErr);
-                    if (container.parentNode) document.body.removeChild(container);
-                    return null;
-                }
+                console.warn('html2canvas截图失败:', err);
+                document.body.removeChild(container);
+                return null;
             }
         }
 
