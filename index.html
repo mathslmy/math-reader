@@ -1667,9 +1667,16 @@
         }
 
         .exercise-doing-question .katex-display { margin: 12px 0; }
+        .exercise-doing-question .lecture-body { padding: 0; }
+        .exercise-doing-question .lecture-body p { margin-bottom: 8px; }
         .exercise-doing-question .latex-display { margin: 12px 0; text-align: center; }
-        .exercise-doing-question .latex-display .katex-display { margin: 0; }
-        .exercise-doing-question p { margin: 0 0 0.3em 0; }
+        .exercise-doing-question .lecture-body .katex-display {
+            margin: 12px 0;
+            padding: 10px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            overflow-x: auto;
+        }
 
         .exercise-doing-canvas-wrap {
             flex: 1;
@@ -7024,63 +7031,6 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
-        }
-
-        // 习题内容渲染：和阅读页面一致的效果
-        // 1. 保护 LaTeX 定界符不被 escapeHtml 破坏
-        // 2. 纯文本部分做 HTML 转义（安全）
-        // 3. 处理换行：\n\n → 段落，\n → <br>
-        // 4. 块级公式 $$...$$ 用 <div class="latex-display"> 包裹（居中显示）
-        function renderExerciseLatex(text) {
-            if (!text) return '';
-            let content = text;
-            const latexBlocks = [];
-            const latexInlines = [];
-
-            // 先提取保护 $$...$$ 块级公式
-            content = content.replace(/\$\$([\s\S]*?)\$\$/g, (match, p1) => {
-                latexBlocks.push(p1);
-                return `%%EXLATEXBLOCK${latexBlocks.length - 1}%%`;
-            });
-
-            // 提取保护 $...$ 行内公式
-            content = content.replace(/\$([^\$\n]+?)\$/g, (match, p1) => {
-                latexInlines.push(p1);
-                return `%%EXLATEXINLINE${latexInlines.length - 1}%%`;
-            });
-
-            // 提取保护 \[...\] 块级公式
-            content = content.replace(/\\\[([\s\S]*?)\\\]/g, (match, p1) => {
-                latexBlocks.push(p1);
-                return `%%EXLATEXBLOCK${latexBlocks.length - 1}%%`;
-            });
-
-            // 提取保护 \(...\) 行内公式
-            content = content.replace(/\\\(([\s\S]*?)\\\)/g, (match, p1) => {
-                latexInlines.push(p1);
-                return `%%EXLATEXINLINE${latexInlines.length - 1}%%`;
-            });
-
-            // 对纯文本部分做 HTML 转义
-            content = escapeHtml(content);
-
-            // 处理换行
-            content = content.replace(/\n\n/g, '</p><p>');
-            content = content.replace(/\n/g, '<br>');
-
-            // 恢复块级公式 → 居中显示的 div
-            content = content.replace(/%%EXLATEXBLOCK(\d+)%%/g, (match, idx) => {
-                const latex = latexBlocks[parseInt(idx)];
-                return `</p><div class="latex-display">$$${latex}$$</div><p>`;
-            });
-
-            // 恢复行内公式
-            content = content.replace(/%%EXLATEXINLINE(\d+)%%/g, (match, idx) => {
-                const latex = latexInlines[parseInt(idx)];
-                return `$${latex}$`;
-            });
-
-            return '<p>' + content + '</p>';
         }
 
         // ==================== Archive ====================
@@ -16389,32 +16339,24 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             });
         }
 
-        // 用和阅读页面一致的渲染方式（renderExerciseLatex + renderMathInElement）生成题目截图
+        // 用和阅读页面完全一致的渲染管线生成题目截图
+        // 关键：html2canvas 对 opacity:0 的元素不渲染字体，必须让容器可见但移出视口
         async function renderQuestionToImage(latexText, qIdx, targetWidth) {
             const renderWidth = Math.round(targetWidth * 2);
 
-            // 创建离屏容器
+            // 创建离屏容器——用 left:-9999px 移出视口而非 opacity:0
+            // html2canvas 对不可见元素的字体渲染有严重bug
             const container = document.createElement('div');
             container.style.cssText = `
-                position: absolute; left: 0; top: 0;
+                position: fixed; left: -9999px; top: 0;
                 width: ${renderWidth}px;
                 background: white;
                 padding: 28px 32px;
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                 color: #1a1a1a;
                 z-index: -9999;
-                opacity: 0;
                 pointer-events: none;
             `;
-
-            // 注入块级公式和段落的样式（离屏容器无法继承页面CSS）
-            const styleEl = document.createElement('style');
-            styleEl.textContent = `
-                .latex-display { margin: 16px 0; text-align: center; }
-                .latex-display .katex-display { margin: 0; }
-                p { margin: 0 0 0.4em 0; }
-            `;
-            container.appendChild(styleEl);
 
             // 题号
             const titleEl = document.createElement('div');
@@ -16422,38 +16364,36 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             titleEl.textContent = `第 ${qIdx + 1} 题`;
             container.appendChild(titleEl);
 
-            // 题目内容——和阅读页面一致的渲染方式：
-            // renderExerciseLatex 处理换行、块级公式居中、行内公式保留，然后 renderMathInElement 渲染
+            // 题目内容——用 renderChatMarkdownLatex 处理 markdown + LaTeX 定界符
             const bodyEl = document.createElement('div');
-            bodyEl.style.cssText = 'font-size: 22px; line-height: 1.8;';
-            bodyEl.innerHTML = renderExerciseLatex(latexText);
+            bodyEl.style.cssText = 'font-size: 22px; line-height: 1.8; text-align: left;';
+            bodyEl.innerHTML = renderChatMarkdownLatex(latexText || '');
             container.appendChild(bodyEl);
 
             document.body.appendChild(container);
 
-            // 用 renderMathInElement 渲染 KaTeX
-            if (typeof renderMathInElement === 'function') {
-                renderMathInElement(bodyEl, {
-                    delimiters: [
-                        {left: '$$', right: '$$', display: true},
-                        {left: '$', right: '$', display: false},
-                        {left: '\\[', right: '\\]', display: true},
-                        {left: '\\(', right: '\\)', display: false}
-                    ],
-                    throwOnError: false
-                });
-            }
+            // 用 renderLectureMath 渲染 KaTeX（和阅读页完全一致，含 strict:false）
+            renderLectureMath(bodyEl);
 
-            // 等待 KaTeX 字体渲染完毕
-            await new Promise(r => setTimeout(r, 500));
+            // 等待 KaTeX web 字体完全加载——这是关键！
+            // KaTeX 使用 KaTeX_Main, KaTeX_Math 等 web font
+            // 如果字体没加载完就截图，html2canvas 会用 fallback 字体导致大小错乱
+            if (document.fonts && document.fonts.ready) {
+                await document.fonts.ready;
+            }
+            // 额外等待确保 KaTeX 排版完成
+            await new Promise(r => setTimeout(r, 300));
 
             try {
-                container.style.opacity = '1';
                 const canvas = await html2canvas(container, {
                     scale: 2,
                     backgroundColor: '#ffffff',
                     useCORS: true,
-                    logging: false
+                    allowTaint: true,
+                    logging: false,
+                    // 强制 html2canvas 使用容器在 DOM 中的真实渲染结果
+                    windowWidth: renderWidth + 100,
+                    windowHeight: container.scrollHeight + 100
                 });
                 document.body.removeChild(container);
                 return canvas.toDataURL('image/png');
@@ -17248,7 +17188,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 // 错题模式：未点重做前，只显示题目和之前的作答结果，隐藏画布
                 const scoreColor = q.score >= 8 ? '#22c55e' : q.score >= 6 ? '#eab308' : '#ef4444';
                 const timeUsedStr = q.timeUsedSeconds ? formatExTime(q.timeUsedSeconds) : '';
-                let html = `<div style="font-size:15px;line-height:1.8;">${renderExerciseLatex(q.latex)}</div>`;
+                let html = `<div class="lecture-body" style="font-size:15px;line-height:1.8;padding:0;">${renderChatMarkdownLatex(q.latex || '')}</div>`;
                 html += `<div class="wrong-exercise-comment" style="background:${scoreColor}15;border-left:3px solid ${scoreColor};">`;
                 html += `<span class="wrong-exercise-score" style="background:${scoreColor};">${q.score}/10</span>`;
                 if (timeUsedStr) {
@@ -17270,7 +17210,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 qDiv.style.maxHeight = 'none';
             } else {
                 // 正常做题 或 错题重做中：只显示题目 + 画布
-                let html = `<div style="font-size:15px;line-height:1.8;">${renderExerciseLatex(q.latex)}</div>`;
+                let html = `<div class="lecture-body" style="font-size:15px;line-height:1.8;padding:0;">${renderChatMarkdownLatex(q.latex || '')}</div>`;
                 qDiv.innerHTML = html;
                 // 显示画布和工具栏
                 canvasWrap.style.display = '';
@@ -17280,18 +17220,8 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 qDiv.style.maxHeight = '';
             }
 
-            // Render KaTeX
-            if (typeof renderMathInElement === 'function') {
-                renderMathInElement(qDiv, {
-                    delimiters: [
-                        {left: '$$', right: '$$', display: true},
-                        {left: '$', right: '$', display: false},
-                        {left: '\\[', right: '\\]', display: true},
-                        {left: '\\(', right: '\\)', display: false}
-                    ],
-                    throwOnError: false
-                });
-            }
+            // Render KaTeX — 和阅读页面完全一致
+            renderLectureMath(qDiv);
 
             // Update buttons
             document.getElementById('exPrevBtn').disabled = questionIndex <= 0;
