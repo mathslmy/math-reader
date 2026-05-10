@@ -16026,9 +16026,20 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             for (let i = 0; i < task.questions.length; i++) {
                 const q = task.questions[i];
                 const cacheKey = `${taskId}_${i}`;
-                const cachedDrawing = exDrawingCache[cacheKey];
-                // 优先用缓存，其次用已保存的drawing
-                const drawing = cachedDrawing || q.userDrawing;
+                // 1) 内存缓存
+                let drawing = exDrawingCache[cacheKey];
+                // 2) IndexedDB 书写缓存
+                if (!drawing || isCanvasBlank(drawing)) {
+                    try { drawing = await getFileData(`exercise_drawing_cache_${cacheKey}`); } catch(e) {}
+                }
+                // 3) 已评分的 userDrawing
+                if (!drawing || isCanvasBlank(drawing)) {
+                    drawing = q.userDrawing;
+                }
+                // 4) IndexedDB 已评分drawing
+                if (!drawing || isCanvasBlank(drawing)) {
+                    try { drawing = await getFileData(`exercise_drawing_${taskId}_${i}`); } catch(e) {}
+                }
                 if (drawing && !isCanvasBlank(drawing)) {
                     toGrade.push({ index: i, question: q, drawing });
                 }
@@ -16144,13 +16155,34 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
 
             showToast('正在收集已作答题目...');
 
-            // 收集有手写内容的题目
+            // 收集有手写内容的题目——三层查找：内存缓存 → IndexedDB缓存 → 已评分drawing → IndexedDB已评分
             const toExport = [];
             for (let i = 0; i < task.questions.length; i++) {
                 const q = task.questions[i];
                 const cacheKey = `${taskId}_${i}`;
-                const cachedDrawing = exDrawingCache[cacheKey];
-                const drawing = cachedDrawing || q.userDrawing;
+
+                // 1) 内存缓存
+                let drawing = exDrawingCache[cacheKey];
+
+                // 2) IndexedDB 书写缓存（未评分但已作答）
+                if (!drawing || isCanvasBlank(drawing)) {
+                    try {
+                        drawing = await getFileData(`exercise_drawing_cache_${cacheKey}`);
+                    } catch(e) {}
+                }
+
+                // 3) 题目对象上的 userDrawing（评分后保存的）
+                if (!drawing || isCanvasBlank(drawing)) {
+                    drawing = q.userDrawing;
+                }
+
+                // 4) IndexedDB 已评分drawing
+                if (!drawing || isCanvasBlank(drawing)) {
+                    try {
+                        drawing = await getFileData(`exercise_drawing_${taskId}_${i}`);
+                    } catch(e) {}
+                }
+
                 if (drawing && !isCanvasBlank(drawing)) {
                     toExport.push({ index: i, question: q, drawing });
                 }
@@ -16162,6 +16194,13 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             }
 
             showToast(`正在生成PDF (${toExport.length} 题)，渲染公式中...`);
+
+            try {
+                await ensureHtml2Canvas();
+            } catch(e) {
+                showToast('加载渲染库失败: ' + e.message);
+                return;
+            }
 
             try {
                 if (!window.PDFLib) throw new Error('pdf-lib 未加载');
@@ -16178,21 +16217,20 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     const contentWidth = width - margin * 2;
                     let yPos = height - margin;
 
-                    // ---- 用KaTeX渲染题目到离屏div，再截图为PNG ----
-                    const questionImg = await renderLatexToImage(q.latex || '', qIdx, contentWidth);
+                    // ---- 用讲义同款渲染管线生成题目截图 ----
+                    const questionImg = await renderQuestionToImage(q.latex || '', qIdx, contentWidth);
                     if (questionImg) {
                         try {
                             const imgBytes = Uint8Array.from(atob(questionImg.split(',')[1]), c => c.charCodeAt(0));
                             const img = await pdfDoc.embedPng(imgBytes);
                             const imgDims = img.scale(1);
-                            // 缩放到适合宽度，保留高清（渲染时用2x DPR）
-                            let drawW = imgDims.width / 2; // 因为渲染用了2x
+                            let drawW = imgDims.width / 2;
                             let drawH = imgDims.height / 2;
                             if (drawW > contentWidth) {
                                 drawH = drawH * (contentWidth / drawW);
                                 drawW = contentWidth;
                             }
-                            const maxQH = height * 0.35; // 题目最多占页面35%
+                            const maxQH = height * 0.35;
                             if (drawH > maxQH) {
                                 drawW = drawW * (maxQH / drawH);
                                 drawH = maxQH;
@@ -16204,16 +16242,8 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                             yPos -= drawH + 10;
                         } catch (qImgErr) {
                             console.warn('题目图片嵌入失败:', qImgErr);
-                            // fallback: 纯文本
-                            const safeLine = (q.latex || '').replace(/[^\x00-\xFF]/g, '?').substring(0, 200);
-                            page.drawText(safeLine, { x: margin, y: yPos - 16, size: 11, font, color: PDFLib.rgb(0.1, 0.1, 0.1) });
                             yPos -= 30;
                         }
-                    } else {
-                        // fallback
-                        const safeLine = (q.latex || '').replace(/[^\x00-\xFF]/g, '?').substring(0, 200);
-                        page.drawText(safeLine, { x: margin, y: yPos - 16, size: 11, font, color: PDFLib.rgb(0.1, 0.1, 0.1) });
-                        yPos -= 30;
                     }
 
                     // 分隔线
@@ -16248,11 +16278,6 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                         });
                     } catch (imgErr) {
                         console.warn('嵌入手写图片失败:', imgErr);
-                        page.drawText('(Drawing failed to embed)', {
-                            x: margin, y: yPos - 20,
-                            size: 10, font,
-                            color: PDFLib.rgb(0.6, 0.2, 0.2)
-                        });
                     }
 
                     // 评分信息（如有）
@@ -16286,7 +16311,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             }
         }
 
-        // 将LaTeX题目渲染为PNG图片（通过离屏DOM + KaTeX + html2canvas截图）
+        // 动态加载 html2canvas
         let _html2canvasLoaded = false;
         async function ensureHtml2Canvas() {
             if (_html2canvasLoaded && window.html2canvas) return;
@@ -16300,56 +16325,47 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             });
         }
 
-        async function renderLatexToImage(latexText, qIdx, targetWidth) {
-            // 创建离屏容器
+        // 用和讲义页面完全相同的渲染管线（renderChatMarkdownLatex + lecture-body + KaTeX）生成题目截图
+        async function renderQuestionToImage(latexText, qIdx, targetWidth) {
+            const renderWidth = Math.round(targetWidth * 2);
+
+            // 创建离屏容器，使用和讲义页面相同的 lecture-body class
             const container = document.createElement('div');
             container.style.cssText = `
                 position: absolute; left: 0; top: 0;
-                width: ${Math.round(targetWidth * 2)}px;
+                width: ${renderWidth}px;
                 background: white;
-                padding: 24px 28px;
+                padding: 28px 32px;
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                font-size: 22px;
-                line-height: 1.8;
+                font-size: 20px;
                 color: #1a1a1a;
                 z-index: -9999;
                 opacity: 0;
                 pointer-events: none;
             `;
 
-            // 题号
-            const titleEl = document.createElement('div');
-            titleEl.style.cssText = 'font-size: 30px; font-weight: 700; margin-bottom: 14px; color: #000;';
-            titleEl.textContent = `Q${qIdx + 1}`;
+            // 题号——与讲义 h2 风格一致
+            const titleEl = document.createElement('h2');
+            titleEl.style.cssText = 'font-size: 1.3em; margin: 0 0 16px 0; padding-bottom: 8px; border-bottom: 2px solid #000; color: #000;';
+            titleEl.textContent = `第 ${qIdx + 1} 题`;
             container.appendChild(titleEl);
 
-            // 题目内容
-            const contentEl = document.createElement('div');
-            contentEl.style.cssText = 'font-size: 22px; line-height: 1.9; word-wrap: break-word;';
-            contentEl.textContent = latexText;
-            container.appendChild(contentEl);
+            // 题目内容——用和讲义完全一样的 lecture-body + renderChatMarkdownLatex
+            const bodyEl = document.createElement('div');
+            bodyEl.className = 'lecture-body';
+            bodyEl.style.cssText = 'font-size: 18px; line-height: 2;';
+            bodyEl.innerHTML = renderChatMarkdownLatex(latexText);
+            container.appendChild(bodyEl);
 
             document.body.appendChild(container);
 
-            // KaTeX渲染
-            if (typeof renderMathInElement === 'function') {
-                renderMathInElement(contentEl, {
-                    delimiters: [
-                        { left: '$$', right: '$$', display: true },
-                        { left: '$', right: '$', display: false },
-                        { left: '\\[', right: '\\]', display: true },
-                        { left: '\\(', right: '\\)', display: false }
-                    ],
-                    throwOnError: false
-                });
-            }
+            // 用和讲义完全一样的 renderLectureMath 渲染公式
+            renderLectureMath(bodyEl);
 
-            // 等KaTeX字体渲染完
-            await new Promise(r => setTimeout(r, 300));
+            // 等待 KaTeX 字体渲染完毕
+            await new Promise(r => setTimeout(r, 500));
 
             try {
-                await ensureHtml2Canvas();
-                // 临时可见以便截图
                 container.style.opacity = '1';
                 const canvas = await html2canvas(container, {
                     scale: 2,
@@ -16357,56 +16373,13 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     useCORS: true,
                     logging: false
                 });
-                container.style.opacity = '0';
                 document.body.removeChild(container);
                 return canvas.toDataURL('image/png');
             } catch (err) {
                 console.warn('html2canvas截图失败:', err);
                 document.body.removeChild(container);
-                // fallback: 纯Canvas手绘
-                return renderLatexFallbackCanvas(latexText, qIdx, targetWidth);
+                return null;
             }
-        }
-
-        // 备用方案：纯Canvas绘制题目文本（不带KaTeX渲染但支持中文）
-        function renderLatexFallbackCanvas(latexText, qIdx, targetWidth) {
-            const dpr = 2;
-            const padding = 20;
-            const fontSize = 13;
-            const lineHeight = fontSize * 1.8;
-            const maxChars = Math.floor((targetWidth - padding * 2) / (fontSize * 0.55));
-            const text = latexText || '';
-            const lines = [];
-            let pos = 0;
-            while (pos < text.length) {
-                lines.push(text.substring(pos, pos + maxChars));
-                pos += maxChars;
-            }
-            if (lines.length === 0) lines.push('');
-
-            const titleH = 32;
-            const canvasH = titleH + padding * 2 + lines.length * lineHeight + 10;
-            const canvas = document.createElement('canvas');
-            canvas.width = targetWidth * dpr;
-            canvas.height = canvasH * dpr;
-            const ctx = canvas.getContext('2d');
-            ctx.scale(dpr, dpr);
-            ctx.fillStyle = 'white';
-            ctx.fillRect(0, 0, targetWidth, canvasH);
-
-            // 题号
-            ctx.fillStyle = '#000';
-            ctx.font = 'bold 18px -apple-system, sans-serif';
-            ctx.fillText(`Q${qIdx + 1}`, padding, padding + 18);
-
-            // 题目
-            ctx.fillStyle = '#1a1a1a';
-            ctx.font = `${fontSize}px -apple-system, sans-serif`;
-            lines.forEach((line, i) => {
-                ctx.fillText(line, padding, padding + titleH + i * lineHeight + fontSize);
-            });
-
-            return canvas.toDataURL('image/png');
         }
 
         // 检查canvas图片是否为空白（纯白或纯透明）
