@@ -1364,204 +1364,407 @@
             color: var(--text-muted);
         }
 
-        /* ==================== Page 4: Settings ==================== */
         /* ==================== Page 6: Exercises ==================== */
         #page6 { padding: 0; }
         #page6.active { display: flex; flex-direction: column; }
 
-        .exercise-header {
+        .exercises-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 16px 16px 8px;
-        }
-        .exercise-header-title { font-size: 18px; font-weight: 700; }
-        .exercise-archive-btn {
-            border: none; background: var(--bg-secondary); padding: 6px 14px;
-            border-radius: 8px; font-size: 13px; cursor: pointer; color: var(--text-secondary);
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
         }
 
-        .exercise-grid {
+        .exercises-header-title { font-size: 18px; font-weight: 700; }
+
+        .exercises-archive-btn {
+            padding: 6px 14px;
+            border-radius: 8px;
+            background: var(--bg-secondary);
+            border: none;
+            font-size: 13px;
+            cursor: pointer;
+            color: var(--text-secondary);
+        }
+
+        .exercises-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 1px;
             flex: 1;
             background: var(--border-color);
             overflow: hidden;
-            margin: 0;
         }
-        .exercise-column {
+
+        .exercises-column {
             background: var(--bg-primary);
             padding: 16px;
-            padding-bottom: 20px;
             display: flex;
             flex-direction: column;
             overflow: hidden;
         }
-        .exercise-column-header {
-            display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;
-        }
-        .exercise-column-title { font-size: 16px; font-weight: 600; }
-        .exercise-list { flex: 1; overflow-y: auto; }
 
-        .exercise-folder {
-            margin-bottom: 8px; cursor: pointer;
+        .exercises-column-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
         }
-        .exercise-folder-header {
-            display: flex; align-items: center; gap: 10px;
-            padding: 12px; background: var(--bg-secondary); border-radius: 10px;
+
+        .exercises-column-title { font-size: 16px; font-weight: 600; }
+
+        .exercises-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .exercise-folder-card {
+            background: var(--bg-secondary);
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 8px;
+            cursor: pointer;
             transition: all 0.2s;
         }
-        .exercise-folder-header:hover { background: var(--bg-tertiary); }
-        .exercise-folder-name {
-            flex: 1; font-size: 14px; font-weight: 500;
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-        }
-        .exercise-folder-count {
-            font-size: 11px; color: var(--text-muted); background: var(--bg-primary);
-            padding: 2px 8px; border-radius: 10px; flex-shrink: 0;
+
+        .exercise-folder-card:hover { transform: translateX(4px); }
+
+        .exercise-folder-card-name {
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 4px;
         }
 
-        /* Exercise folder view */
-        #exerciseFolderView {
-            flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0;
+        .exercise-folder-card-meta {
+            font-size: 11px;
+            color: var(--text-muted);
         }
-        #exerciseFolderContent { padding: 16px; padding-bottom: 80px; }
+
+        /* Exercise folder detail view */
+        #exerciseFolderView {
+            flex: 1;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            padding: 0;
+        }
+
+        #exerciseFolderContent {
+            padding: 16px;
+            padding-bottom: 80px;
+        }
 
         .exercise-task-card {
-            background: var(--bg-secondary); border-radius: 12px; padding: 14px;
-            margin-bottom: 10px; cursor: pointer; transition: all 0.2s;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 14px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
         }
+
         .exercise-task-card:hover { transform: translateX(4px); }
-        .exercise-task-title { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+
+        .exercise-task-title {
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 6px;
+        }
+
         .exercise-task-progress {
-            display: flex; align-items: center; gap: 6px; margin-top: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
+
         .exercise-task-progress-bar {
-            flex: 1; height: 4px; background: var(--bg-tertiary); border-radius: 2px; overflow: hidden;
+            flex: 1;
+            height: 4px;
+            background: var(--bg-tertiary);
+            border-radius: 2px;
+            overflow: hidden;
         }
+
         .exercise-task-progress-fill {
-            height: 100%; border-radius: 2px; transition: width 0.3s;
+            height: 100%;
+            border-radius: 2px;
         }
-        .exercise-task-progress-text { font-size: 11px; color: var(--text-muted); }
 
-        .exercise-source-card {
-            background: var(--bg-secondary); border-radius: 10px; padding: 12px;
-            margin-bottom: 8px; display: flex; align-items: center; gap: 10px;
-            cursor: pointer; transition: all 0.2s;
+        .exercise-task-progress-text {
+            font-size: 11px;
+            color: var(--text-muted);
         }
-        .exercise-source-card:hover { transform: translateX(4px); }
-        .exercise-source-icon {
-            width: 36px; height: 36px; border-radius: 8px; background: var(--bg-tertiary);
-            display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-        }
-        .exercise-source-icon svg { width: 18px; height: 18px; color: var(--text-secondary); }
-        .exercise-source-info { flex: 1; min-width: 0; }
-        .exercise-source-name {
-            font-size: 13px; font-weight: 500;
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-        }
-        .exercise-source-meta { font-size: 11px; color: var(--text-muted); }
 
-        /* Exercise action bar */
-        .exercise-action-bar {
-            position: fixed; bottom: 56px; left: 0; right: 0;
-            padding: 8px 16px; display: none; justify-content: flex-end; gap: 10px;
-            z-index: 250; background: var(--bg-primary); border-top: 1px solid var(--border-color);
+        .exercise-source-section {
+            margin-top: 16px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border-color);
         }
-        body.exercise-session-active .exercise-action-bar { display: flex; }
-        .exercise-action-btn {
-            width: 44px; height: 44px; border-radius: 50%; border: none; cursor: pointer;
-            display: flex; align-items: center; justify-content: center;
+
+        .exercise-source-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .exercise-material-card {
+            background: var(--bg-secondary);
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+        }
+
+        .exercise-material-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: var(--bg-tertiary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .exercise-material-icon svg { width: 18px; height: 18px; color: var(--text-secondary); }
+
+        .exercise-material-name {
+            font-size: 13px;
+            font-weight: 500;
+            flex: 1;
+            min-width: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Exercise upload bar */
+        .exercise-upload-bar {
+            position: fixed;
+            bottom: 56px;
+            left: 0;
+            right: 0;
+            padding: 8px 16px;
+            display: none;
+            justify-content: flex-end;
+            gap: 10px;
+            z-index: 250;
+            background: var(--bg-primary);
+            border-top: 1px solid var(--border-color);
+        }
+
+        body.exercise-folder-active .exercise-upload-bar {
+            display: flex;
+        }
+
+        .exercise-upload-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-        }
-        .exercise-action-btn svg { width: 20px; height: 20px; }
-        .exercise-action-btn.primary { background: var(--accent); color: white; }
-        body.dark-theme .exercise-action-btn.primary { color: #000; }
-        .exercise-action-btn.secondary {
-            background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color);
+            background: var(--accent);
+            color: white;
         }
 
-        /* Solving overlay */
-        .exercise-solve-overlay {
-            display: none; position: fixed; inset: 0; z-index: 5000;
-            background: var(--bg-primary); flex-direction: column;
+        body.dark-theme .exercise-upload-btn { color: #000; }
+
+        .exercise-upload-btn svg { width: 20px; height: 20px; }
+
+        /* ==================== Exercise Doing View ==================== */
+        .exercise-doing-view {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 56px;
+            background: var(--bg-primary);
+            z-index: 200;
+            display: none;
+            flex-direction: column;
         }
-        .exercise-solve-overlay.show { display: flex; }
-        .solve-header {
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 12px 16px; border-bottom: 1px solid var(--border-color);
+
+        .exercise-doing-view.show { display: flex; }
+
+        .exercise-doing-header {
+            display: flex;
+            align-items: center;
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border-color);
+            gap: 10px;
         }
-        .solve-close-btn {
-            border: none; background: none; cursor: pointer; color: var(--text-primary); padding: 4px;
+
+        .exercise-doing-back {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: var(--bg-secondary);
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: var(--text-primary);
+            flex-shrink: 0;
         }
-        .solve-timer {
-            font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums;
+
+        .exercise-doing-title {
+            flex: 1;
+            font-size: 14px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
-        .solve-timer.warning { color: #ef4444; }
-        .solve-progress-label { font-size: 13px; color: var(--text-secondary); font-weight: 500; }
-        .solve-body {
-            flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px;
-            display: flex; flex-direction: column; gap: 16px;
+
+        .exercise-doing-timer {
+            font-size: 13px;
+            padding: 4px 10px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            color: var(--text-secondary);
+            font-variant-numeric: tabular-nums;
+            flex-shrink: 0;
         }
-        .solve-question-area {
-            background: var(--bg-secondary); border-radius: 12px; padding: 16px;
-            font-size: 15px; line-height: 1.7; min-height: 80px;
+
+        .exercise-doing-timer.warning { color: #ef4444; background: #fef2f2; }
+
+        .exercise-doing-question {
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+            overflow-y: auto;
+            max-height: 40%;
+            line-height: 1.8;
         }
-        .solve-canvas-wrap {
-            flex: 1; min-height: 250px; border: 2px dashed var(--border-color);
-            border-radius: 12px; position: relative; background: white; touch-action: none;
+
+        .exercise-doing-question .katex-display { margin: 12px 0; }
+
+        .exercise-doing-canvas-wrap {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            background: white;
         }
-        .solve-canvas {
-            width: 100%; height: 100%; position: absolute; top: 0; left: 0;
-            border-radius: 12px; touch-action: none;
+
+        .exercise-doing-canvas {
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+            cursor: crosshair;
         }
-        .solve-toolbar {
-            display: flex; gap: 6px; padding: 4px; position: absolute; top: 8px; right: 8px;
-            background: rgba(255,255,255,0.9); border-radius: 8px; box-shadow: var(--shadow);
-        }
-        .solve-tool-btn {
-            width: 32px; height: 32px; border: none; border-radius: 6px;
-            background: transparent; cursor: pointer; display: flex;
-            align-items: center; justify-content: center;
-        }
-        .solve-tool-btn.active { background: var(--accent); color: white; }
-        .solve-tool-btn svg { width: 16px; height: 16px; }
-        .solve-footer {
-            display: flex; align-items: center; justify-content: center; gap: 12px;
-            padding: 12px 16px; border-top: 1px solid var(--border-color);
+
+        .exercise-doing-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-top: 1px solid var(--border-color);
             background: var(--bg-primary);
         }
-        .solve-btn {
-            padding: 10px 24px; border-radius: 10px; border: 1px solid var(--border-color);
-            background: var(--bg-secondary); font-size: 14px; font-weight: 500;
-            cursor: pointer; transition: all 0.2s;
-        }
-        .solve-btn:active { transform: scale(0.96); }
-        .solve-btn.primary {
-            background: var(--accent); color: white; border-color: var(--accent);
+
+        .exercise-doing-toolbar .pen-color {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 2px solid transparent;
+            cursor: pointer;
         }
 
-        /* Wrong answer review */
-        .wrong-review-section { margin-top: 12px; }
-        .wrong-review-comment {
-            background: var(--bg-secondary); border-radius: 10px; padding: 14px;
-            margin-top: 8px; font-size: 13px; line-height: 1.6;
-        }
-        .wrong-score-badge {
-            display: inline-block; padding: 2px 10px; border-radius: 10px;
-            font-size: 12px; font-weight: 600; color: white;
-        }
-        .wrong-score-green { background: #22c55e; }
-        .wrong-score-yellow { background: #f59e0b; }
-        .wrong-score-red { background: #ef4444; }
+        .exercise-doing-toolbar .pen-color.active { border-color: var(--accent); }
 
-        /* Archive view for exercises */
-        #exerciseArchiveView {
-            flex: 1; overflow-y: auto; padding: 16px; padding-bottom: 80px;
+        .exercise-doing-toolbar .clear-canvas-btn {
+            margin-left: auto;
+            padding: 4px 10px;
+            border-radius: 6px;
+            background: var(--bg-secondary);
+            border: none;
+            font-size: 12px;
+            cursor: pointer;
+            color: var(--text-secondary);
         }
 
-        /* ==================== Page 4: Settings (original) ==================== */
+        .exercise-doing-footer {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            padding: 8px 12px;
+            border-top: 1px solid var(--border-color);
+            background: var(--bg-primary);
+        }
+
+        .exercise-doing-btn {
+            padding: 10px 20px;
+            border-radius: 10px;
+            border: none;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
+        .exercise-doing-btn.primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        body.dark-theme .exercise-doing-btn.primary { color: #000; }
+
+        .exercise-doing-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        /* ==================== Wrong exercise view ==================== */
+        .wrong-exercise-comment {
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 10px;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .wrong-exercise-score {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            color: white;
+            margin-bottom: 6px;
+        }
+
+        .wrong-exercise-user-drawing {
+            max-width: 100%;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            margin: 8px 0;
+        }
+
+        /* Exercise archive view */
+        .exercise-archive-view {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 56px;
+            background: var(--bg-primary);
+            z-index: 200;
+            display: none;
+            flex-direction: column;
+        }
+
+        .exercise-archive-view.show { display: flex; }
+
+        /* ==================== Page 4: Settings ==================== */
         .settings-section {
             background: var(--bg-secondary);
             border-radius: var(--radius-lg);
@@ -4118,87 +4321,80 @@
 
     <!-- ==================== Page 6: Exercises ==================== -->
     <div class="page" id="page6">
-        <div class="exercise-header">
-            <span class="exercise-header-title">习题</span>
-            <button class="exercise-archive-btn" onclick="toggleExerciseArchive()">归档</button>
+        <div class="exercises-header">
+            <span class="exercises-header-title">习题</span>
+            <button class="exercises-archive-btn" onclick="openExerciseArchive()">归档</button>
         </div>
-        <div class="exercise-grid" id="exerciseGrid">
-            <div class="exercise-column" onclick="onExerciseColumnClick(event, 'new')">
-                <div class="exercise-column-header">
-                    <span class="exercise-column-title">新题</span>
+        <div class="exercises-grid" id="exercisesGrid">
+            <div class="exercises-column" onclick="onExerciseColumnClick(event, 'new')">
+                <div class="exercises-column-header">
+                    <span class="exercises-column-title">新题</span>
                     <span class="column-count" id="exerciseNewCount">0</span>
                 </div>
-                <div class="exercise-list" id="exerciseNewList">
+                <div class="exercises-list" id="exerciseNewList">
                     <div class="empty-state"><p>点击空白处新建文件夹</p></div>
                 </div>
             </div>
-            <div class="exercise-column" onclick="onExerciseColumnClick(event, 'wrong')">
-                <div class="exercise-column-header">
-                    <span class="exercise-column-title">错题</span>
+            <div class="exercises-column">
+                <div class="exercises-column-header">
+                    <span class="exercises-column-title">错题</span>
                     <span class="column-count" id="exerciseWrongCount">0</span>
                 </div>
-                <div class="exercise-list" id="exerciseWrongList">
-                    <div class="empty-state"><p>完成习题后自动收录</p></div>
+                <div class="exercises-list" id="exerciseWrongList">
+                    <div class="empty-state"><p>暂无错题</p></div>
                 </div>
             </div>
         </div>
+        <!-- Folder detail view -->
         <div id="exerciseFolderView" style="display:none;">
             <div id="exerciseFolderContent"></div>
         </div>
-        <div id="exerciseArchiveView" style="display:none;"></div>
     </div>
 
-    <!-- Exercise action bar -->
-    <div class="exercise-action-bar" id="exerciseActionBar">
-        <button class="exercise-action-btn secondary" onclick="exerciseUploadFile()" title="上传习题">
+    <!-- Exercise upload bar -->
+    <div class="exercise-upload-bar" id="exerciseUploadBar">
+        <button class="exercise-upload-btn" onclick="exerciseUploadFiles()" title="上传习题">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         </button>
-        <button class="exercise-action-btn primary" onclick="exerciseTakePhoto()" title="拍照上传">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
-        </button>
     </div>
-    <input type="file" id="exerciseCameraInput" accept="image/*" capture="environment" style="display:none;">
     <input type="file" id="exerciseFileInput" accept="image/*,.pdf" multiple style="display:none;">
 
-    <!-- Exercise solving overlay -->
-    <div class="exercise-solve-overlay" id="exerciseSolveOverlay">
-        <div class="solve-header">
-            <button class="solve-close-btn" onclick="closeExerciseSolve()">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    <!-- Exercise doing view (fullscreen) -->
+    <div class="exercise-doing-view" id="exerciseDoingView">
+        <div class="exercise-doing-header">
+            <button class="exercise-doing-back" onclick="closeExerciseDoing()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
             </button>
-            <span class="solve-progress-label" id="solveProgressLabel">1 / 6</span>
-            <span class="solve-timer" id="solveTimer">20:00</span>
+            <span class="exercise-doing-title" id="exerciseDoingTitle">题目</span>
+            <span class="exercise-doing-timer" id="exerciseDoingTimer">20:00</span>
         </div>
-        <div class="solve-body">
-            <div class="solve-question-area" id="solveQuestionArea">题目加载中...</div>
-            <div class="solve-canvas-wrap" id="solveCanvasWrap">
-                <canvas class="solve-canvas" id="solveCanvas"></canvas>
-                <div class="solve-toolbar">
-                    <button class="solve-tool-btn active" id="solvePenBtn" onclick="setSolveTool('pen')">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg>
-                    </button>
-                    <button class="solve-tool-btn" id="solveEraserBtn" onclick="setSolveTool('eraser')">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 20H7L3 16l8-8 9 9-4 3z"/><line x1="6" y1="11" x2="13" y2="18"/></svg>
-                    </button>
-                    <button class="solve-tool-btn" onclick="clearSolveCanvas()">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
-                    </button>
-                </div>
-            </div>
-            <!-- Wrong answer review section (hidden during normal solving) -->
-            <div class="wrong-review-section" id="wrongReviewSection" style="display:none;">
-                <div style="font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:6px;">你的作答</div>
-                <div style="border:1px solid var(--border-color);border-radius:10px;overflow:hidden;margin-bottom:10px;">
-                    <img id="wrongUserAnswer" style="width:100%;display:block;" />
-                </div>
-                <div style="font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:6px;">AI 评分</div>
-                <div class="wrong-review-comment" id="wrongAIComment"></div>
-            </div>
+        <div class="exercise-doing-question" id="exerciseDoingQuestion"></div>
+        <div class="exercise-doing-toolbar">
+            <div class="pen-color active" style="background:#000" data-color="#000000" onclick="setExPenColor(this)"></div>
+            <div class="pen-color" style="background:#3b82f6" data-color="#3b82f6" onclick="setExPenColor(this)"></div>
+            <div class="pen-color" style="background:#ef4444" data-color="#ef4444" onclick="setExPenColor(this)"></div>
+            <button class="clear-canvas-btn" onclick="clearExCanvas()">清除</button>
         </div>
-        <div class="solve-footer" id="solveFooter">
-            <button class="solve-btn" onclick="solveNavigate(-1)">上一题</button>
-            <button class="solve-btn primary" id="solveSubmitBtn" onclick="submitCurrentAnswer()">完成</button>
-            <button class="solve-btn" onclick="solveNavigate(1)">下一题</button>
+        <div class="exercise-doing-canvas-wrap">
+            <canvas class="exercise-doing-canvas" id="exerciseDoingCanvas"></canvas>
+        </div>
+        <div class="exercise-doing-footer">
+            <button class="exercise-doing-btn" id="exPrevBtn" onclick="exPrevQuestion()">上一题</button>
+            <button class="exercise-doing-btn primary" id="exCompleteBtn" onclick="exCompleteQuestion()">完成</button>
+            <button class="exercise-doing-btn" id="exNextBtn" onclick="exNextQuestion()">下一题</button>
+        </div>
+    </div>
+
+    <!-- Exercise archive view -->
+    <div class="exercise-archive-view" id="exerciseArchiveView">
+        <div class="exercise-doing-header">
+            <button class="exercise-doing-back" onclick="closeExerciseArchive()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <span class="exercise-doing-title">归档</span>
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:16px;" id="exerciseArchiveContent">
+            <div class="empty-state"><p>暂无归档</p></div>
         </div>
     </div>
 
@@ -4961,7 +5157,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
             <span>笔记</span>
         </div>
-        <div class="nav-item" id="navExercise" onclick="switchPage(6)">
+        <div class="nav-item" id="navExercises" onclick="switchPage(6)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
             <span>习题</span>
         </div>
@@ -4983,8 +5179,8 @@
                 seminars: []
             },
             exercises: {
-                folders: [],   // [{ id, name, createdAt, archived, tasks: [{ id, title, fileId, fileName, questions: [{ latex, score, userAnswer, aiComment, status }], progress }], files: [{ id, name, type, mimeType, data(ref) }] }]
-                archivedFolders: []
+                folders: [],   // [{ id, name, createdAt, archived, tasks: [{ id, name, questions: [{latex, status, score, userDrawing, aiComment}], sourceFiles: [{id,name,type,mimeType}] }] }]
+                wrongByFolder: {}  // { folderId: [{ taskId, taskName, questions: [{questionIndex, latex, score, userDrawing, aiComment, redoDrawings:[]}] }] }
             },
             settings: {
                 supabaseUrl: '',
@@ -5039,7 +5235,7 @@
             renderLibrary();
             renderNotesPage();
             renderClassroomPage();
-            renderExercisePage();
+            renderExercisesPage();
             
             // Clean up expired photos
             cleanupExpiredPhotos();
@@ -5048,8 +5244,7 @@
             document.getElementById('classroomCameraInput').addEventListener('change', onClassroomCameraCapture);
             document.getElementById('classroomFileInput').addEventListener('change', onClassroomFileUpload);
 
-            // Exercise file inputs
-            document.getElementById('exerciseCameraInput').addEventListener('change', onExerciseCameraCapture);
+            // Exercise file input
             document.getElementById('exerciseFileInput').addEventListener('change', onExerciseFileUpload);
 
             // 初始化R2自动同步
@@ -5398,7 +5593,7 @@
                     if (!appData.notes) appData.notes = {};
                     if (!appData.archived) appData.archived = [];
                     if (!appData.classroom) appData.classroom = { courses: [], seminars: [] };
-                    if (!appData.exercises) appData.exercises = { folders: [], archivedFolders: [] };
+                    if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {} };
                     if (!appData.settings) appData.settings = {};
                     if (appData.settings.photoRetentionDays === undefined) appData.settings.photoRetentionDays = 0;
                 } catch(e) {
@@ -5420,7 +5615,6 @@
                         if (!appData.notes) appData.notes = {};
                         if (!appData.archived) appData.archived = [];
                         if (!appData.classroom) appData.classroom = { courses: [], seminars: [] };
-                        if (!appData.exercises) appData.exercises = { folders: [], archivedFolders: [] };
                         if (!appData.settings) appData.settings = {};
                         // 写回 localStorage
                         try { localStorage.setItem('mathReader', JSON.stringify(appData)); } catch(e2) {}
@@ -5498,6 +5692,23 @@
             // 剔除论文AI摘要（大文本存在IndexedDB）
             toSave.papers.forEach(p => { delete p.aiAbstract; delete p._abstractCache; });
             toSave.archived.forEach(a => { delete a.aiAbstract; delete a._abstractCache; });
+            // 剔除习题中的 userDrawing base64 数据（太大）
+            if (toSave.exercises) {
+                (toSave.exercises.folders || []).forEach(folder => {
+                    (folder.tasks || []).forEach(task => {
+                        (task.questions || []).forEach(q => { delete q.userDrawing; });
+                        (task.sourceFiles || []).forEach(sf => { delete sf.data; });
+                    });
+                });
+                Object.values(toSave.exercises.wrongByFolder || {}).forEach(wrongTasks => {
+                    (wrongTasks || []).forEach(wt => {
+                        (wt.questions || []).forEach(q => {
+                            delete q.userDrawing;
+                            (q.redoDrawings || []).forEach(rd => { delete rd.drawing; });
+                        });
+                    });
+                });
+            }
             try {
                 localStorage.setItem('mathReader', JSON.stringify(toSave));
             } catch (e) {
@@ -5549,11 +5760,7 @@
             // 控制草稿小条显示
             document.body.classList.remove('page2-active');
             document.body.classList.remove('classroom-session-active');
-            document.body.classList.remove('exercise-session-active');
-            // Close exercise solve overlay if open
-            if (document.getElementById('exerciseSolveOverlay').classList.contains('show')) {
-                closeExerciseSolve();
-            }
+            document.body.classList.remove('exercise-folder-active');
             if (num === 2) {
                 document.body.classList.add('page2-active');
                 // 如果没有打开文档，尝试打开上次的文档
@@ -5575,7 +5782,7 @@
             }
 
             if (num === 6) {
-                renderExercisePage();
+                renderExercisesPage();
             }
 
             if (num === 4) {
@@ -9520,15 +9727,6 @@
                     if (matData) {
                         const matKey = 'classroom/' + fileId;
                         await r2PutObject(matKey, matData, 'application/octet-stream');
-                    }
-                }
-
-                // 如果是上传习题文件/答案，同步数据
-                if (action === 'exercise_upload' && fileId) {
-                    const exData = await getFileData(fileId).catch(() => null);
-                    if (exData) {
-                        const exKey = 'exercises/' + fileId;
-                        await r2PutObject(exKey, exData, 'application/octet-stream');
                     }
                 }
                 
@@ -15002,119 +15200,203 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
         // Override the lecture viewer regen button to handle classroom notes
         const origConfirmRegenerateLecture = typeof confirmRegenerateLecture === 'function' ? confirmRegenerateLecture : null;
 
-        // ==================== Exercise Module ====================
-        let currentExerciseFolder = null;
-        let currentExerciseSolve = null; // { folderId, taskId, questionIndex, isWrong, timerInterval, secondsLeft, strokes }
-        let _exerciseLongPressTimer = null;
+        // ==================== Exercises Module ====================
+        let currentExerciseFolder = null; // { folderId }
+        let currentExerciseTask = null;   // { folderId, taskId }
+        let exDoingState = null;          // { folderId, taskId, questionIndex, isWrong, wrongFolderId }
+        let exTimerInterval = null;
+        let exTimerSeconds = 1200; // 20 min
+        let exPenColor = '#000000';
+        let exDrawing = false;
+        let exLastX = 0, exLastY = 0;
+        let exCanvasCtx = null;
+        let exStrokeHistory = [];
 
-        function ensureExerciseData() {
-            if (!appData.exercises) appData.exercises = { folders: [], archivedFolders: [] };
+        function getExercisesData() {
+            if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {} };
             if (!appData.exercises.folders) appData.exercises.folders = [];
-            if (!appData.exercises.archivedFolders) appData.exercises.archivedFolders = [];
+            if (!appData.exercises.wrongByFolder) appData.exercises.wrongByFolder = {};
+            return appData.exercises;
         }
 
-        function renderExercisePage() {
-            ensureExerciseData();
+        function renderExercisesPage() {
             currentExerciseFolder = null;
-            document.body.classList.remove('exercise-session-active');
-            document.getElementById('exerciseGrid').style.display = '';
+            currentExerciseTask = null;
+            document.body.classList.remove('exercise-folder-active');
+            document.getElementById('exercisesGrid').style.display = '';
             document.getElementById('exerciseFolderView').style.display = 'none';
-            document.getElementById('exerciseArchiveView').style.display = 'none';
 
-            const folders = appData.exercises.folders;
-            document.getElementById('exerciseNewCount').textContent = folders.length;
+            const data = getExercisesData();
+            const folders = data.folders.filter(f => !f.archived);
 
-            // New exercises column
+            // Left column: new exercises
             const newList = document.getElementById('exerciseNewList');
+            document.getElementById('exerciseNewCount').textContent = folders.length;
             if (folders.length === 0) {
                 newList.innerHTML = '<div class="empty-state"><p>点击空白处新建文件夹</p></div>';
             } else {
                 newList.innerHTML = folders.map(f => {
                     const taskCount = (f.tasks || []).length;
-                    return `<div class="exercise-folder" onclick="event.stopPropagation();enterExerciseFolder('${f.id}','new')"
-                        oncontextmenu="event.preventDefault();showExerciseFolderMenu(event,'${f.id}')"
-                        ontouchstart="startExerciseFolderLongPress(event,'${f.id}')" ontouchend="cancelExerciseLongPress()" ontouchmove="cancelExerciseLongPress()">
-                        <div class="exercise-folder-header">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
-                            <span class="exercise-folder-name">${escapeHtml(f.name)}</span>
-                            <span class="exercise-folder-count">${taskCount}</span>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-                        </div>
+                    const totalQ = (f.tasks || []).reduce((s, t) => s + (t.questions || []).length, 0);
+                    const doneQ = (f.tasks || []).reduce((s, t) => s + (t.questions || []).filter(q => q.status === 'done').length, 0);
+                    return `<div class="exercise-folder-card" onclick="event.stopPropagation();enterExerciseFolder('${f.id}')"
+                        oncontextmenu="event.preventDefault();if(!('ontouchstart' in window))showExFolderMenu(event,'${f.id}')"
+                        ontouchstart="startExFolderLongPress(event,'${f.id}')" ontouchend="cancelExFolderLongPress()" ontouchmove="cancelExFolderLongPress()">
+                        <div class="exercise-folder-card-name">${escapeHtml(f.name)}</div>
+                        <div class="exercise-folder-card-meta">${taskCount} 任务 · ${doneQ}/${totalQ} 题</div>
                     </div>`;
                 }).join('');
             }
 
-            // Wrong answers column
+            // Right column: wrong exercises
             const wrongList = document.getElementById('exerciseWrongList');
-            const foldersWithWrong = folders.filter(f => {
-                return (f.tasks || []).some(t => (t.questions || []).some(q => q.status === 'graded'));
+            const wrongFolders = folders.filter(f => {
+                const wrong = data.wrongByFolder[f.id];
+                return wrong && wrong.length > 0 && wrong.some(t => t.questions && t.questions.length > 0);
             });
-            document.getElementById('exerciseWrongCount').textContent = foldersWithWrong.length;
-            if (foldersWithWrong.length === 0) {
-                wrongList.innerHTML = '<div class="empty-state"><p>完成习题后自动收录</p></div>';
+            document.getElementById('exerciseWrongCount').textContent = wrongFolders.length;
+            if (wrongFolders.length === 0) {
+                wrongList.innerHTML = '<div class="empty-state"><p>暂无错题</p></div>';
             } else {
-                wrongList.innerHTML = foldersWithWrong.map(f => {
-                    const wrongCount = (f.tasks || []).reduce((acc, t) => acc + (t.questions || []).filter(q => q.status === 'graded').length, 0);
-                    return `<div class="exercise-folder" onclick="event.stopPropagation();enterExerciseFolder('${f.id}','wrong')">
-                        <div class="exercise-folder-header">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
-                            <span class="exercise-folder-name">${escapeHtml(f.name)}</span>
-                            <span class="exercise-folder-count">${wrongCount} 题</span>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-                        </div>
+                wrongList.innerHTML = wrongFolders.map(f => {
+                    const wrong = data.wrongByFolder[f.id] || [];
+                    const totalWrong = wrong.reduce((s, t) => s + (t.questions || []).length, 0);
+                    return `<div class="exercise-folder-card" onclick="event.stopPropagation();enterWrongFolder('${f.id}')">
+                        <div class="exercise-folder-card-name">${escapeHtml(f.name)}</div>
+                        <div class="exercise-folder-card-meta">${totalWrong} 道错题</div>
                     </div>`;
                 }).join('');
             }
         }
 
-        function onExerciseColumnClick(e, col) {
-            if (e.target.closest('.exercise-folder')) return;
-            if (col === 'wrong') return;
+        // Folder long press
+        let _exFolderLPTimer = null;
+        function cancelExFolderLongPress() { if (_exFolderLPTimer) { clearTimeout(_exFolderLPTimer); _exFolderLPTimer = null; } }
+        function startExFolderLongPress(e, folderId) {
+            cancelExFolderLongPress();
+            const t = e.touches ? e.touches[0] : e;
+            const cx = t.clientX, cy = t.clientY;
+            _exFolderLPTimer = setTimeout(() => {
+                _exFolderLPTimer = null;
+                showExFolderMenu({ clientX: cx, clientY: cy }, folderId);
+            }, 500);
+        }
+
+        function showExFolderMenu(e, folderId) {
+            closeLongPressMenu();
+            const overlay = document.createElement('div');
+            overlay.className = 'longpress-overlay';
+            overlay.onclick = closeLongPressMenu;
+            const menu = document.createElement('div');
+            menu.className = 'longpress-menu';
+            menu.id = 'longpressMenu';
+            menu.innerHTML = `
+                <button class="longpress-menu-item" onclick="renameExFolder('${folderId}')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                    编辑
+                </button>
+                <button class="longpress-menu-item" onclick="archiveExFolder('${folderId}')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+                    归档
+                </button>
+                <button class="longpress-menu-item danger" onclick="deleteExFolder('${folderId}')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                    删除
+                </button>`;
+            document.body.appendChild(overlay);
+            document.body.appendChild(menu);
+            let x = e.clientX || 100, y = e.clientY || 100;
+            if (x + 140 > window.innerWidth) x = window.innerWidth - 150;
+            if (y + 120 > window.innerHeight) y = window.innerHeight - 130;
+            menu.style.left = x + 'px';
+            menu.style.top = y + 'px';
+        }
+
+        function onExerciseColumnClick(e, type) {
+            if (e.target.closest('.exercise-folder-card')) return;
             const name = prompt('新建习题文件夹名称：');
             if (!name || !name.trim()) return;
-            ensureExerciseData();
-            appData.exercises.folders.push({
-                id: 'exf_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+            const data = getExercisesData();
+            const folderId = 'exf_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+            data.folders.push({
+                id: folderId,
                 name: name.trim(),
                 createdAt: new Date().toISOString(),
-                tasks: [],
-                files: []
+                archived: false,
+                tasks: []
             });
+            // Create matching wrong folder
+            data.wrongByFolder[folderId] = [];
             saveData();
             debouncedChatSync();
-            renderExercisePage();
+            renderExercisesPage();
         }
 
-        function getExerciseFolder(folderId) {
-            ensureExerciseData();
-            return appData.exercises.folders.find(f => f.id === folderId);
-        }
-
-        function enterExerciseFolder(folderId, mode) {
-            const folder = getExerciseFolder(folderId);
+        function renameExFolder(folderId) {
+            closeLongPressMenu();
+            const data = getExercisesData();
+            const folder = data.folders.find(f => f.id === folderId);
             if (!folder) return;
-            currentExerciseFolder = { folderId, mode };
-            document.getElementById('exerciseGrid').style.display = 'none';
-            document.getElementById('exerciseArchiveView').style.display = 'none';
-            const folderView = document.getElementById('exerciseFolderView');
-            folderView.style.display = 'block';
-            if (mode === 'wrong') {
-                renderExerciseWrongFolder(folder);
-            } else {
-                document.body.classList.add('exercise-session-active');
-                renderExerciseNewFolder(folder);
+            const newName = prompt('重命名：', folder.name);
+            if (!newName || !newName.trim()) return;
+            folder.name = newName.trim();
+            saveData();
+            debouncedChatSync();
+            renderExercisesPage();
+        }
+
+        function archiveExFolder(folderId) {
+            closeLongPressMenu();
+            const data = getExercisesData();
+            const folder = data.folders.find(f => f.id === folderId);
+            if (!folder) return;
+            folder.archived = true;
+            saveData();
+            debouncedChatSync();
+            renderExercisesPage();
+            showToast('已归档');
+        }
+
+        function deleteExFolder(folderId) {
+            closeLongPressMenu();
+            if (!confirm('确定删除此文件夹及所有习题？此操作不可撤销。')) return;
+            const data = getExercisesData();
+            const idx = data.folders.findIndex(f => f.id === folderId);
+            if (idx >= 0) {
+                // Clean up IDB files
+                const folder = data.folders[idx];
+                (folder.tasks || []).forEach(task => {
+                    (task.sourceFiles || []).forEach(sf => {
+                        try { deleteFileData('exercise_' + sf.id); } catch(e) {}
+                    });
+                });
+                data.folders.splice(idx, 1);
+                delete data.wrongByFolder[folderId];
+                saveData();
+                debouncedChatSync();
+                renderExercisesPage();
             }
         }
 
-        function renderExerciseNewFolder(folder) {
+        function enterExerciseFolder(folderId) {
+            const data = getExercisesData();
+            const folder = data.folders.find(f => f.id === folderId);
+            if (!folder) return;
+            currentExerciseFolder = { folderId };
+            document.body.classList.add('exercise-folder-active');
+            document.getElementById('exercisesGrid').style.display = 'none';
+            document.getElementById('exerciseFolderView').style.display = 'block';
+            renderExerciseFolderContent(folder);
+        }
+
+        function renderExerciseFolderContent(folder) {
             const container = document.getElementById('exerciseFolderContent');
             if (!folder.tasks) folder.tasks = [];
-            if (!folder.files) folder.files = [];
 
-            let html = `<div class="exercise-folder" onclick="renderExercisePage();document.body.classList.remove('exercise-session-active');">
-                <div class="exercise-folder-header" style="padding:8px 12px;">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
-                    <span class="exercise-folder-name" style="font-size:13px;">返回</span>
+            let html = `<div class="classroom-folder" onclick="renderExercisesPage()">
+                <div class="classroom-folder-header">
+                    <svg class="note-folder-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                    <span class="classroom-folder-name">返回</span>
                 </div>
             </div>`;
 
@@ -15122,259 +15404,129 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 <span style="font-size:16px;font-weight:600;">${escapeHtml(folder.name)}</span>
             </div>`;
 
-            // Exercise tasks (above)
+            // Tasks (like AI notes in classroom)
             if (folder.tasks.length > 0) {
-                html += '<div style="margin-bottom:12px;font-size:13px;font-weight:600;color:var(--text-secondary);">习题任务</div>';
+                html += `<div style="margin-bottom:12px;font-size:13px;font-weight:600;color:var(--text-secondary);">习题任务</div>`;
                 folder.tasks.forEach((task, idx) => {
-                    const total = (task.questions || []).length;
-                    const done = (task.questions || []).filter(q => q.status === 'graded' || q.status === 'correct').length;
-                    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-                    const progressColor = pct === 100 ? '#22c55e' : 'var(--accent)';
-                    html += `<div class="exercise-task-card" onclick="startExerciseSolve('${folder.id}','${task.id}',false)">
-                        <div class="exercise-task-title">${escapeHtml(task.title || '习题任务')}</div>
-                        <div style="font-size:12px;color:var(--text-muted);">${done}/${total} 题已完成</div>
+                    const totalQ = (task.questions || []).length;
+                    const doneQ = (task.questions || []).filter(q => q.status === 'done').length;
+                    const pct = totalQ > 0 ? Math.round((doneQ / totalQ) * 100) : 0;
+                    html += `<div class="exercise-task-card" onclick="startExerciseTask('${folder.id}','${task.id}')">
+                        <div class="exercise-task-title">${escapeHtml(task.name)}</div>
                         <div class="exercise-task-progress">
-                            <div class="exercise-task-progress-bar"><div class="exercise-task-progress-fill" style="width:${pct}%;background:${progressColor};"></div></div>
-                            <span class="exercise-task-progress-text">${pct}%</span>
+                            <div class="exercise-task-progress-bar"><div class="exercise-task-progress-fill" style="width:${pct}%;background:var(--accent-green);"></div></div>
+                            <span class="exercise-task-progress-text">${doneQ}/${totalQ}</span>
                         </div>
                     </div>`;
                 });
             }
 
-            // Source files (below)
-            html += `<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border-color);">
-                <div style="font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:8px;">习题文件 (${folder.files.length})</div>`;
-            if (folder.files.length === 0) {
+            // Source files
+            html += `<div class="exercise-source-section">
+                <div class="exercise-source-title">习题文件 (${folder.tasks.reduce((s, t) => s + (t.sourceFiles || []).length, 0)})</div>`;
+            if (folder.tasks.length === 0) {
                 html += '<div class="empty-state" style="padding:20px;"><p>点击右下角上传习题文件</p></div>';
             } else {
-                folder.files.forEach(file => {
-                    const isImg = file.type === 'image';
-                    html += `<div class="exercise-source-card" onclick="viewExerciseFile('${folder.id}','${file.id}')">
-                        <div class="exercise-source-icon">
-                            ${isImg ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>'
-                                    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'}
-                        </div>
-                        <div class="exercise-source-info">
-                            <div class="exercise-source-name">${escapeHtml(file.name)}</div>
-                            <div class="exercise-source-meta">${file.type === 'image' ? '图片' : 'PDF'}</div>
-                        </div>
-                    </div>`;
-                });
-            }
-            html += '</div>';
-            html += '<div style="height:80px;"></div>';
-            container.innerHTML = html;
-        }
-
-        function renderExerciseWrongFolder(folder) {
-            const container = document.getElementById('exerciseFolderContent');
-            if (!folder.tasks) folder.tasks = [];
-
-            let html = `<div class="exercise-folder" onclick="renderExercisePage();">
-                <div class="exercise-folder-header" style="padding:8px 12px;">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
-                    <span class="exercise-folder-name" style="font-size:13px;">返回</span>
-                </div>
-            </div>`;
-
-            html += `<div style="display:flex;justify-content:space-between;align-items:center;margin:12px 0 8px;">
-                <span style="font-size:16px;font-weight:600;">${escapeHtml(folder.name)} - 错题</span>
-            </div>`;
-
-            const tasksWithWrong = folder.tasks.filter(t => (t.questions || []).some(q => q.status === 'graded'));
-            if (tasksWithWrong.length === 0) {
-                html += '<div class="empty-state" style="padding:20px;"><p>暂无错题记录</p></div>';
-            } else {
-                tasksWithWrong.forEach(task => {
-                    const wrongQs = (task.questions || []).filter(q => q.status === 'graded');
-                    wrongQs.forEach((q, qIdx) => {
-                        const realIdx = (task.questions || []).indexOf(q);
-                        const scoreClass = q.score >= 8 ? 'wrong-score-green' : q.score >= 6 ? 'wrong-score-yellow' : 'wrong-score-red';
-                        html += `<div class="exercise-task-card" onclick="startExerciseSolve('${folder.id}','${task.id}',true,${realIdx})" style="border-left:4px solid ${q.score >= 8 ? '#22c55e' : q.score >= 6 ? '#f59e0b' : '#ef4444'};">
-                            <div class="exercise-task-title">${escapeHtml(task.title)} - 第${realIdx + 1}题</div>
-                            <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
-                                <span class="wrong-score-badge ${scoreClass}">${q.score}/10</span>
-                                <span style="font-size:12px;color:var(--text-muted);">${q.aiComment ? q.aiComment.substring(0, 30) + '...' : ''}</span>
+                folder.tasks.forEach(task => {
+                    (task.sourceFiles || []).forEach(sf => {
+                        const isImg = sf.type === 'image';
+                        html += `<div class="exercise-material-card" onclick="viewExerciseSource('${folder.id}','${task.id}','${sf.id}')">
+                            <div class="exercise-material-icon">
+                                ${isImg ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>'
+                                        : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'}
                             </div>
+                            <span class="exercise-material-name">${escapeHtml(sf.name)}</span>
                         </div>`;
                     });
                 });
             }
+            html += `</div>`;
             html += '<div style="height:60px;"></div>';
             container.innerHTML = html;
         }
 
-        // Long press for folder management
-        function cancelExerciseLongPress() {
-            if (_exerciseLongPressTimer) { clearTimeout(_exerciseLongPressTimer); _exerciseLongPressTimer = null; }
-        }
-        function startExerciseFolderLongPress(e, folderId) {
-            cancelExerciseLongPress();
-            _exerciseLongPressTimer = setTimeout(() => {
-                showExerciseFolderMenu(e, folderId);
-            }, 600);
-        }
-        function showExerciseFolderMenu(e, folderId) {
-            e.preventDefault();
-            const folder = getExerciseFolder(folderId);
-            if (!folder) return;
-            const action = prompt('操作: 输入 1=重命名, 2=删除, 3=归档');
-            if (action === '1') {
-                const newName = prompt('重命名:', folder.name);
-                if (newName && newName.trim()) {
-                    folder.name = newName.trim();
-                    saveData(); debouncedChatSync(); renderExercisePage();
-                }
-            } else if (action === '2') {
-                if (confirm('确定删除此文件夹及所有内容？')) {
-                    // Clean up IndexedDB
-                    (folder.files || []).forEach(f => { try { deleteFileData('exercise_' + f.id); } catch(e){} });
-                    (folder.tasks || []).forEach(t => {
-                        (t.questions || []).forEach(q => {
-                            if (q.userAnswerId) try { deleteFileData('exercise_answer_' + q.userAnswerId); } catch(e){}
-                        });
-                    });
-                    const idx = appData.exercises.folders.indexOf(folder);
-                    if (idx >= 0) appData.exercises.folders.splice(idx, 1);
-                    saveData(); debouncedChatSync(); renderExercisePage();
-                }
-            } else if (action === '3') {
-                const idx = appData.exercises.folders.indexOf(folder);
-                if (idx >= 0) {
-                    appData.exercises.folders.splice(idx, 1);
-                    folder.archivedAt = new Date().toISOString();
-                    appData.exercises.archivedFolders.push(folder);
-                    saveData(); debouncedChatSync(); renderExercisePage();
-                    showToast('已归档');
-                }
-            }
-        }
-
-        // Archive toggle
-        function toggleExerciseArchive() {
-            ensureExerciseData();
-            const archView = document.getElementById('exerciseArchiveView');
-            if (archView.style.display === 'none') {
-                document.getElementById('exerciseGrid').style.display = 'none';
-                document.getElementById('exerciseFolderView').style.display = 'none';
-                archView.style.display = 'block';
-                renderExerciseArchive();
-            } else {
-                renderExercisePage();
-            }
-        }
-        function renderExerciseArchive() {
-            const container = document.getElementById('exerciseArchiveView');
-            const archived = appData.exercises.archivedFolders || [];
-            if (archived.length === 0) {
-                container.innerHTML = '<div style="margin-bottom:12px;"><button class="exercise-archive-btn" onclick="renderExercisePage()">返回</button></div><div class="empty-state"><p>暂无归档</p></div>';
-                return;
-            }
-            let html = '<div style="margin-bottom:12px;"><button class="exercise-archive-btn" onclick="renderExercisePage()">返回</button></div>';
-            archived.forEach((f, i) => {
-                html += `<div class="exercise-task-card">
-                    <div class="exercise-task-title">${escapeHtml(f.name)}</div>
-                    <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">归档于 ${f.archivedAt ? new Date(f.archivedAt).toLocaleDateString() : ''}</div>
-                    <button onclick="restoreExerciseFolder(${i})" style="border:none;background:var(--accent);color:white;padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;">恢复</button>
-                    <button onclick="deleteArchivedExerciseFolder(${i})" style="border:none;background:var(--bg-tertiary);padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;color:#ef4444;margin-left:6px;">删除</button>
-                </div>`;
-            });
-            container.innerHTML = html;
-        }
-        function restoreExerciseFolder(idx) {
-            const f = appData.exercises.archivedFolders.splice(idx, 1)[0];
-            delete f.archivedAt;
-            appData.exercises.folders.push(f);
-            saveData(); debouncedChatSync(); renderExerciseArchive();
-            showToast('已恢复');
-        }
-        function deleteArchivedExerciseFolder(idx) {
-            if (!confirm('永久删除？')) return;
-            appData.exercises.archivedFolders.splice(idx, 1);
-            saveData(); renderExerciseArchive();
-        }
-
-        // File upload
-        function exerciseTakePhoto() {
-            document.getElementById('exerciseCameraInput').click();
-        }
-        function exerciseUploadFile() {
+        // Upload exercise files
+        function exerciseUploadFiles() {
             document.getElementById('exerciseFileInput').click();
         }
-        function onExerciseCameraCapture(e) {
-            if (e.target.files.length > 0) processExerciseUpload([e.target.files[0]]);
-            e.target.value = '';
-        }
-        function onExerciseFileUpload(e) {
-            if (e.target.files.length > 0) processExerciseUpload(Array.from(e.target.files));
-            e.target.value = '';
-        }
 
-        async function processExerciseUpload(files) {
-            if (!currentExerciseFolder) return;
-            const folder = getExerciseFolder(currentExerciseFolder.folderId);
+        async function onExerciseFileUpload(e) {
+            const files = e.target.files;
+            if (!files || files.length === 0) return;
+            if (!currentExerciseFolder) { showToast('请先进入文件夹'); return; }
+
+            const data = getExercisesData();
+            const folder = data.folders.find(f => f.id === currentExerciseFolder.folderId);
             if (!folder) return;
-            if (!folder.files) folder.files = [];
-            if (!folder.tasks) folder.tasks = [];
 
-            for (const file of files) {
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
                 const isImage = file.type.startsWith('image/');
-                const isPDF = file.type === 'application/pdf';
-                if (!isImage && !isPDF) { showToast('仅支持图片或PDF'); continue; }
+                const isPdf = file.type === 'application/pdf';
+                if (!isImage && !isPdf) continue;
 
-                showToast('正在处理: ' + file.name);
+                showToast(`正在处理: ${file.name}...`);
 
-                const reader = new FileReader();
-                const dataUrl = await new Promise((resolve, reject) => {
-                    reader.onload = () => resolve(reader.result);
-                    reader.onerror = reject;
-                    reader.readAsDataURL(file);
-                });
+                try {
+                    const dataUrl = await readFileAsDataURL(file);
+                    const fileId = 'exfile_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
 
-                const fileId = 'exfile_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
-                // Save file data to IndexedDB
-                await saveFileData('exercise_' + fileId, dataUrl);
-                triggerSyncOnFileChange('exercise_' + fileId, 'exercise_upload');
+                    // Save to IndexedDB
+                    await saveFileData('exercise_' + fileId, dataUrl);
 
-                folder.files.push({
-                    id: fileId,
-                    name: file.name,
-                    type: isImage ? 'image' : 'pdf',
-                    mimeType: file.type,
-                    createdAt: new Date().toISOString()
-                });
+                    // Create task
+                    const taskId = 'extask_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+                    const task = {
+                        id: taskId,
+                        name: file.name.replace(/\.[^/.]+$/, ''),
+                        questions: [],
+                        sourceFiles: [{
+                            id: fileId,
+                            name: file.name,
+                            type: isImage ? 'image' : 'pdf',
+                            mimeType: file.type
+                        }],
+                        createdAt: new Date().toISOString()
+                    };
 
-                saveData();
+                    folder.tasks.push(task);
+                    saveData();
+                    renderExerciseFolderContent(folder);
 
-                // Create exercise task via AI
-                await generateExerciseTask(folder, fileId, file.name, dataUrl, isImage);
+                    // Send to AI to extract questions
+                    await extractExerciseQuestions(folder.id, taskId, dataUrl, isImage, file.type);
+
+                } catch (err) {
+                    console.error('上传习题失败:', err);
+                    showToast('上传失败: ' + err.message);
+                }
             }
 
-            if (currentExerciseFolder) {
-                renderExerciseNewFolder(folder);
-            }
+            e.target.value = '';
             debouncedChatSync();
         }
 
-        async function generateExerciseTask(folder, fileId, fileName, dataUrl, isImage) {
-            const systemPrompt = `你是一个专业的数学习题解析助手。请将上传的习题文件中的每一道题目提取出来，用标准LaTeX格式返回。
+        function readFileAsDataURL(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = () => reject(new Error('读取文件失败'));
+                reader.readAsDataURL(file);
+            });
+        }
+
+        async function extractExerciseQuestions(folderId, taskId, dataUrl, isImage, mimeType) {
+            const systemPrompt = `你是一个数学习题解析助手。请仔细识别上传的习题文件，将其中的每一道题目拆解出来。
 
 要求：
-1. 每道题单独一行，格式为 QUESTION_START 和 QUESTION_END 标记包围
-2. 所有数学公式使用LaTeX格式
-3. 保持题目原始编号
-4. 如果有选项，保持选项格式
-5. 仅提取题目，不要提供答案
+1. 每道题目单独返回，使用LaTeX格式
+2. 行内公式用 $...$ ，独立公式用 $$...$$
+3. 保留题号
+4. 严格按照原题内容，不要修改或补充
+5. 返回格式为JSON数组，每个元素是一道题的LaTeX文本
 
-返回格式示例：
-QUESTION_START
-1. 求证：对任意正整数 $n$，有 $\\sum_{k=1}^{n} k = \\frac{n(n+1)}{2}$。
-QUESTION_END
-QUESTION_START
-2. 设 $f(x)$ 在 $[a,b]$ 上连续，在 $(a,b)$ 上可导，且 $f(a)=f(b)$，求证存在 $\\xi \\in (a,b)$ 使得 $f'(\\xi)=0$。
-QUESTION_END`;
-
-            const userMsg = '请提取以下习题文件中的所有题目：';
+返回格式（只返回JSON，不要其他内容）：
+["题目1的LaTeX文本", "题目2的LaTeX文本", ...]`;
 
             try {
                 let msgContent;
@@ -15383,160 +15535,182 @@ QUESTION_END`;
                         role: 'user',
                         content: [
                             { type: 'image_url', image_url: { url: dataUrl } },
-                            { type: 'text', text: userMsg }
+                            { type: 'text', text: '请识别并拆解这张图片中的所有数学题目，按要求返回JSON数组。' }
                         ]
                     }];
                 } else {
-                    // For PDF, try extracting text first
+                    // PDF: extract text first
+                    const base64 = dataUrl.split(',')[1];
+                    const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+                    let pdfText = '';
+                    try {
+                        const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+                        for (let p = 1; p <= pdf.numPages; p++) {
+                            const page = await pdf.getPage(p);
+                            const tc = await page.getTextContent();
+                            pdfText += tc.items.map(it => it.str).join(' ') + '\n';
+                        }
+                    } catch (e) { pdfText = '[PDF文本提取失败]'; }
                     msgContent = [{
                         role: 'user',
-                        content: userMsg + '\n[PDF文件: ' + fileName + ']'
+                        content: '以下是习题PDF的文本内容，请拆解其中的每道题目：\n\n' + pdfText
                     }];
                 }
 
-                const options = { maxTokens: 4096 };
-                if (!isImage) {
-                    options.pdfAttachment = dataUrl;
-                }
-                const result = await callAI(systemPrompt, msgContent, options);
-                if (!result) return;
+                const result = await callAI(systemPrompt, msgContent, { maxTokens: 4096, temperature: 0.3 });
+                if (!result) { showToast('AI解析返回为空'); return; }
 
-                // Parse questions
-                const questions = [];
-                const regex = /QUESTION_START\s*([\s\S]*?)\s*QUESTION_END/g;
-                let match;
-                while ((match = regex.exec(result)) !== null) {
-                    questions.push({
-                        latex: match[1].trim(),
-                        score: null,
-                        userAnswer: null,
-                        userAnswerId: null,
-                        aiComment: null,
-                        status: 'pending' // pending, graded, correct
-                    });
-                }
-
-                if (questions.length === 0) {
-                    // Fallback: treat entire result as one question
-                    questions.push({
-                        latex: result.trim(),
-                        score: null,
-                        userAnswer: null,
-                        userAnswerId: null,
-                        aiComment: null,
-                        status: 'pending'
-                    });
-                }
-
-                const taskId = 'extask_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
-                folder.tasks.push({
-                    id: taskId,
-                    title: fileName.replace(/\.[^.]+$/, ''),
-                    fileId: fileId,
-                    fileName: fileName,
-                    questions: questions,
-                    createdAt: new Date().toISOString()
-                });
-
-                saveData();
-                showToast(`已提取 ${questions.length} 道题目`);
-
-            } catch (err) {
-                console.error('习题提取失败:', err);
-                showToast('习题提取失败: ' + err.message);
-            }
-        }
-
-        async function viewExerciseFile(folderId, fileId) {
-            const folder = getExerciseFolder(folderId);
-            if (!folder) return;
-            const file = (folder.files || []).find(f => f.id === fileId);
-            if (!file) return;
-
-            const data = await getFileData('exercise_' + fileId);
-            if (!data) { showToast('文件数据未找到'); return; }
-
-            const overlay = document.createElement('div');
-            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9000;display:flex;align-items:center;justify-content:center;cursor:pointer;';
-            overlay.onclick = () => overlay.remove();
-            if (file.type === 'image') {
-                const img = document.createElement('img');
-                img.src = data;
-                img.style.cssText = 'max-width:95%;max-height:90%;object-fit:contain;border-radius:8px;';
-                overlay.appendChild(img);
-            } else {
-                const info = document.createElement('div');
-                info.style.cssText = 'color:white;font-size:16px;';
-                info.textContent = 'PDF: ' + file.name;
-                overlay.appendChild(info);
-            }
-            document.body.appendChild(overlay);
-        }
-
-        // ==================== Exercise Solving ====================
-        function startExerciseSolve(folderId, taskId, isWrong, startIndex) {
-            const folder = getExerciseFolder(folderId);
-            if (!folder) return;
-            const task = (folder.tasks || []).find(t => t.id === taskId);
-            if (!task || !task.questions || task.questions.length === 0) { showToast('无题目'); return; }
-
-            let qIndex = startIndex || 0;
-            if (!isWrong) {
-                // Find first unanswered question
-                const firstUnanswered = task.questions.findIndex(q => q.status === 'pending');
-                if (firstUnanswered >= 0) qIndex = firstUnanswered;
-            }
-
-            currentExerciseSolve = {
-                folderId, taskId, questionIndex: qIndex, isWrong: !!isWrong,
-                timerInterval: null, secondsLeft: 20 * 60, strokes: [], redoStrokes: [],
-                isDrawing: false, lastX: 0, lastY: 0, tool: 'pen', isRedoing: false
-            };
-
-            const overlay = document.getElementById('exerciseSolveOverlay');
-            overlay.classList.add('show');
-            renderSolveQuestion();
-            if (!isWrong) {
-                startSolveTimer();
-            }
-            initSolveCanvas();
-        }
-
-        function closeExerciseSolve() {
-            if (currentExerciseSolve && currentExerciseSolve.timerInterval) {
-                clearInterval(currentExerciseSolve.timerInterval);
-            }
-            currentExerciseSolve = null;
-            document.getElementById('exerciseSolveOverlay').classList.remove('show');
-            // Refresh folder view
-            if (currentExerciseFolder) {
-                const folder = getExerciseFolder(currentExerciseFolder.folderId);
-                if (folder) {
-                    if (currentExerciseFolder.mode === 'wrong') {
-                        renderExerciseWrongFolder(folder);
+                // Parse JSON
+                let questions;
+                try {
+                    const cleaned = result.replace(/```json|```/g, '').trim();
+                    questions = JSON.parse(cleaned);
+                } catch (e) {
+                    // Try to extract array
+                    const match = result.match(/\[[\s\S]*\]/);
+                    if (match) {
+                        questions = JSON.parse(match[0]);
                     } else {
-                        renderExerciseNewFolder(folder);
+                        showToast('AI返回格式错误');
+                        return;
                     }
                 }
+
+                if (!Array.isArray(questions) || questions.length === 0) {
+                    showToast('未识别到题目');
+                    return;
+                }
+
+                // Update task
+                const data = getExercisesData();
+                const folder = data.folders.find(f => f.id === folderId);
+                if (!folder) return;
+                const task = folder.tasks.find(t => t.id === taskId);
+                if (!task) return;
+
+                task.questions = questions.map((q, idx) => ({
+                    index: idx,
+                    latex: q,
+                    status: 'pending', // pending | done
+                    score: null,
+                    userDrawing: null,
+                    aiComment: null
+                }));
+
+                saveData();
+                debouncedChatSync();
+                showToast(`已识别 ${questions.length} 道题目`);
+
+                if (currentExerciseFolder && currentExerciseFolder.folderId === folderId) {
+                    renderExerciseFolderContent(folder);
+                }
+
+            } catch (err) {
+                console.error('AI解析习题失败:', err);
+                showToast('解析失败: ' + err.message);
             }
         }
 
-        function renderSolveQuestion() {
-            if (!currentExerciseSolve) return;
-            const folder = getExerciseFolder(currentExerciseSolve.folderId);
-            const task = (folder.tasks || []).find(t => t.id === currentExerciseSolve.taskId);
-            if (!task) return;
+        async function viewExerciseSource(folderId, taskId, fileId) {
+            try {
+                const dataUrl = await getFileData('exercise_' + fileId);
+                if (!dataUrl) { showToast('文件数据未找到'); return; }
+                const overlay = document.createElement('div');
+                overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9000;display:flex;align-items:center;justify-content:center;cursor:pointer;';
+                overlay.onclick = () => overlay.remove();
+                if (dataUrl.startsWith('data:image')) {
+                    const img = document.createElement('img');
+                    img.src = dataUrl;
+                    img.style.cssText = 'max-width:95%;max-height:90%;object-fit:contain;border-radius:8px;';
+                    overlay.appendChild(img);
+                } else {
+                    const txt = document.createElement('div');
+                    txt.textContent = 'PDF文件预览暂不支持，点击关闭';
+                    txt.style.cssText = 'color:white;font-size:16px;';
+                    overlay.appendChild(txt);
+                }
+                document.body.appendChild(overlay);
+            } catch (e) {
+                showToast('加载失败');
+            }
+        }
 
-            const q = task.questions[currentExerciseSolve.questionIndex];
-            const total = task.questions.length;
-            const current = currentExerciseSolve.questionIndex + 1;
+        // Start exercise task
+        function startExerciseTask(folderId, taskId) {
+            const data = getExercisesData();
+            const folder = data.folders.find(f => f.id === folderId);
+            if (!folder) return;
+            const task = folder.tasks.find(t => t.id === taskId);
+            if (!task || !task.questions || task.questions.length === 0) {
+                showToast('该任务暂无题目');
+                return;
+            }
 
-            document.getElementById('solveProgressLabel').textContent = `${current} / ${total}`;
+            // Find first pending question
+            let startIdx = task.questions.findIndex(q => q.status === 'pending');
+            if (startIdx < 0) startIdx = 0;
 
-            const questionArea = document.getElementById('solveQuestionArea');
-            questionArea.innerHTML = q.latex;
+            openExerciseDoing(folderId, taskId, startIdx, false);
+        }
+
+        function openExerciseDoing(folderId, taskId, questionIndex, isWrong) {
+            const data = getExercisesData();
+            let questions, title;
+
+            if (isWrong) {
+                const wrongTasks = data.wrongByFolder[folderId] || [];
+                const wTask = wrongTasks.find(t => t.taskId === taskId);
+                if (!wTask || !wTask.questions || wTask.questions.length === 0) return;
+                questions = wTask.questions;
+                title = wTask.taskName + ' (错题)';
+            } else {
+                const folder = data.folders.find(f => f.id === folderId);
+                if (!folder) return;
+                const task = folder.tasks.find(t => t.id === taskId);
+                if (!task) return;
+                questions = task.questions;
+                title = task.name;
+            }
+
+            if (questionIndex < 0 || questionIndex >= questions.length) return;
+
+            exDoingState = { folderId, taskId, questionIndex, isWrong, questions };
+
+            // Setup UI
+            document.getElementById('exerciseDoingTitle').textContent = `${title} (${questionIndex + 1}/${questions.length})`;
+            document.getElementById('exerciseDoingView').classList.add('show');
+
+            // Render question
+            const q = questions[questionIndex];
+            const qDiv = document.getElementById('exerciseDoingQuestion');
+
+            if (isWrong) {
+                // In wrong mode, show question + hide previous drawing/comment until redo
+                qDiv.innerHTML = `<div style="font-size:15px;line-height:1.8;">${escapeHtml(q.latex)}</div>`;
+                // Hide previous answer and comment (will show after grading or if user hasn't started redo)
+                if (q._redoing) {
+                    // User is actively redoing, hide old content
+                } else {
+                    // Show old score, drawing, comment
+                    const scoreColor = q.score >= 8 ? '#22c55e' : q.score >= 6 ? '#eab308' : '#ef4444';
+                    let extraHtml = `<div class="wrong-exercise-comment" style="background:${scoreColor}15;border-left:3px solid ${scoreColor};">`;
+                    extraHtml += `<span class="wrong-exercise-score" style="background:${scoreColor};">${q.score}/10</span>`;
+                    if (q.userDrawing) {
+                        extraHtml += `<img class="wrong-exercise-user-drawing" src="${q.userDrawing}" alt="作答">`;
+                    }
+                    if (q.aiComment) {
+                        extraHtml += `<div style="margin-top:6px;">${escapeHtml(q.aiComment)}</div>`;
+                    }
+                    extraHtml += `</div>`;
+                    qDiv.innerHTML += extraHtml;
+                }
+            } else {
+                qDiv.innerHTML = `<div style="font-size:15px;line-height:1.8;">${escapeHtml(q.latex)}</div>`;
+            }
+
+            // Render KaTeX
             if (typeof renderMathInElement === 'function') {
-                renderMathInElement(questionArea, {
+                renderMathInElement(qDiv, {
                     delimiters: [
                         {left: '$$', right: '$$', display: true},
                         {left: '$', right: '$', display: false},
@@ -15547,279 +15721,336 @@ QUESTION_END`;
                 });
             }
 
-            // Show/hide wrong review section
-            const wrongSection = document.getElementById('wrongReviewSection');
-            const canvasWrap = document.getElementById('solveCanvasWrap');
-            const submitBtn = document.getElementById('solveSubmitBtn');
+            // Update buttons
+            document.getElementById('exPrevBtn').disabled = questionIndex <= 0;
+            document.getElementById('exNextBtn').disabled = questionIndex >= questions.length - 1;
 
-            if (currentExerciseSolve.isWrong && !currentExerciseSolve.isRedoing) {
-                // Show review mode
-                wrongSection.style.display = 'block';
-                canvasWrap.style.display = 'none';
-                submitBtn.textContent = '重做';
-                submitBtn.onclick = () => startRedo();
-
-                // Load user answer image
-                if (q.userAnswerId) {
-                    getFileData('exercise_answer_' + q.userAnswerId).then(data => {
-                        if (data) document.getElementById('wrongUserAnswer').src = data;
-                    });
-                }
-                // Show AI comment
-                const commentEl = document.getElementById('wrongAIComment');
-                const scoreClass = q.score >= 8 ? 'wrong-score-green' : q.score >= 6 ? 'wrong-score-yellow' : 'wrong-score-red';
-                commentEl.innerHTML = `<span class="wrong-score-badge ${scoreClass}">${q.score}/10</span><br><br>${escapeHtml(q.aiComment || '')}`;
-
-                // Hide timer
-                document.getElementById('solveTimer').style.display = 'none';
+            if (isWrong) {
+                document.getElementById('exCompleteBtn').textContent = q._redoing ? '完成' : '重做';
+                document.getElementById('exPrevBtn').textContent = '上一题';
+                document.getElementById('exNextBtn').textContent = '下一题';
             } else {
-                wrongSection.style.display = 'none';
-                canvasWrap.style.display = 'block';
-                submitBtn.textContent = '完成';
-                submitBtn.onclick = () => submitCurrentAnswer();
-                document.getElementById('solveTimer').style.display = '';
-
-                // Clear canvas for this question
-                clearSolveCanvas();
+                document.getElementById('exCompleteBtn').textContent = '完成';
             }
-        }
 
-        function startRedo() {
-            if (!currentExerciseSolve) return;
-            currentExerciseSolve.isRedoing = true;
-            document.getElementById('wrongReviewSection').style.display = 'none';
-            document.getElementById('solveCanvasWrap').style.display = 'block';
-            document.getElementById('solveTimer').style.display = '';
-            const submitBtn = document.getElementById('solveSubmitBtn');
-            submitBtn.textContent = '完成';
-            submitBtn.onclick = () => submitCurrentAnswer();
-            clearSolveCanvas();
-            startSolveTimer();
-        }
+            // Setup canvas
+            initExCanvas();
 
-        function startSolveTimer() {
-            if (!currentExerciseSolve) return;
-            if (currentExerciseSolve.timerInterval) clearInterval(currentExerciseSolve.timerInterval);
-            currentExerciseSolve.secondsLeft = 20 * 60;
-            updateTimerDisplay();
-            currentExerciseSolve.timerInterval = setInterval(() => {
-                currentExerciseSolve.secondsLeft--;
-                updateTimerDisplay();
-                if (currentExerciseSolve.secondsLeft <= 0) {
-                    clearInterval(currentExerciseSolve.timerInterval);
-                    showToast('时间到！');
-                }
-            }, 1000);
-        }
-
-        function updateTimerDisplay() {
-            if (!currentExerciseSolve) return;
-            const s = currentExerciseSolve.secondsLeft;
-            const m = Math.floor(s / 60);
-            const sec = s % 60;
-            const display = `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
-            const el = document.getElementById('solveTimer');
-            el.textContent = display;
-            el.classList.toggle('warning', s < 120);
-        }
-
-        function solveNavigate(dir) {
-            if (!currentExerciseSolve) return;
-            const folder = getExerciseFolder(currentExerciseSolve.folderId);
-            const task = (folder.tasks || []).find(t => t.id === currentExerciseSolve.taskId);
-            if (!task) return;
-
-            let newIdx = currentExerciseSolve.questionIndex + dir;
-            if (currentExerciseSolve.isWrong && !currentExerciseSolve.isRedoing) {
-                // Navigate only among graded questions
-                const gradedIndices = task.questions.map((q, i) => q.status === 'graded' ? i : -1).filter(i => i >= 0);
-                const curPos = gradedIndices.indexOf(currentExerciseSolve.questionIndex);
-                const newPos = curPos + dir;
-                if (newPos < 0 || newPos >= gradedIndices.length) { showToast(dir < 0 ? '已是第一题' : '已是最后一题'); return; }
-                newIdx = gradedIndices[newPos];
+            // Start timer (only for non-wrong mode)
+            if (!isWrong) {
+                exTimerSeconds = 1200;
+                updateExTimerDisplay();
+                if (exTimerInterval) clearInterval(exTimerInterval);
+                exTimerInterval = setInterval(() => {
+                    exTimerSeconds--;
+                    updateExTimerDisplay();
+                    if (exTimerSeconds <= 0) {
+                        clearInterval(exTimerInterval);
+                        showToast('时间到！');
+                    }
+                }, 1000);
             } else {
-                if (newIdx < 0 || newIdx >= task.questions.length) { showToast(dir < 0 ? '已是第一题' : '已是最后一题'); return; }
+                document.getElementById('exerciseDoingTimer').textContent = '--:--';
             }
-
-            currentExerciseSolve.questionIndex = newIdx;
-            currentExerciseSolve.isRedoing = false;
-            renderSolveQuestion();
         }
 
-        // Canvas for solving
-        function initSolveCanvas() {
-            const canvas = document.getElementById('solveCanvas');
-            const wrap = document.getElementById('solveCanvasWrap');
+        function updateExTimerDisplay() {
+            const min = Math.floor(exTimerSeconds / 60);
+            const sec = exTimerSeconds % 60;
+            const timerEl = document.getElementById('exerciseDoingTimer');
+            timerEl.textContent = String(min).padStart(2, '0') + ':' + String(sec).padStart(2, '0');
+            timerEl.classList.toggle('warning', exTimerSeconds <= 120);
+        }
 
-            function resizeCanvas() {
-                canvas.width = wrap.clientWidth;
-                canvas.height = wrap.clientHeight;
-            }
-            resizeCanvas();
-            const resizeObs = new ResizeObserver(resizeCanvas);
-            resizeObs.observe(wrap);
+        function closeExerciseDoing() {
+            document.getElementById('exerciseDoingView').classList.remove('show');
+            if (exTimerInterval) { clearInterval(exTimerInterval); exTimerInterval = null; }
+            exDoingState = null;
+        }
 
-            const ctx = canvas.getContext('2d');
-            ctx.strokeStyle = '#000';
-            ctx.lineWidth = 2;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
+        function initExCanvas() {
+            const canvas = document.getElementById('exerciseDoingCanvas');
+            const wrap = canvas.parentElement;
+            canvas.width = wrap.clientWidth * 2;
+            canvas.height = wrap.clientHeight * 2;
+            canvas.style.width = wrap.clientWidth + 'px';
+            canvas.style.height = wrap.clientHeight + 'px';
+            exCanvasCtx = canvas.getContext('2d');
+            exCanvasCtx.scale(2, 2);
+            exCanvasCtx.lineCap = 'round';
+            exCanvasCtx.lineJoin = 'round';
+            exCanvasCtx.lineWidth = 2;
+            exCanvasCtx.strokeStyle = exPenColor;
+            exStrokeHistory = [];
 
-            function getPos(e) {
+            // Remove old listeners
+            canvas.onpointerdown = null;
+            canvas.onpointermove = null;
+            canvas.onpointerup = null;
+
+            canvas.onpointerdown = (e) => {
+                e.preventDefault();
+                exDrawing = true;
                 const rect = canvas.getBoundingClientRect();
-                const touch = e.touches ? e.touches[0] : e;
-                return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
-            }
+                exLastX = e.clientX - rect.left;
+                exLastY = e.clientY - rect.top;
+                exCanvasCtx.beginPath();
+                exCanvasCtx.moveTo(exLastX, exLastY);
+            };
 
-            function startDraw(e) {
+            canvas.onpointermove = (e) => {
+                if (!exDrawing) return;
                 e.preventDefault();
-                if (!currentExerciseSolve) return;
-                currentExerciseSolve.isDrawing = true;
-                const pos = getPos(e);
-                currentExerciseSolve.lastX = pos.x;
-                currentExerciseSolve.lastY = pos.y;
-                ctx.beginPath();
-                ctx.moveTo(pos.x, pos.y);
-            }
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                exCanvasCtx.strokeStyle = exPenColor;
+                exCanvasCtx.lineTo(x, y);
+                exCanvasCtx.stroke();
+                exCanvasCtx.beginPath();
+                exCanvasCtx.moveTo(x, y);
+                exLastX = x;
+                exLastY = y;
+            };
 
-            function draw(e) {
-                e.preventDefault();
-                if (!currentExerciseSolve || !currentExerciseSolve.isDrawing) return;
-                const pos = getPos(e);
-                const tool = currentExerciseSolve.tool;
-                if (tool === 'eraser') {
-                    ctx.save();
-                    ctx.globalCompositeOperation = 'destination-out';
-                    ctx.lineWidth = 20;
-                    ctx.lineTo(pos.x, pos.y);
-                    ctx.stroke();
-                    ctx.restore();
-                } else {
-                    ctx.globalCompositeOperation = 'source-over';
-                    ctx.lineWidth = 2;
-                    ctx.strokeStyle = '#000';
-                    ctx.lineTo(pos.x, pos.y);
-                    ctx.stroke();
-                }
-                currentExerciseSolve.lastX = pos.x;
-                currentExerciseSolve.lastY = pos.y;
-            }
+            canvas.onpointerup = (e) => {
+                exDrawing = false;
+            };
 
-            function endDraw(e) {
-                if (!currentExerciseSolve) return;
-                currentExerciseSolve.isDrawing = false;
-            }
-
-            canvas.addEventListener('mousedown', startDraw);
-            canvas.addEventListener('mousemove', draw);
-            canvas.addEventListener('mouseup', endDraw);
-            canvas.addEventListener('mouseleave', endDraw);
-            canvas.addEventListener('touchstart', startDraw, { passive: false });
-            canvas.addEventListener('touchmove', draw, { passive: false });
-            canvas.addEventListener('touchend', endDraw);
+            canvas.onpointerleave = () => { exDrawing = false; };
         }
 
-        function setSolveTool(tool) {
-            if (!currentExerciseSolve) return;
-            currentExerciseSolve.tool = tool;
-            document.getElementById('solvePenBtn').classList.toggle('active', tool === 'pen');
-            document.getElementById('solveEraserBtn').classList.toggle('active', tool === 'eraser');
+        function setExPenColor(el) {
+            document.querySelectorAll('.exercise-doing-toolbar .pen-color').forEach(c => c.classList.remove('active'));
+            el.classList.add('active');
+            exPenColor = el.dataset.color;
         }
 
-        function clearSolveCanvas() {
-            const canvas = document.getElementById('solveCanvas');
-            const ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        function clearExCanvas() {
+            if (!exCanvasCtx) return;
+            const canvas = document.getElementById('exerciseDoingCanvas');
+            exCanvasCtx.clearRect(0, 0, canvas.width, canvas.height);
         }
 
-        async function submitCurrentAnswer() {
-            if (!currentExerciseSolve) return;
-            const folder = getExerciseFolder(currentExerciseSolve.folderId);
-            const task = (folder.tasks || []).find(t => t.id === currentExerciseSolve.taskId);
-            if (!task) return;
+        function getExCanvasDataURL() {
+            const canvas = document.getElementById('exerciseDoingCanvas');
+            return canvas.toDataURL('image/png');
+        }
 
-            const q = task.questions[currentExerciseSolve.questionIndex];
-            if (!q) return;
+        function exPrevQuestion() {
+            if (!exDoingState || exDoingState.questionIndex <= 0) return;
+            openExerciseDoing(exDoingState.folderId, exDoingState.taskId, exDoingState.questionIndex - 1, exDoingState.isWrong);
+        }
 
-            // Capture canvas as image
-            const canvas = document.getElementById('solveCanvas');
-            const answerDataUrl = canvas.toDataURL('image/png');
+        function exNextQuestion() {
+            if (!exDoingState) return;
+            if (exDoingState.questionIndex >= exDoingState.questions.length - 1) return;
+            openExerciseDoing(exDoingState.folderId, exDoingState.taskId, exDoingState.questionIndex + 1, exDoingState.isWrong);
+        }
 
-            // Save user answer to IndexedDB
-            const answerId = 'ans_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
-            await saveFileData('exercise_answer_' + answerId, answerDataUrl);
-            triggerSyncOnFileChange('exercise_answer_' + answerId, 'exercise_upload');
-            q.userAnswerId = answerId;
+        async function exCompleteQuestion() {
+            if (!exDoingState) return;
+            const { folderId, taskId, questionIndex, isWrong, questions } = exDoingState;
+            const q = questions[questionIndex];
 
-            showToast('正在AI判分...');
+            if (isWrong && !q._redoing) {
+                // Start redo mode
+                q._redoing = true;
+                // Re-render to hide old comment
+                openExerciseDoing(folderId, taskId, questionIndex, true);
+                return;
+            }
 
-            // Send to AI for grading
-            const systemPrompt = `你是一位严格的数学阅卷老师。请对学生的手写解答进行评分。
+            const userDrawing = getExCanvasDataURL();
+
+            // Show loading
+            showToast('AI评分中...');
+
+            const systemPrompt = `你是一个严格的数学评分助手。请对用户提交的数学题作答进行评分。
 
 评分标准（满分10分）：
-1. 证明/解答是否正确（0-4分）
-2. 数学用语是否严谨（0-3分）
-3. 解答结构是否清晰（0-3分）
+1. 证明/解题是否正确（6分）
+2. 数学用语是否严谨（2分）
+3. 结构是否清晰（2分）
 
-请严格按以下JSON格式返回（不要返回其他内容）：
+返回格式（只返回JSON，不要其他内容）：
 {
-    "score": 数字(0-10),
-    "correct": true或false,
-    "rigor": "严谨/较好/需改进",
-    "structure": "清晰/较好/需改进",
-    "comment": "详细评语，指出具体问题和改进建议"
+  "score": 数字(0-10),
+  "correct": true/false,
+  "rigor": "评价数学用语严谨性",
+  "structure": "评价结构清晰度",
+  "comment": "综合评价和改进建议"
 }`;
-
-            const userMsg = `题目：\n${q.latex}\n\n请评价学生的手写解答（见图片）。`;
 
             try {
                 const msgContent = [{
                     role: 'user',
                     content: [
-                        { type: 'image_url', image_url: { url: answerDataUrl } },
-                        { type: 'text', text: userMsg }
+                        { type: 'image_url', image_url: { url: userDrawing } },
+                        { type: 'text', text: `题目：${q.latex}\n\n请对上面图片中用户的手写作答进行评分。` }
                     ]
                 }];
 
-                const result = await callAI(systemPrompt, msgContent, { maxTokens: 2048 });
-                if (!result) { showToast('评分失败'); return; }
+                const result = await callAI(systemPrompt, msgContent, { maxTokens: 2048, temperature: 0.3 });
+                if (!result) { showToast('AI返回为空'); return; }
 
-                // Parse result
                 let grading;
                 try {
-                    const jsonStr = result.replace(/```json|```/g, '').trim();
-                    grading = JSON.parse(jsonStr);
-                } catch(e) {
-                    // Fallback parsing
-                    grading = { score: 5, correct: false, comment: result };
+                    const cleaned = result.replace(/```json|```/g, '').trim();
+                    grading = JSON.parse(cleaned);
+                } catch (e) {
+                    const match = result.match(/\{[\s\S]*\}/);
+                    if (match) grading = JSON.parse(match[0]);
+                    else { showToast('评分格式错误'); return; }
                 }
 
-                q.score = grading.score || 0;
-                q.aiComment = `正确性: ${grading.correct ? '✓' : '✗'} | 严谨性: ${grading.rigor || '-'} | 结构: ${grading.structure || '-'}\n\n${grading.comment || ''}`;
-                q.status = 'graded';
-                q.gradedAt = new Date().toISOString();
+                const score = Math.min(10, Math.max(0, Math.round(grading.score || 0)));
+                const comment = `正确性: ${grading.correct ? '✓' : '✗'}\n严谨性: ${grading.rigor || '-'}\n结构: ${grading.structure || '-'}\n综合: ${grading.comment || '-'}`;
+
+                if (isWrong) {
+                    // Update wrong question
+                    q.score = score;
+                    q.userDrawing = userDrawing;
+                    q.aiComment = comment;
+                    q._redoing = false;
+                    if (!q.redoDrawings) q.redoDrawings = [];
+                    q.redoDrawings.push({ drawing: userDrawing, score, comment, time: new Date().toISOString() });
+                } else {
+                    // Update original task question
+                    const data = getExercisesData();
+                    const folder = data.folders.find(f => f.id === folderId);
+                    if (!folder) return;
+                    const task = folder.tasks.find(t => t.id === taskId);
+                    if (!task) return;
+                    const origQ = task.questions[questionIndex];
+                    if (origQ) {
+                        origQ.status = 'done';
+                        origQ.score = score;
+                        origQ.userDrawing = userDrawing;
+                        origQ.aiComment = comment;
+                    }
+
+                    // Save user drawing to IDB
+                    const drawKey = `exercise_drawing_${taskId}_${questionIndex}`;
+                    await saveFileData(drawKey, userDrawing);
+
+                    // Add to wrong folder
+                    if (!data.wrongByFolder[folderId]) data.wrongByFolder[folderId] = [];
+                    let wrongTask = data.wrongByFolder[folderId].find(t => t.taskId === taskId);
+                    if (!wrongTask) {
+                        wrongTask = { taskId, taskName: task.name, questions: [] };
+                        data.wrongByFolder[folderId].push(wrongTask);
+                    }
+                    wrongTask.questions.push({
+                        questionIndex,
+                        latex: origQ.latex,
+                        score,
+                        userDrawing,
+                        aiComment: comment,
+                        redoDrawings: []
+                    });
+                }
 
                 saveData();
                 debouncedChatSync();
 
-                const scoreColor = q.score >= 8 ? '🟢' : q.score >= 6 ? '🟡' : '🔴';
-                showToast(`${scoreColor} 得分: ${q.score}/10`);
+                const scoreColor = score >= 8 ? '#22c55e' : score >= 6 ? '#eab308' : '#ef4444';
+                showToast(`得分: ${score}/10`);
 
-                // Auto advance to next question
-                const nextIdx = currentExerciseSolve.questionIndex + 1;
-                if (nextIdx < task.questions.length) {
-                    currentExerciseSolve.questionIndex = nextIdx;
-                    currentExerciseSolve.isRedoing = false;
-                    renderSolveQuestion();
-                    clearSolveCanvas();
-                } else {
-                    showToast('所有题目已完成！');
-                    setTimeout(() => closeExerciseSolve(), 1500);
-                }
+                // Re-render current question to show result
+                openExerciseDoing(folderId, taskId, questionIndex, isWrong);
 
             } catch (err) {
-                console.error('AI判分失败:', err);
-                showToast('判分失败: ' + err.message);
+                console.error('AI评分失败:', err);
+                showToast('评分失败: ' + err.message);
+            }
+        }
+
+        // Wrong exercises folder
+        function enterWrongFolder(folderId) {
+            const data = getExercisesData();
+            const folder = data.folders.find(f => f.id === folderId);
+            if (!folder) return;
+            const wrongTasks = data.wrongByFolder[folderId] || [];
+            if (wrongTasks.length === 0) { showToast('暂无错题'); return; }
+
+            currentExerciseFolder = { folderId };
+            document.getElementById('exercisesGrid').style.display = 'none';
+            document.getElementById('exerciseFolderView').style.display = 'block';
+
+            const container = document.getElementById('exerciseFolderContent');
+            let html = `<div class="classroom-folder" onclick="renderExercisesPage()">
+                <div class="classroom-folder-header">
+                    <svg class="note-folder-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                    <span class="classroom-folder-name">返回</span>
+                </div>
+            </div>`;
+            html += `<div style="margin:12px 0 8px;font-size:16px;font-weight:600;">${escapeHtml(folder.name)} - 错题</div>`;
+
+            wrongTasks.forEach(wt => {
+                if (!wt.questions || wt.questions.length === 0) return;
+                html += `<div style="margin-bottom:12px;">
+                    <div style="font-size:14px;font-weight:500;margin-bottom:8px;">${escapeHtml(wt.taskName)}</div>`;
+                wt.questions.forEach((q, qIdx) => {
+                    const scoreColor = q.score >= 8 ? '#22c55e' : q.score >= 6 ? '#eab308' : '#ef4444';
+                    html += `<div class="exercise-task-card" style="border-left:3px solid ${scoreColor};" onclick="openWrongExerciseDoing('${folderId}','${wt.taskId}',${qIdx})">
+                        <div class="exercise-task-title" style="font-size:13px;">第${q.questionIndex + 1}题</div>
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <span class="wrong-exercise-score" style="background:${scoreColor};font-size:11px;">${q.score}/10</span>
+                            <span style="font-size:11px;color:var(--text-muted);">点击重做</span>
+                        </div>
+                    </div>`;
+                });
+                html += `</div>`;
+            });
+
+            html += '<div style="height:60px;"></div>';
+            container.innerHTML = html;
+        }
+
+        function openWrongExerciseDoing(folderId, taskId, qIdx) {
+            openExerciseDoing(folderId, taskId, qIdx, true);
+        }
+
+        // Exercise archive
+        function openExerciseArchive() {
+            const data = getExercisesData();
+            const archived = data.folders.filter(f => f.archived);
+            const view = document.getElementById('exerciseArchiveView');
+            view.classList.add('show');
+            const content = document.getElementById('exerciseArchiveContent');
+            if (archived.length === 0) {
+                content.innerHTML = '<div class="empty-state"><p>暂无归档</p></div>';
+            } else {
+                content.innerHTML = archived.map(f => {
+                    const taskCount = (f.tasks || []).length;
+                    return `<div class="exercise-folder-card" style="margin-bottom:8px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <div>
+                                <div class="exercise-folder-card-name">${escapeHtml(f.name)}</div>
+                                <div class="exercise-folder-card-meta">${taskCount} 任务</div>
+                            </div>
+                            <button onclick="unarchiveExFolder('${f.id}')" style="border:none;background:var(--bg-tertiary);padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;">恢复</button>
+                        </div>
+                    </div>`;
+                }).join('');
+            }
+        }
+
+        function closeExerciseArchive() {
+            document.getElementById('exerciseArchiveView').classList.remove('show');
+        }
+
+        function unarchiveExFolder(folderId) {
+            const data = getExercisesData();
+            const folder = data.folders.find(f => f.id === folderId);
+            if (folder) {
+                folder.archived = false;
+                saveData();
+                debouncedChatSync();
+                closeExerciseArchive();
+                renderExercisesPage();
+                showToast('已恢复');
             }
         }
 
