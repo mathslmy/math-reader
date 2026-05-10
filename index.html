@@ -16555,22 +16555,8 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 canvasWrap.style.display = 'none';
                 toolbar.style.display = 'none';
             } else {
-                // 正常做题 或 错题重做中：显示题目 + 画布
+                // 正常做题 或 错题重做中：只显示题目 + 画布
                 let html = `<div style="font-size:15px;line-height:1.8;">${escapeHtml(q.latex)}</div>`;
-                // 已完成的正常题目也显示分数和评语
-                if (!isWrong && q.status === 'done' && q.score != null) {
-                    const scoreColor = q.score >= 8 ? '#22c55e' : q.score >= 6 ? '#eab308' : '#ef4444';
-                    const timeUsedStr = q.timeUsedSeconds ? formatExTime(q.timeUsedSeconds) : '';
-                    html += `<div class="wrong-exercise-comment" style="background:${scoreColor}15;border-left:3px solid ${scoreColor};">`;
-                    html += `<span class="wrong-exercise-score" style="background:${scoreColor};">${q.score}/10</span>`;
-                    if (timeUsedStr) {
-                        html += `<span style="font-size:12px;color:var(--text-muted);margin-left:8px;">⏱ 用时 ${timeUsedStr}</span>`;
-                    }
-                    if (q.aiComment) {
-                        html += `<div style="margin-top:6px;">${escapeHtml(q.aiComment)}</div>`;
-                    }
-                    html += `</div>`;
-                }
                 qDiv.innerHTML = html;
                 // 显示画布和工具栏
                 canvasWrap.style.display = '';
