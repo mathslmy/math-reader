@@ -5266,6 +5266,8 @@
             // 请求持久化存储，防止浏览器自动清理 IndexedDB
             await requestStoragePersist();
             loadData();
+            // 从 IndexedDB 加载习题数据（不再放 localStorage）
+            await loadExercisesFromIDB();
             // 将 localStorage 中残留的讲义内容迁移到 IndexedDB
             await migrateLectureContentToIDB();
             // 将 localStorage 中残留的论文摘要迁移到 IndexedDB
@@ -5655,6 +5657,44 @@
             }
         }
 
+        // 从 IndexedDB 加载习题数据，并迁移 localStorage 中的残留
+        async function loadExercisesFromIDB() {
+            try {
+                const exStr = await getFileData('__exercises_data__');
+                if (exStr) {
+                    const exData = JSON.parse(exStr);
+                    appData.exercises = exData;
+                    if (!appData.exercises.folders) appData.exercises.folders = [];
+                    if (!appData.exercises.wrongByFolder) appData.exercises.wrongByFolder = {};
+                    console.log('[loadExercisesFromIDB] 习题数据已从 IndexedDB 加载');
+                }
+            } catch(e) {
+                console.warn('[loadExercisesFromIDB] 读取失败:', e);
+            }
+            // 迁移：如果 localStorage 中的 appData 还残留 exercises 数据
+            try {
+                const raw = localStorage.getItem('mathReader');
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (parsed.exercises && (parsed.exercises.folders?.length || Object.keys(parsed.exercises.wrongByFolder || {}).length)) {
+                        // localStorage 中有习题数据，迁移到 IDB
+                        if (!appData.exercises || !appData.exercises.folders?.length) {
+                            appData.exercises = parsed.exercises;
+                            console.log('[migrate] 习题数据从 localStorage 迁移到 IndexedDB');
+                        }
+                        // 从 localStorage 中删掉 exercises 字段并写回
+                        delete parsed.exercises;
+                        try { localStorage.setItem('mathReader', JSON.stringify(parsed)); } catch(e2) {}
+                        // 保存到 IDB
+                        await saveFileData('__exercises_data__', JSON.stringify(appData.exercises));
+                    }
+                }
+            } catch(e) {
+                console.warn('[migrate] 习题迁移失败:', e);
+            }
+            if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {} };
+        }
+
         // 从 IndexedDB 备份恢复 appData
         async function tryRestoreAppDataFromBackup() {
             try {
@@ -5662,12 +5702,15 @@
                 if (backupStr) {
                     const backup = JSON.parse(backupStr);
                     if (Array.isArray(backup.books) && Array.isArray(backup.papers)) {
+                        // exercises 不从备份恢复，由 loadExercisesFromIDB 单独处理
+                        delete backup.exercises;
                         appData = backup;
                         if (!appData.notes) appData.notes = {};
                         if (!appData.archived) appData.archived = [];
                         if (!appData.classroom) appData.classroom = { courses: [], seminars: [] };
                         if (!appData.settings) appData.settings = {};
-                        // 写回 localStorage
+                        if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {} };
+                        // 写回 localStorage（不含 exercises）
                         try { localStorage.setItem('mathReader', JSON.stringify(appData)); } catch(e2) {}
                         console.log('[loadData] 已从 IndexedDB 备份恢复数据');
                         showToast('已从备份恢复数据');
@@ -5708,6 +5751,8 @@
             // 剔除论文AI摘要（大文本已在 IndexedDB）
             toBackup.papers.forEach(p => { delete p.aiAbstract; delete p._abstractCache; });
             toBackup.archived.forEach(a => { delete a.aiAbstract; delete a._abstractCache; });
+            // 习题数据已单独存 IndexedDB，备份中不再包含
+            delete toBackup.exercises;
             saveFileData('__appdata_backup__', JSON.stringify(toBackup)).catch(e => {
                 console.warn('[backup] IndexedDB 备份失败:', e);
             });
@@ -5743,28 +5788,27 @@
             // 剔除论文AI摘要（大文本存在IndexedDB）
             toSave.papers.forEach(p => { delete p.aiAbstract; delete p._abstractCache; });
             toSave.archived.forEach(a => { delete a.aiAbstract; delete a._abstractCache; });
-            // 剔除习题中的大数据——题目级别数据全部存IndexedDB，localStorage只保留结构
-            if (toSave.exercises) {
-                (toSave.exercises.folders || []).forEach(folder => {
+            // 习题数据完全存入 IndexedDB，不放 localStorage
+            const exercisesToIDB = toSave.exercises ? JSON.parse(JSON.stringify(toSave.exercises)) : null;
+            delete toSave.exercises;
+            if (exercisesToIDB) {
+                // 剔除 userDrawing / sourceFiles.data 等大字段再存 IDB
+                (exercisesToIDB.folders || []).forEach(folder => {
                     (folder.tasks || []).forEach(task => {
-                        (task.questions || []).forEach(q => {
-                            delete q.userDrawing;
-                            delete q.remainingSeconds;
-                            delete q.timeUsedSeconds;
-                            delete q.aiComment;
-                            delete q.score;
-                        });
+                        (task.questions || []).forEach(q => { delete q.userDrawing; });
                         (task.sourceFiles || []).forEach(sf => { delete sf.data; });
                     });
                 });
-                Object.values(toSave.exercises.wrongByFolder || {}).forEach(wrongTasks => {
+                Object.values(exercisesToIDB.wrongByFolder || {}).forEach(wrongTasks => {
                     (wrongTasks || []).forEach(wt => {
                         (wt.questions || []).forEach(q => {
                             delete q.userDrawing;
-                            delete q.aiComment;
                             (q.redoDrawings || []).forEach(rd => { delete rd.drawing; });
                         });
                     });
+                });
+                saveFileData('__exercises_data__', JSON.stringify(exercisesToIDB)).catch(e => {
+                    console.error('[saveData] exercises 写入 IndexedDB 失败:', e);
                 });
             }
             try {
@@ -11002,7 +11046,9 @@
         function clearAllData() {
             if (confirm('确定清除所有数据？此操作不可恢复。')) {
                 localStorage.removeItem('mathReader');
-                appData = { books: [], papers: [], notes: {}, archived: [], settings: appData.settings };
+                // 清除 IndexedDB 中的习题数据
+                saveFileData('__exercises_data__', '{"folders":[],"wrongByFolder":{}}').catch(()=>{});
+                appData = { books: [], papers: [], notes: {}, archived: [], settings: appData.settings, exercises: { folders: [], wrongByFolder: {} } };
                 saveData();
                 renderLibrary();
                 renderNotesPage();
@@ -15561,18 +15607,10 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                         deleteFileData(`exercise_drawing_cache_${task.id}_${i}`).catch(e => {});
                         deleteFileData(`exercise_timer_${task.id}_${i}`).catch(e => {});
                         deleteFileData(`exercise_drawing_${task.id}_${i}`).catch(e => {});
-                        deleteFileData(`exercise_qdata_${task.id}_${i}`).catch(e => {});
                     });
                     // 清理内存缓存
                     (task.questions || []).forEach((q, i) => {
                         delete exDrawingCache[`${task.id}_${i}`];
-                    });
-                });
-                // 清理错题IndexedDB数据
-                const wrongTasks = data.wrongByFolder[folderId] || [];
-                (wrongTasks || []).forEach(wt => {
-                    (wt.questions || []).forEach((wq, i) => {
-                        deleteFileData(`exercise_wrong_${folderId}_${wt.taskId}_${i}`).catch(e => {});
                     });
                 });
                 data.folders.splice(idx, 1);
@@ -15672,7 +15710,6 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 deleteFileData(`exercise_drawing_cache_${taskId}_${i}`).catch(e => {});
                 deleteFileData(`exercise_timer_${taskId}_${i}`).catch(e => {});
                 deleteFileData(`exercise_drawing_${taskId}_${i}`).catch(e => {});
-                deleteFileData(`exercise_qdata_${taskId}_${i}`).catch(e => {});
                 delete exDrawingCache[`${taskId}_${i}`];
             });
             // Clear existing questions
@@ -15705,27 +15742,19 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 try { deleteFileData('exercise_' + sf.id); } catch(e) {}
                 triggerSyncOnFileChange(sf.id, 'exercise_delete');
             });
-            // 清理每道题的IndexedDB缓存（书写、计时、drawing、评分数据）
+            // 清理每道题的IndexedDB缓存（书写、计时、drawing）
             (task.questions || []).forEach((q, i) => {
                 deleteFileData(`exercise_drawing_cache_${taskId}_${i}`).catch(e => {});
                 deleteFileData(`exercise_timer_${taskId}_${i}`).catch(e => {});
                 deleteFileData(`exercise_drawing_${taskId}_${i}`).catch(e => {});
-                deleteFileData(`exercise_qdata_${taskId}_${i}`).catch(e => {});
             });
-            // 清理错题IndexedDB数据
-            const wrongTasks = data.wrongByFolder[folderId] || [];
-            const wTask = wrongTasks.find(wt => wt.taskId === taskId);
-            if (wTask && wTask.questions) {
-                wTask.questions.forEach((wq, i) => {
-                    deleteFileData(`exercise_wrong_${folderId}_${taskId}_${i}`).catch(e => {});
-                });
-            }
             // 清理内存缓存
             (task.questions || []).forEach((q, i) => {
                 delete exDrawingCache[`${taskId}_${i}`];
             });
             folder.tasks.splice(taskIdx, 1);
             // Also clean wrong questions for this task
+            const wrongTasks = data.wrongByFolder[folderId] || [];
             const wtIdx = wrongTasks.findIndex(wt => wt.taskId === taskId);
             if (wtIdx >= 0) wrongTasks.splice(wtIdx, 1);
             saveData();
@@ -15841,11 +15870,6 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                         });
                     }
 
-                    // 题目和错题数据存IndexedDB
-                    saveExQuestionToIDB(taskId, qIdx, q);
-                    const wqI = wrongTask.questions.findIndex(wq => wq.questionIndex === qIdx);
-                    if (wqI >= 0) saveWrongQuestionToIDB(folderId, taskId, wqI, wrongTask.questions[wqI]);
-
                     graded++;
                     saveData();
 
@@ -15946,14 +15970,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             }
         }
 
-        async function renderExerciseFolderContent(folder) {
-            // 先从IndexedDB恢复所有题目的评分和状态数据
-            for (const task of (folder.tasks || [])) {
-                for (let i = 0; i < (task.questions || []).length; i++) {
-                    await restoreExQuestionFromIDB(task.id, i, task.questions[i]);
-                }
-            }
-
+        function renderExerciseFolderContent(folder) {
             const container = document.getElementById('exerciseFolderContent');
             if (!folder.tasks) folder.tasks = [];
 
@@ -16557,7 +16574,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
         }
 
         // Start exercise task
-        async function startExerciseTask(folderId, taskId) {
+        function startExerciseTask(folderId, taskId) {
             const data = getExercisesData();
             const folder = data.folders.find(f => f.id === folderId);
             if (!folder) return;
@@ -16565,11 +16582,6 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             if (!task || !task.questions || task.questions.length === 0) {
                 showToast('该任务暂无题目');
                 return;
-            }
-
-            // 从IndexedDB恢复所有题目的评分和计时数据
-            for (let i = 0; i < task.questions.length; i++) {
-                await restoreExQuestionFromIDB(taskId, i, task.questions[i]);
             }
 
             // Find first pending question
@@ -16693,18 +16705,12 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
 
             // Start timer (only for non-wrong mode)
             if (!isWrong) {
-                // 先显示默认值，然后异步恢复
-                if (q.remainingSeconds === undefined || q.remainingSeconds === null) {
-                    q.remainingSeconds = 1200;
-                }
-                if (!q.timeUsedSeconds) q.timeUsedSeconds = 0;
-                exTimerSeconds = q.remainingSeconds;
-                updateExTimerDisplay();
-
-                const _timerRestoreId = `${taskId}_${questionIndex}`;
+                // 先从IndexedDB恢复计时（异步，恢复后更新显示）
                 restoreExTimerFromDB(taskId, questionIndex, q).then(() => {
-                    // 防止异步竞态：确认还在同一道题
-                    if (!exDoingState || `${exDoingState.taskId}_${exDoingState.questionIndex}` !== _timerRestoreId) return;
+                    if (q.remainingSeconds === undefined || q.remainingSeconds === null) {
+                        q.remainingSeconds = 1200;
+                    }
+                    if (!q.timeUsedSeconds) q.timeUsedSeconds = 0;
                     exTimerSeconds = q.remainingSeconds;
                     exTimerStartedAt = Date.now();
                     updateExTimerDisplay();
@@ -16790,73 +16796,15 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             saveData();
         }
 
-        // 从IndexedDB恢复计时数据（IndexedDB优先，appData中的值作为fallback）
+        // 从IndexedDB恢复计时数据
         async function restoreExTimerFromDB(taskId, questionIndex, q) {
             try {
                 const timerKey = `exercise_timer_${taskId}_${questionIndex}`;
                 const saved = await getFileData(timerKey);
                 if (saved) {
                     const parsed = JSON.parse(saved);
-                    // IndexedDB的数据比appData更新（appData可能是旧的localStorage加载）
                     if (parsed.remainingSeconds != null) q.remainingSeconds = parsed.remainingSeconds;
                     if (parsed.timeUsedSeconds != null) q.timeUsedSeconds = parsed.timeUsedSeconds;
-                }
-                // 如果IndexedDB没有数据，q上可能已经有localStorage恢复的值，保持不动
-            } catch(e) {}
-        }
-
-        // 保存题目评分数据到IndexedDB
-        function saveExQuestionToIDB(taskId, questionIndex, q) {
-            const key = `exercise_qdata_${taskId}_${questionIndex}`;
-            const data = JSON.stringify({
-                status: q.status,
-                score: q.score,
-                aiComment: q.aiComment,
-                timeUsedSeconds: q.timeUsedSeconds,
-                remainingSeconds: q.remainingSeconds
-            });
-            saveFileData(key, data).catch(e => console.warn('保存题目数据失败:', e));
-        }
-
-        // 保存错题数据到IndexedDB
-        function saveWrongQuestionToIDB(folderId, taskId, wqIndex, wq) {
-            const key = `exercise_wrong_${folderId}_${taskId}_${wqIndex}`;
-            const data = JSON.stringify({
-                questionIndex: wq.questionIndex,
-                latex: wq.latex,
-                score: wq.score,
-                aiComment: wq.aiComment,
-                timeUsedSeconds: wq.timeUsedSeconds
-            });
-            saveFileData(key, data).catch(e => console.warn('保存错题数据失败:', e));
-        }
-
-        // 恢复题目评分数据从IndexedDB
-        async function restoreExQuestionFromIDB(taskId, questionIndex, q) {
-            try {
-                const key = `exercise_qdata_${taskId}_${questionIndex}`;
-                const saved = await getFileData(key);
-                if (saved) {
-                    const parsed = JSON.parse(saved);
-                    if (parsed.status) q.status = parsed.status;
-                    if (parsed.score != null) q.score = parsed.score;
-                    if (parsed.aiComment) q.aiComment = parsed.aiComment;
-                    if (parsed.timeUsedSeconds != null) q.timeUsedSeconds = parsed.timeUsedSeconds;
-                    if (parsed.remainingSeconds != null) q.remainingSeconds = parsed.remainingSeconds;
-                }
-            } catch(e) {}
-        }
-
-        // 恢复错题数据从IndexedDB
-        async function restoreWrongQuestionFromIDB(folderId, taskId, wqIndex, wq) {
-            try {
-                const key = `exercise_wrong_${folderId}_${taskId}_${wqIndex}`;
-                const saved = await getFileData(key);
-                if (saved) {
-                    const parsed = JSON.parse(saved);
-                    if (parsed.score != null) wq.score = parsed.score;
-                    if (parsed.aiComment) wq.aiComment = parsed.aiComment;
-                    if (parsed.timeUsedSeconds != null) wq.timeUsedSeconds = parsed.timeUsedSeconds;
                 }
             } catch(e) {}
         }
@@ -17089,8 +17037,6 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     q._redoing = false;
                     if (!q.redoDrawings) q.redoDrawings = [];
                     q.redoDrawings.push({ drawing: userDrawing, score, comment, time: new Date().toISOString() });
-                    // 错题数据存IndexedDB
-                    saveWrongQuestionToIDB(folderId, taskId, questionIndex, q);
                 } else {
                     // Finalize timer: save elapsed time for this question
                     let finalTimeUsed = 0;
@@ -17140,12 +17086,6 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                         timeUsedSeconds: finalTimeUsed,
                         redoDrawings: []
                     });
-
-                    // 题目评分数据存IndexedDB
-                    saveExQuestionToIDB(taskId, questionIndex, origQ);
-                    // 错题数据存IndexedDB
-                    const wqIdx = wrongTask.questions.length - 1;
-                    saveWrongQuestionToIDB(folderId, taskId, wqIdx, wrongTask.questions[wqIdx]);
                 }
 
                 saveData();
@@ -17207,15 +17147,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             container.innerHTML = html;
         }
 
-        async function openWrongExerciseDoing(folderId, taskId, qIdx) {
-            const data = getExercisesData();
-            const wrongTasks = data.wrongByFolder[folderId] || [];
-            const wTask = wrongTasks.find(t => t.taskId === taskId);
-            if (wTask && wTask.questions) {
-                for (let i = 0; i < wTask.questions.length; i++) {
-                    await restoreWrongQuestionFromIDB(folderId, taskId, i, wTask.questions[i]);
-                }
-            }
+        function openWrongExerciseDoing(folderId, taskId, qIdx) {
             openExerciseDoing(folderId, taskId, qIdx, true);
         }
 
