@@ -1426,6 +1426,9 @@
             margin-bottom: 8px;
             cursor: pointer;
             transition: all 0.2s;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
         }
 
         .exercise-folder-card:hover { transform: translateX(4px); }
@@ -1461,6 +1464,9 @@
             margin-bottom: 10px;
             cursor: pointer;
             transition: all 0.2s;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
         }
 
         .exercise-task-card:hover { transform: translateX(4px); }
@@ -1517,6 +1523,9 @@
             align-items: center;
             gap: 10px;
             cursor: pointer;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
         }
 
         .exercise-material-icon {
@@ -9806,6 +9815,19 @@
                         await r2PutObject('abstracts/' + fileId, absData, 'text/plain; charset=utf-8');
                     }
                 }
+
+                // 如果是上传习题文件，同步到云端
+                if (action === 'exercise_upload' && fileId) {
+                    const sfData = await getFileData('exercise_' + fileId).catch(() => null);
+                    if (sfData) {
+                        await r2PutObject('exercises/' + fileId, sfData, 'application/octet-stream');
+                    }
+                }
+
+                // 如果是删除习题文件，删除云端文件
+                if (action === 'exercise_delete' && fileId) {
+                    try { await r2DeleteObject('exercises/' + fileId); } catch (e) {}
+                }
                 
                 // 更新上次同步时间
                 config.lastSyncTime = new Date().toISOString();
@@ -9819,6 +9841,8 @@
                 } else if (action === 'abstract_upload') {
                     showToast('摘要已同步到云端');
                     sendNotification('摘要云同步完成', '论文摘要已安全同步到云端');
+                } else if (action === 'exercise_upload' || action === 'exercise_delete') {
+                    showToast('习题文件已同步');
                 } else {
                     showToast('已自动同步到云端');
                 }
@@ -10584,6 +10608,93 @@
             return merged;
         }
 
+        // ==================== Exercises 数据合并 ====================
+        function mergeExercisesData(cloudEx, localEx, cloudSyncedAtMs) {
+            const cloud = cloudEx || { folders: [], wrongByFolder: {} };
+            const local = localEx || { folders: [], wrongByFolder: {} };
+            const baseline = Number(cloudSyncedAtMs) || 0;
+
+            // Merge folders
+            const cf = cloud.folders || [];
+            const lf = local.folders || [];
+            const lfMap = {};
+            lf.forEach(f => { if (f && f.id) lfMap[f.id] = f; });
+            const cfIds = new Set(cf.map(f => f && f.id).filter(Boolean));
+
+            const mergedFolders = cf.map(cFolder => {
+                if (!cFolder || !cFolder.id) return cFolder;
+                const lFolder = lfMap[cFolder.id];
+                if (!lFolder) return cFolder;
+                // Merge tasks
+                const cTasks = cFolder.tasks || [];
+                const lTasks = lFolder.tasks || [];
+                const ltMap = {};
+                lTasks.forEach(t => { if (t && t.id) ltMap[t.id] = t; });
+                const ctIds = new Set(cTasks.map(t => t && t.id).filter(Boolean));
+                const mergedTasks = cTasks.map(ct => {
+                    const lt = ltMap[ct.id];
+                    if (!lt) return ct;
+                    // Merge sourceFiles by union
+                    const csfIds = new Set((ct.sourceFiles || []).map(s => s.id));
+                    const mergedSF = [...(ct.sourceFiles || [])];
+                    (lt.sourceFiles || []).forEach(sf => { if (!csfIds.has(sf.id)) mergedSF.push(sf); });
+                    // Merge questions: prefer done over pending, higher score
+                    const cq = ct.questions || [];
+                    const lq = lt.questions || [];
+                    const maxLen = Math.max(cq.length, lq.length);
+                    const mergedQ = [];
+                    for (let i = 0; i < maxLen; i++) {
+                        const c = cq[i], l = lq[i];
+                        if (!c) { mergedQ.push(l); continue; }
+                        if (!l) { mergedQ.push(c); continue; }
+                        if (l.status === 'done' && c.status !== 'done') mergedQ.push(l);
+                        else if (c.status === 'done' && l.status !== 'done') mergedQ.push(c);
+                        else if ((l.score || 0) > (c.score || 0)) mergedQ.push(l);
+                        else mergedQ.push({ ...c, timeSpent: Math.max(c.timeSpent || 0, l.timeSpent || 0) });
+                    }
+                    return { ...ct, sourceFiles: mergedSF, questions: mergedQ, timerRemaining: Math.min(ct.timerRemaining ?? 1200, lt.timerRemaining ?? 1200) };
+                });
+                // Local-only tasks newer than baseline
+                lTasks.forEach(lt => {
+                    if (!lt || !lt.id || ctIds.has(lt.id)) return;
+                    const ms = lt.createdAt ? Date.parse(lt.createdAt) : NaN;
+                    if (!isNaN(ms) && ms > baseline) mergedTasks.push(lt);
+                });
+                return { ...cFolder, tasks: mergedTasks, archived: cFolder.archived || lFolder.archived };
+            });
+            // Local-only folders newer than baseline
+            lf.forEach(lFolder => {
+                if (!lFolder || !lFolder.id || cfIds.has(lFolder.id)) return;
+                const ms = lFolder.createdAt ? Date.parse(lFolder.createdAt) : NaN;
+                if (!isNaN(ms) && ms > baseline) mergedFolders.push(lFolder);
+            });
+
+            // Merge wrongByFolder
+            const mergedWrong = {};
+            const allFids = new Set([...mergedFolders.map(f => f.id), ...Object.keys(cloud.wrongByFolder || {}), ...Object.keys(local.wrongByFolder || {})]);
+            allFids.forEach(fid => {
+                const cw = (cloud.wrongByFolder || {})[fid] || [];
+                const lw = (local.wrongByFolder || {})[fid] || [];
+                const tMap = {};
+                [...cw, ...lw].forEach(wt => {
+                    if (!wt || !wt.taskId) return;
+                    if (!tMap[wt.taskId]) { tMap[wt.taskId] = { ...wt, questions: [...(wt.questions || [])] }; return; }
+                    const existing = tMap[wt.taskId];
+                    const idxSet = new Set(existing.questions.map(q => q.questionIndex));
+                    (wt.questions || []).forEach(q => {
+                        if (!idxSet.has(q.questionIndex)) existing.questions.push(q);
+                        else {
+                            const ei = existing.questions.findIndex(eq => eq.questionIndex === q.questionIndex);
+                            if (ei >= 0 && (q.score || 0) > (existing.questions[ei].score || 0)) existing.questions[ei] = q;
+                        }
+                    });
+                });
+                mergedWrong[fid] = Object.values(tMap);
+            });
+
+            return { folders: mergedFolders, wrongByFolder: mergedWrong };
+        }
+
         async function autoSyncFromR2OnStartup() {
             const config = appData.settings && appData.settings.r2Config;
             if (!config || !config.accessKeyId || !config.autoSyncEnabled) return;
@@ -10630,10 +10741,8 @@
                     cloudSyncedAtMs
                 );
                 appData.lectureDrafts = metadata.lectureDrafts || appData.lectureDrafts || {};
-                // 合并习题数据：云端覆盖本地（简单策略）
-                if (metadata.exercises) {
-                    appData.exercises = metadata.exercises;
-                }
+                // 合并习题数据：按 folder/task 级别合并（参考 classroom 合并策略）
+                appData.exercises = mergeExercisesData(metadata.exercises, appData.exercises, cloudSyncedAtMs);
                 if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {} };
                 // API 设置仅保留本地值，不被云端覆盖
                 appData.settings = { ...metadata.settings, ...localApiSettings, r2Config: localR2Config };
@@ -15324,6 +15433,8 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
         let exDoingState = null;          // { folderId, taskId, questionIndex, isWrong, wrongFolderId }
         let exTimerInterval = null;
         let exTimerSeconds = 1200; // 20 min
+        let exCurrentTaskId = null;   // which task timer belongs to
+        let exQuestionOpenedAt = null; // timestamp when current question was opened
         let exPenColor = '#000000';
         let exDrawing = false;
         let exLastX = 0, exLastY = 0;
@@ -15503,6 +15614,99 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             renderExerciseFolderContent(folder);
         }
 
+        // ---- Task long press ----
+        let _exTaskLPTimer = null;
+        function cancelExTaskLongPress() { if (_exTaskLPTimer) { clearTimeout(_exTaskLPTimer); _exTaskLPTimer = null; } }
+        function startExTaskLongPress(e, folderId, taskId) {
+            cancelExTaskLongPress();
+            const t = e.touches ? e.touches[0] : e;
+            const cx = t.clientX, cy = t.clientY;
+            _exTaskLPTimer = setTimeout(() => { _exTaskLPTimer = null; showExTaskMenu({ clientX: cx, clientY: cy }, folderId, taskId); }, 500);
+        }
+        function showExTaskMenu(e, folderId, taskId) {
+            closeLongPressMenu();
+            const overlay = document.createElement('div');
+            overlay.className = 'longpress-overlay';
+            overlay.onclick = closeLongPressMenu;
+            const menu = document.createElement('div');
+            menu.className = 'longpress-menu';
+            menu.id = 'longpressMenu';
+            menu.innerHTML = `<button class="longpress-menu-item danger" onclick="deleteExTask('${folderId}','${taskId}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>删除任务</button>`;
+            document.body.appendChild(overlay);
+            document.body.appendChild(menu);
+            let x = e.clientX || 100, y = e.clientY || 100;
+            if (x + 140 > window.innerWidth) x = window.innerWidth - 150;
+            if (y + 80 > window.innerHeight) y = window.innerHeight - 90;
+            menu.style.left = x + 'px'; menu.style.top = y + 'px';
+        }
+        function deleteExTask(folderId, taskId) {
+            closeLongPressMenu();
+            if (!confirm('确定删除此习题任务？')) return;
+            const data = getExercisesData();
+            const folder = data.folders.find(f => f.id === folderId);
+            if (!folder) return;
+            const ti = (folder.tasks || []).findIndex(t => t.id === taskId);
+            if (ti < 0) return;
+            const task = folder.tasks[ti];
+            (task.sourceFiles || []).forEach(sf => {
+                try { deleteFileData('exercise_' + sf.id); } catch(e) {}
+                triggerSyncOnFileChange(sf.id, 'exercise_delete');
+            });
+            (task.questions || []).forEach((q, qi) => {
+                try { deleteFileData(`exercise_drawing_${taskId}_${qi}`); } catch(e) {}
+            });
+            folder.tasks.splice(ti, 1);
+            if (data.wrongByFolder[folderId]) {
+                data.wrongByFolder[folderId] = data.wrongByFolder[folderId].filter(w => w.taskId !== taskId);
+            }
+            saveData(); debouncedChatSync();
+            renderExerciseFolderContent(folder);
+            showToast('已删除');
+        }
+
+        // ---- Source file long press ----
+        let _exFileLPTimer = null;
+        function cancelExFileLongPress() { if (_exFileLPTimer) { clearTimeout(_exFileLPTimer); _exFileLPTimer = null; } }
+        function startExFileLongPress(e, folderId, taskId, fileId) {
+            cancelExFileLongPress();
+            const t = e.touches ? e.touches[0] : e;
+            const cx = t.clientX, cy = t.clientY;
+            _exFileLPTimer = setTimeout(() => { _exFileLPTimer = null; showExFileMenu({ clientX: cx, clientY: cy }, folderId, taskId, fileId); }, 500);
+        }
+        function showExFileMenu(e, folderId, taskId, fileId) {
+            closeLongPressMenu();
+            const overlay = document.createElement('div');
+            overlay.className = 'longpress-overlay';
+            overlay.onclick = closeLongPressMenu;
+            const menu = document.createElement('div');
+            menu.className = 'longpress-menu';
+            menu.id = 'longpressMenu';
+            menu.innerHTML = `<button class="longpress-menu-item danger" onclick="deleteExFile('${folderId}','${taskId}','${fileId}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>删除文件</button>`;
+            document.body.appendChild(overlay);
+            document.body.appendChild(menu);
+            let x = e.clientX || 100, y = e.clientY || 100;
+            if (x + 140 > window.innerWidth) x = window.innerWidth - 150;
+            if (y + 80 > window.innerHeight) y = window.innerHeight - 90;
+            menu.style.left = x + 'px'; menu.style.top = y + 'px';
+        }
+        function deleteExFile(folderId, taskId, fileId) {
+            closeLongPressMenu();
+            if (!confirm('确定删除此习题文件？')) return;
+            const data = getExercisesData();
+            const folder = data.folders.find(f => f.id === folderId);
+            if (!folder) return;
+            const task = (folder.tasks || []).find(t => t.id === taskId);
+            if (!task) return;
+            const si = (task.sourceFiles || []).findIndex(sf => sf.id === fileId);
+            if (si < 0) return;
+            try { deleteFileData('exercise_' + fileId); } catch(e) {}
+            triggerSyncOnFileChange(fileId, 'exercise_delete');
+            task.sourceFiles.splice(si, 1);
+            saveData(); debouncedChatSync();
+            renderExerciseFolderContent(folder);
+            showToast('已删除');
+        }
+
         function renderExerciseFolderContent(folder) {
             const container = document.getElementById('exerciseFolderContent');
             if (!folder.tasks) folder.tasks = [];
@@ -15525,7 +15729,9 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     const totalQ = (task.questions || []).length;
                     const doneQ = (task.questions || []).filter(q => q.status === 'done').length;
                     const pct = totalQ > 0 ? Math.round((doneQ / totalQ) * 100) : 0;
-                    html += `<div class="exercise-task-card" onclick="startExerciseTask('${folder.id}','${task.id}')">
+                    html += `<div class="exercise-task-card" onclick="startExerciseTask('${folder.id}','${task.id}')"
+                        oncontextmenu="event.preventDefault();if(!('ontouchstart' in window))showExTaskMenu(event,'${folder.id}','${task.id}')"
+                        ontouchstart="startExTaskLongPress(event,'${folder.id}','${task.id}')" ontouchend="cancelExTaskLongPress()" ontouchmove="cancelExTaskLongPress()">
                         <div class="exercise-task-title">${escapeHtml(task.name)}</div>
                         <div class="exercise-task-progress">
                             <div class="exercise-task-progress-bar"><div class="exercise-task-progress-fill" style="width:${pct}%;background:var(--accent-green);"></div></div>
@@ -15545,8 +15751,8 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     (task.sourceFiles || []).forEach(sf => {
                         const isImg = sf.type === 'image';
                         html += `<div class="exercise-material-card" onclick="viewExerciseSource('${folder.id}','${task.id}','${sf.id}')"
-                            oncontextmenu="event.preventDefault();if(!('ontouchstart' in window))showExSourceMenu(event,'${folder.id}','${task.id}','${sf.id}')"
-                            ontouchstart="startExSourceLongPress(event,'${folder.id}','${task.id}','${sf.id}')" ontouchend="cancelExSourceLongPress()" ontouchmove="cancelExSourceLongPress()">
+                            oncontextmenu="event.preventDefault();if(!('ontouchstart' in window))showExFileMenu(event,'${folder.id}','${task.id}','${sf.id}')"
+                            ontouchstart="startExFileLongPress(event,'${folder.id}','${task.id}','${sf.id}')" ontouchend="cancelExFileLongPress()" ontouchmove="cancelExFileLongPress()">
                             <div class="exercise-material-icon">
                                 ${isImg ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>'
                                         : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'}
@@ -15589,6 +15795,9 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
 
                     // Save to IndexedDB
                     await saveFileData('exercise_' + fileId, dataUrl);
+
+                    // Sync to cloud
+                    triggerSyncOnFileChange(fileId, 'exercise_upload');
 
                     // Create task
                     const taskId = 'extask_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
@@ -15676,20 +15885,50 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 const result = await callAI(systemPrompt, msgContent, { maxTokens: 4096, temperature: 0.3 });
                 if (!result) { showToast('AI解析返回为空'); return; }
 
-                // Parse JSON
+                // Parse JSON - handle various AI response formats
                 let questions;
                 try {
-                    const cleaned = result.replace(/```json|```/g, '').trim();
-                    questions = JSON.parse(cleaned);
-                } catch (e) {
-                    // Try to extract array
-                    const match = result.match(/\[[\s\S]*\]/);
-                    if (match) {
-                        questions = JSON.parse(match[0]);
-                    } else {
-                        showToast('AI返回格式错误');
-                        return;
+                    let cleaned = result.replace(/```json\s*|```\s*/g, '').trim();
+                    cleaned = cleaned.replace(/^\uFEFF/, '');
+                    const parsed = JSON.parse(cleaned);
+                    if (Array.isArray(parsed)) {
+                        questions = parsed;
+                    } else if (parsed && typeof parsed === 'object') {
+                        const arrKey = Object.keys(parsed).find(k => Array.isArray(parsed[k]));
+                        questions = arrKey ? parsed[arrKey] : null;
                     }
+                } catch (e) {
+                    // Try extracting array from mixed text
+                    const arrMatch = result.match(/\[[\s\S]*\]/);
+                    if (arrMatch) {
+                        try { questions = JSON.parse(arrMatch[0]); } catch(e2) {
+                            try { questions = JSON.parse(arrMatch[0].replace(/,\s*\]/g, ']').replace(/'/g, '"')); } catch(e3) {}
+                        }
+                    }
+                    // Try extracting object with array
+                    if (!questions) {
+                        const objMatch = result.match(/\{[\s\S]*\}/);
+                        if (objMatch) {
+                            try {
+                                const obj = JSON.parse(objMatch[0]);
+                                const arrKey = Object.keys(obj).find(k => Array.isArray(obj[k]));
+                                if (arrKey) questions = obj[arrKey];
+                            } catch(e4) {}
+                        }
+                    }
+                    // Last resort: extract lines as questions
+                    if (!questions) {
+                        const lines = result.split(/\n/).map(l => l.replace(/^\s*\d+[\.\)、]\s*/, '').replace(/^["']|["'],?\s*$/g, '').trim()).filter(l => l.length > 3 && !/^[\[{\]}\s]*$/.test(l));
+                        if (lines.length > 0) questions = lines;
+                    }
+                }
+                // Normalize: ensure all items are strings
+                if (Array.isArray(questions)) {
+                    questions = questions.map(q => {
+                        if (typeof q === 'string') return q;
+                        if (q && typeof q === 'object') return q.text || q.question || q.latex || q.content || JSON.stringify(q);
+                        return String(q);
+                    }).filter(q => q && q.trim().length > 0);
                 }
 
                 if (!Array.isArray(questions) || questions.length === 0) {
@@ -15727,77 +15966,65 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             }
         }
 
-        // Source file long press delete
-        let _exSourceLPTimer = null;
-        function cancelExSourceLongPress() { if (_exSourceLPTimer) { clearTimeout(_exSourceLPTimer); _exSourceLPTimer = null; } }
-        function startExSourceLongPress(e, folderId, taskId, fileId) {
-            cancelExSourceLongPress();
-            const t = e.touches ? e.touches[0] : e;
-            const cx = t.clientX, cy = t.clientY;
-            _exSourceLPTimer = setTimeout(() => {
-                _exSourceLPTimer = null;
-                showExSourceMenu({ clientX: cx, clientY: cy }, folderId, taskId, fileId);
-            }, 500);
-        }
-
-        function showExSourceMenu(e, folderId, taskId, fileId) {
-            closeLongPressMenu();
-            const overlay = document.createElement('div');
-            overlay.className = 'longpress-overlay';
-            overlay.onclick = closeLongPressMenu;
-            const menu = document.createElement('div');
-            menu.className = 'longpress-menu';
-            menu.id = 'longpressMenu';
-            menu.innerHTML = `
-                <button class="longpress-menu-item danger" onclick="deleteExSourceFile('${folderId}','${taskId}','${fileId}')">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
-                    删除
-                </button>`;
-            document.body.appendChild(overlay);
-            document.body.appendChild(menu);
-            let x = e.clientX || 100, y = e.clientY || 100;
-            if (x + 140 > window.innerWidth) x = window.innerWidth - 150;
-            if (y + 120 > window.innerHeight) y = window.innerHeight - 130;
-            menu.style.left = x + 'px';
-            menu.style.top = y + 'px';
-        }
-
-        function deleteExSourceFile(folderId, taskId, fileId) {
-            closeLongPressMenu();
-            if (!confirm('确定删除此习题文件？')) return;
-            const data = getExercisesData();
-            const folder = data.folders.find(f => f.id === folderId);
-            if (!folder) return;
-            const task = folder.tasks.find(t => t.id === taskId);
-            if (!task) return;
-            const sfIdx = (task.sourceFiles || []).findIndex(sf => sf.id === fileId);
-            if (sfIdx < 0) return;
-            try { deleteFileData('exercise_' + fileId); } catch(e) {}
-            triggerSyncOnFileChange(fileId, 'exercise_delete');
-            task.sourceFiles.splice(sfIdx, 1);
-            saveData();
-            debouncedChatSync();
-            renderExerciseFolderContent(folder);
-            showToast('已删除');
-        }
-
         async function viewExerciseSource(folderId, taskId, fileId) {
             try {
                 const dataUrl = await getFileData('exercise_' + fileId);
                 if (!dataUrl) { showToast('文件数据未找到'); return; }
                 const overlay = document.createElement('div');
-                overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9000;display:flex;align-items:center;justify-content:center;cursor:pointer;';
-                overlay.onclick = () => overlay.remove();
+                overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9000;display:flex;flex-direction:column;';
+                // Close button
+                const topBar = document.createElement('div');
+                topBar.style.cssText = 'display:flex;justify-content:flex-end;padding:10px 14px;flex-shrink:0;';
+                const closeBtn = document.createElement('button');
+                closeBtn.innerHTML = '✕';
+                closeBtn.style.cssText = 'width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.2);color:white;border:none;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;';
+                closeBtn.onclick = () => overlay.remove();
+                topBar.appendChild(closeBtn);
+                overlay.appendChild(topBar);
+
+                const scrollArea = document.createElement('div');
+                scrollArea.style.cssText = 'flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 12px 40px;';
+                scrollArea.onclick = (e) => { if (e.target === scrollArea) overlay.remove(); };
+                overlay.appendChild(scrollArea);
+
                 if (dataUrl.startsWith('data:image')) {
                     const img = document.createElement('img');
                     img.src = dataUrl;
-                    img.style.cssText = 'max-width:95%;max-height:90%;object-fit:contain;border-radius:8px;';
-                    overlay.appendChild(img);
+                    img.style.cssText = 'max-width:95%;max-height:90vh;object-fit:contain;border-radius:8px;';
+                    scrollArea.appendChild(img);
                 } else {
-                    const txt = document.createElement('div');
-                    txt.textContent = 'PDF文件预览暂不支持，点击关闭';
-                    txt.style.cssText = 'color:white;font-size:16px;';
-                    overlay.appendChild(txt);
+                    // PDF preview
+                    const loadingEl = document.createElement('div');
+                    loadingEl.textContent = 'PDF加载中...';
+                    loadingEl.style.cssText = 'color:white;font-size:15px;padding:40px;';
+                    scrollArea.appendChild(loadingEl);
+                    try {
+                        const base64 = dataUrl.split(',')[1];
+                        const pdfBytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+                        const pdf = await pdfjsLib.getDocument({ data: pdfBytes }).promise;
+                        scrollArea.removeChild(loadingEl);
+                        const maxW = Math.min(window.innerWidth - 24, 800);
+                        for (let p = 1; p <= pdf.numPages; p++) {
+                            const page = await pdf.getPage(p);
+                            const vp = page.getViewport({ scale: 1 });
+                            const scale = maxW / vp.width;
+                            const svp = page.getViewport({ scale });
+                            const cvs = document.createElement('canvas');
+                            cvs.width = svp.width * 2;
+                            cvs.height = svp.height * 2;
+                            cvs.style.cssText = `width:${svp.width}px;height:${svp.height}px;background:white;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,0.3);`;
+                            const ctx = cvs.getContext('2d');
+                            ctx.scale(2, 2);
+                            await page.render({ canvasContext: ctx, viewport: svp }).promise;
+                            scrollArea.appendChild(cvs);
+                            const lbl = document.createElement('div');
+                            lbl.textContent = `${p} / ${pdf.numPages}`;
+                            lbl.style.cssText = 'color:rgba(255,255,255,0.5);font-size:11px;margin-bottom:4px;';
+                            scrollArea.appendChild(lbl);
+                        }
+                    } catch (pdfErr) {
+                        loadingEl.textContent = 'PDF渲染失败: ' + pdfErr.message;
+                    }
                 }
                 document.body.appendChild(overlay);
             } catch (e) {
@@ -15864,8 +16091,9 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 } else {
                     // Show old score, drawing, comment
                     const scoreColor = q.score >= 8 ? '#22c55e' : q.score >= 6 ? '#eab308' : '#ef4444';
+                    const tStr = q.timeSpent ? (' · 用时' + formatTimeSpent(q.timeSpent)) : '';
                     let extraHtml = `<div class="wrong-exercise-comment" style="background:${scoreColor}15;border-left:3px solid ${scoreColor};">`;
-                    extraHtml += `<span class="wrong-exercise-score" style="background:${scoreColor};">${q.score}/10</span>`;
+                    extraHtml += `<span class="wrong-exercise-score" style="background:${scoreColor};">${q.score}/10${tStr}</span>`;
                     if (q.userDrawing) {
                         extraHtml += `<img class="wrong-exercise-user-drawing" src="${q.userDrawing}" alt="作答">`;
                     }
@@ -15907,20 +16135,32 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             // Setup canvas
             initExCanvas();
 
-            // Start timer (only for non-wrong mode)
+            // Save previous question's elapsed time before switching
+            _saveExQuestionTime();
+
+            // Start timer
             if (!isWrong) {
-                exTimerSeconds = 1200;
+                // Only reset timer if switching to a different task
+                if (exCurrentTaskId !== taskId) {
+                    exCurrentTaskId = taskId;
+                    // Restore saved remaining time, or start fresh
+                    const data2 = getExercisesData();
+                    const f2 = data2.folders.find(f => f.id === folderId);
+                    const t2 = f2 ? f2.tasks.find(t => t.id === taskId) : null;
+                    exTimerSeconds = (t2 && typeof t2.timerRemaining === 'number') ? t2.timerRemaining : 1200;
+                    // Restart interval
+                    if (exTimerInterval) clearInterval(exTimerInterval);
+                    exTimerInterval = setInterval(() => {
+                        exTimerSeconds--;
+                        updateExTimerDisplay();
+                        if (exTimerSeconds <= 0) { clearInterval(exTimerInterval); showToast('时间到！'); }
+                    }, 1000);
+                }
+                // If same task, timer keeps running — don't reset
                 updateExTimerDisplay();
-                if (exTimerInterval) clearInterval(exTimerInterval);
-                exTimerInterval = setInterval(() => {
-                    exTimerSeconds--;
-                    updateExTimerDisplay();
-                    if (exTimerSeconds <= 0) {
-                        clearInterval(exTimerInterval);
-                        showToast('时间到！');
-                    }
-                }, 1000);
+                exQuestionOpenedAt = Date.now();
             } else {
+                exQuestionOpenedAt = Date.now();
                 document.getElementById('exerciseDoingTimer').textContent = '--:--';
             }
         }
@@ -15933,11 +16173,58 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             timerEl.classList.toggle('warning', exTimerSeconds <= 120);
         }
 
+        function formatTimeSpent(seconds) {
+            if (!seconds || seconds <= 0) return '';
+            if (seconds < 60) return seconds + '秒';
+            const m = Math.floor(seconds / 60);
+            const s = seconds % 60;
+            if (m < 60) return s > 0 ? `${m}分${s}秒` : `${m}分`;
+            const h = Math.floor(m / 60);
+            const rm = m % 60;
+            return rm > 0 ? `${h}时${rm}分` : `${h}时`;
+        }
+
+        // Save the time spent on the currently open question
+        function _saveExQuestionTime() {
+            if (!exDoingState || !exQuestionOpenedAt) return;
+            const elapsed = Math.round((Date.now() - exQuestionOpenedAt) / 1000);
+            exQuestionOpenedAt = null;
+            if (elapsed <= 0) return;
+            const { folderId, taskId, questionIndex, isWrong } = exDoingState;
+            if (isWrong) return; // don't track redo time on the original
+            const data = getExercisesData();
+            const folder = data.folders.find(f => f.id === folderId);
+            if (!folder) return;
+            const task = folder.tasks.find(t => t.id === taskId);
+            if (!task || !task.questions || !task.questions[questionIndex]) return;
+            task.questions[questionIndex].timeSpent = (task.questions[questionIndex].timeSpent || 0) + elapsed;
+        }
+
         function closeExerciseDoing() {
+            // Save time for current question
+            _saveExQuestionTime();
+            // Persist remaining timer to task
+            if (exDoingState && !exDoingState.isWrong && exCurrentTaskId) {
+                const data = getExercisesData();
+                const folder = data.folders.find(f => f.id === exDoingState.folderId);
+                if (folder) {
+                    const task = folder.tasks.find(t => t.id === exDoingState.taskId);
+                    if (task) { task.timerRemaining = Math.max(0, exTimerSeconds); }
+                }
+                saveData();
+            }
             document.getElementById('exerciseDoingView').classList.remove('show');
             document.body.classList.remove('exercise-doing-active');
             if (exTimerInterval) { clearInterval(exTimerInterval); exTimerInterval = null; }
+            exCurrentTaskId = null;
+            exQuestionOpenedAt = null;
             exDoingState = null;
+            // Refresh folder view
+            if (currentExerciseFolder) {
+                const data = getExercisesData();
+                const folder = data.folders.find(f => f.id === currentExerciseFolder.folderId);
+                if (folder) renderExerciseFolderContent(folder);
+            }
         }
 
         function initExCanvas() {
@@ -16011,12 +16298,14 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
 
         function exPrevQuestion() {
             if (!exDoingState || exDoingState.questionIndex <= 0) return;
+            _saveExQuestionTime();
             openExerciseDoing(exDoingState.folderId, exDoingState.taskId, exDoingState.questionIndex - 1, exDoingState.isWrong);
         }
 
         function exNextQuestion() {
             if (!exDoingState) return;
             if (exDoingState.questionIndex >= exDoingState.questions.length - 1) return;
+            _saveExQuestionTime();
             openExerciseDoing(exDoingState.folderId, exDoingState.taskId, exDoingState.questionIndex + 1, exDoingState.isWrong);
         }
 
@@ -16028,10 +16317,14 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             if (isWrong && !q._redoing) {
                 // Start redo mode
                 q._redoing = true;
+                exQuestionOpenedAt = Date.now();
                 // Re-render to hide old comment
                 openExerciseDoing(folderId, taskId, questionIndex, true);
                 return;
             }
+
+            // Save elapsed time before grading
+            _saveExQuestionTime();
 
             const userDrawing = getExCanvasDataURL();
 
@@ -16068,12 +16361,22 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
 
                 let grading;
                 try {
-                    const cleaned = result.replace(/```json|```/g, '').trim();
+                    const cleaned = result.replace(/```json\s*|```\s*/g, '').trim().replace(/^\uFEFF/, '');
                     grading = JSON.parse(cleaned);
                 } catch (e) {
                     const match = result.match(/\{[\s\S]*\}/);
-                    if (match) grading = JSON.parse(match[0]);
-                    else { showToast('评分格式错误'); return; }
+                    if (match) {
+                        try { grading = JSON.parse(match[0]); } catch(e2) {
+                            try { grading = JSON.parse(match[0].replace(/,\s*}/g, '}').replace(/'/g, '"')); } catch(e3) {
+                                grading = null;
+                            }
+                        }
+                    }
+                    if (!grading) {
+                        // Fallback: extract score from text
+                        const sm = result.match(/(\d+)\s*[\/／]\s*10/);
+                        grading = { score: sm ? parseInt(sm[1]) : 5, correct: !/不正确|错误|incorrect/i.test(result), rigor: '-', structure: '-', comment: result.substring(0, 200) };
+                    }
                 }
 
                 const score = Math.min(10, Math.max(0, Math.round(grading.score || 0)));
@@ -16119,6 +16422,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                         score,
                         userDrawing,
                         aiComment: comment,
+                        timeSpent: origQ.timeSpent || 0,
                         redoDrawings: []
                     });
                 }
@@ -16165,11 +16469,12 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                     <div style="font-size:14px;font-weight:500;margin-bottom:8px;">${escapeHtml(wt.taskName)}</div>`;
                 wt.questions.forEach((q, qIdx) => {
                     const scoreColor = q.score >= 8 ? '#22c55e' : q.score >= 6 ? '#eab308' : '#ef4444';
+                    const tStr = q.timeSpent ? (' · 用时' + formatTimeSpent(q.timeSpent)) : '';
                     html += `<div class="exercise-task-card" style="border-left:3px solid ${scoreColor};" onclick="openWrongExerciseDoing('${folderId}','${wt.taskId}',${qIdx})">
                         <div class="exercise-task-title" style="font-size:13px;">第${q.questionIndex + 1}题</div>
                         <div style="display:flex;align-items:center;gap:6px;">
                             <span class="wrong-exercise-score" style="background:${scoreColor};font-size:11px;">${q.score}/10</span>
-                            <span style="font-size:11px;color:var(--text-muted);">点击重做</span>
+                            <span style="font-size:11px;color:var(--text-muted);">${tStr ? tStr + ' · ' : ''}点击重做</span>
                         </div>
                     </div>`;
                 });
