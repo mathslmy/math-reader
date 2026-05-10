@@ -7037,36 +7037,41 @@
             const latexBlocks = [];
             const latexInlines = [];
 
-            // 先提取保护 $$...$$ 块级公式
+            // 保护 $$...$$ 块级公式
             content = content.replace(/\$\$([\s\S]*?)\$\$/g, (match, p1) => {
-                latexBlocks.push(p1);
+                latexBlocks.push(p1.trim());
                 return `%%EXLATEXBLOCK${latexBlocks.length - 1}%%`;
             });
 
-            // 提取保护 $...$ 行内公式
+            // 保护 $...$ 行内公式
             content = content.replace(/\$([^\$\n]+?)\$/g, (match, p1) => {
-                latexInlines.push(p1);
+                latexInlines.push(p1.trim());
                 return `%%EXLATEXINLINE${latexInlines.length - 1}%%`;
             });
 
-            // 提取保护 \[...\] 块级公式
+            // 保护 \[...\] 块级公式
             content = content.replace(/\\\[([\s\S]*?)\\\]/g, (match, p1) => {
-                latexBlocks.push(p1);
+                latexBlocks.push(p1.trim());
                 return `%%EXLATEXBLOCK${latexBlocks.length - 1}%%`;
             });
 
-            // 提取保护 \(...\) 行内公式
+            // 保护 \(...\) 行内公式
             content = content.replace(/\\\(([\s\S]*?)\\\)/g, (match, p1) => {
-                latexInlines.push(p1);
+                latexInlines.push(p1.trim());
                 return `%%EXLATEXINLINE${latexInlines.length - 1}%%`;
             });
 
-            // 对纯文本部分做 HTML 转义
-            content = escapeHtml(content);
-
-            // 处理换行
-            content = content.replace(/\n\n/g, '</p><p>');
-            content = content.replace(/\n/g, '<br>');
+            // 和阅读页面一致的 Markdown 处理
+            content = content
+                .replace(/^### (.*$)/gm, '<h3>$1</h3>')
+                .replace(/^## (.*$)/gm, '<h2>$1</h2>')
+                .replace(/^# (.*$)/gm, '<h1>$1</h1>')
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/^- (.*$)/gm, '<li>$1</li>')
+                .replace(/^(\d+)\. (.*$)/gm, '<li>$2</li>')
+                .replace(/\n\n/g, '</p><p>')
+                .replace(/\n/g, '<br>');
 
             // 恢复块级公式 → 居中显示的 div
             content = content.replace(/%%EXLATEXBLOCK(\d+)%%/g, (match, idx) => {
@@ -16407,12 +16412,21 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 pointer-events: none;
             `;
 
-            // 注入块级公式和段落的样式（离屏容器无法继承页面CSS）
+            // 注入和阅读页面一致的 lecture-body 样式（离屏容器无法继承页面CSS）
             const styleEl = document.createElement('style');
             styleEl.textContent = `
+                .lecture-body { font-size: 22px; line-height: 1.8; }
+                .lecture-body h1 { font-size: 1.6em; font-weight: 700; margin: 0.8em 0 0.4em; }
+                .lecture-body h2 { font-size: 1.35em; font-weight: 700; margin: 0.7em 0 0.35em; border-bottom: 1px solid #e0e0e0; padding-bottom: 0.2em; }
+                .lecture-body h3 { font-size: 1.15em; font-weight: 600; margin: 0.6em 0 0.3em; }
+                .lecture-body p { margin: 0 0 0.6em 0; }
+                .lecture-body li { margin-left: 1.5em; margin-bottom: 0.3em; list-style: disc; }
+                .lecture-body strong { font-weight: 700; }
+                .lecture-body .katex { font-size: 1.05em; }
+                .lecture-body .katex-display { margin: 16px 0; overflow-x: auto; overflow-y: hidden; }
+                .lecture-body .katex-display > .katex { text-align: center; }
                 .latex-display { margin: 16px 0; text-align: center; }
                 .latex-display .katex-display { margin: 0; }
-                p { margin: 0 0 0.4em 0; }
             `;
             container.appendChild(styleEl);
 
@@ -16422,10 +16436,9 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             titleEl.textContent = `第 ${qIdx + 1} 题`;
             container.appendChild(titleEl);
 
-            // 题目内容——和阅读页面一致的渲染方式：
-            // renderExerciseLatex 处理换行、块级公式居中、行内公式保留，然后 renderMathInElement 渲染
+            // 题目内容——和阅读页面一致的渲染方式
             const bodyEl = document.createElement('div');
-            bodyEl.style.cssText = 'font-size: 22px; line-height: 1.8;';
+            bodyEl.className = 'lecture-body';
             bodyEl.innerHTML = renderExerciseLatex(latexText);
             container.appendChild(bodyEl);
 
@@ -16436,11 +16449,12 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 renderMathInElement(bodyEl, {
                     delimiters: [
                         {left: '$$', right: '$$', display: true},
-                        {left: '$', right: '$', display: false},
                         {left: '\\[', right: '\\]', display: true},
+                        {left: '$', right: '$', display: false},
                         {left: '\\(', right: '\\)', display: false}
                     ],
-                    throwOnError: false
+                    throwOnError: false,
+                    strict: false
                 });
             }
 
@@ -17285,11 +17299,12 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
                 renderMathInElement(qDiv, {
                     delimiters: [
                         {left: '$$', right: '$$', display: true},
-                        {left: '$', right: '$', display: false},
                         {left: '\\[', right: '\\]', display: true},
+                        {left: '$', right: '$', display: false},
                         {left: '\\(', right: '\\)', display: false}
                     ],
-                    throwOnError: false
+                    throwOnError: false,
+                    strict: false
                 });
             }
 
