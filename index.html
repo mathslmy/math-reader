@@ -1561,6 +1561,10 @@
             display: flex;
         }
 
+        body.exercise-doing-active .exercise-upload-bar {
+            display: none !important;
+        }
+
         .exercise-upload-btn {
             width: 44px;
             height: 44px;
@@ -1585,11 +1589,17 @@
             top: 0;
             left: 0;
             right: 0;
-            bottom: 0;
+            bottom: 56px;
             background: var(--bg-primary);
-            z-index: 300;
+            z-index: 290;
             display: none;
             flex-direction: column;
+        }
+
+        @supports (padding-bottom: env(safe-area-inset-bottom)) {
+            .exercise-doing-view {
+                bottom: calc(56px + env(safe-area-inset-bottom));
+            }
         }
 
         .exercise-doing-view.show { display: flex; }
@@ -1757,11 +1767,17 @@
             top: 0;
             left: 0;
             right: 0;
-            bottom: 0;
+            bottom: 56px;
             background: var(--bg-primary);
-            z-index: 300;
+            z-index: 290;
             display: none;
             flex-direction: column;
+        }
+
+        @supports (padding-bottom: env(safe-area-inset-bottom)) {
+            .exercise-archive-view {
+                bottom: calc(56px + env(safe-area-inset-bottom));
+            }
         }
 
         .exercise-archive-view.show { display: flex; }
@@ -15773,6 +15789,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
             // Setup UI
             document.getElementById('exerciseDoingTitle').textContent = `${title} (${questionIndex + 1}/${questions.length})`;
             document.getElementById('exerciseDoingView').classList.add('show');
+            document.body.classList.add('exercise-doing-active');
 
             // Render question
             const q = questions[questionIndex];
@@ -15858,6 +15875,7 @@ ${paper.abstract ? '原摘要：' + paper.abstract : ''}`;
 
         function closeExerciseDoing() {
             document.getElementById('exerciseDoingView').classList.remove('show');
+            document.body.classList.remove('exercise-doing-active');
             if (exTimerInterval) { clearInterval(exTimerInterval); exTimerInterval = null; }
             exDoingState = null;
         }
