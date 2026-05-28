@@ -2496,6 +2496,8 @@
             align-items: center;
             gap: 6px;
             margin-bottom: 4px;
+            -webkit-user-select: none;
+            user-select: none;
         }
 
         .chat-message.user .chat-sender {
@@ -2531,6 +2533,118 @@
             object-fit: cover;
         }
 
+        /* 头像旁的消息操作按钮（重做/编辑/删除） */
+        .chat-msg-actions {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        .chat-msg-action {
+            width: 24px;
+            height: 24px;
+            padding: 0;
+            border: none;
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            flex-shrink: 0;
+            opacity: 0.7;
+            transition: opacity 0.15s, background 0.15s;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .chat-msg-action:hover, .chat-msg-action:active {
+            opacity: 1;
+            background: var(--border-color);
+        }
+        .chat-msg-action.danger { color: #ef4444; }
+        .chat-msg-action svg { width: 14px; height: 14px; }
+
+        /* 选中文字时浮现的"引用"按钮 */
+        .chat-quote-btn {
+            position: fixed;
+            display: none;
+            align-items: center;
+            gap: 5px;
+            padding: 7px 14px;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: 18px;
+            font-size: 13px;
+            font-weight: 600;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+            cursor: pointer;
+            z-index: 1001;
+            -webkit-tap-highlight-color: transparent;
+            white-space: nowrap;
+        }
+        .chat-quote-btn.show { display: inline-flex; }
+        .chat-quote-btn svg { width: 14px; height: 14px; }
+
+        /* 输入框上方的引用预览条 */
+        .chat-quote-preview {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            background: var(--bg-secondary);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 8px 8px 0;
+            font-size: 13px;
+            color: var(--text-secondary);
+            flex-shrink: 0;
+        }
+        .chat-quote-preview-label {
+            color: var(--accent);
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+        .chat-quote-preview-text {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .chat-quote-preview-close {
+            flex-shrink: 0;
+            border: none;
+            background: none;
+            color: var(--text-muted);
+            font-size: 18px;
+            line-height: 1;
+            cursor: pointer;
+            padding: 0 2px;
+        }
+
+        /* 气泡内引用的内容块 */
+        .chat-quote-block {
+            border-left: 3px solid var(--accent);
+            padding: 4px 10px;
+            margin-bottom: 6px;
+            background: rgba(0,0,0,0.05);
+            border-radius: 0 6px 6px 0;
+            font-size: 13px;
+            opacity: 0.9;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .chat-message.user .chat-quote-block {
+            border-left-color: rgba(255,255,255,0.6);
+            background: rgba(255,255,255,0.14);
+        }
+        body.dark .chat-quote-block { background: rgba(255,255,255,0.07); }
+
         .chat-bubble {
             padding: 10px 14px;
             border-radius: 18px;
@@ -2541,8 +2655,8 @@
             min-width: 0;
             overflow: hidden;
             -webkit-touch-callout: none;
-            -webkit-user-select: none;
-            user-select: none;
+            -webkit-user-select: text;
+            user-select: text;
         }
 
         .chat-message.user .chat-bubble {
@@ -4928,12 +5042,23 @@
             <div class="chat-container" id="readerChatContainer">
                 <!-- 动态生成聊天消息 -->
             </div>
+            <div class="chat-quote-preview" id="readerChatQuotePreview" style="display:none;">
+                <span class="chat-quote-preview-label" data-i18n="chat_quote_label">引用</span>
+                <span class="chat-quote-preview-text" id="readerChatQuotePreviewText"></span>
+                <button class="chat-quote-preview-close" onclick="clearChatQuote()" aria-label="remove quote">&times;</button>
+            </div>
             <div class="chat-input-area">
                 <input type="text" id="readerChatInput" class="chat-input" placeholder="说点什么..." data-i18n="chat_placeholder" data-i18n-attr="placeholder" onkeypress="if(event.key==='Enter')sendReaderChatMessage()">
                 <button class="chat-send-btn" onclick="sendReaderChatMessage()" data-i18n="chat_send">发送</button>
             </div>
         </div>
     </div>
+
+    <!-- 聊天选区"引用"按钮（顶层 fixed 定位） -->
+    <button class="chat-quote-btn" id="readerChatQuoteBtn" onmousedown="event.preventDefault()" onclick="quoteSelectedChatText()">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9.983 3v7.391c0 5.704-3.731 9.57-8.983 10.609l-.995-2.151c2.432-.917 3.995-3.638 3.995-5.849H0v-8h9.983zm14.017 0v7.391c0 5.704-3.731 9.57-8.983 10.609l-.995-2.151c2.432-.917 3.995-3.638 3.995-5.849h-3.999v-8h9.982z"/></svg>
+        <span data-i18n="chat_quote">引用</span>
+    </button>
 
     <!-- ==================== Task Select Modal ==================== -->
     <div class="modal-overlay" id="taskSelectModal" onclick="hideModal('taskSelectModal')">
@@ -5451,6 +5576,7 @@
                 case_sensitive:'区分大小写',ocr_search:'OCR识别搜索',
                 select_doc_hint:'从书架选择文档开始阅读',cancel:'取消',jump:'跳转',
                 draft:'草稿',notes_title:'笔记',clear:'清空',delete:'删除',
+                chat_edit:'编辑',chat_quote:'引用',chat_quote_label:'引用',chat_quote_prefix:'【引用】',confirm_regenerate:'重新生成此回答？此条及之后的消息将被替换。',
                 recognize:'识别',save:'保存',lecture_tab:'讲义',abstract_tab:'摘要',
                 course:'课程',click_new_course:'点击空白处新建课程',
                 seminar:'讲座',click_new_seminar:'点击空白处新建讲座',
@@ -5614,6 +5740,7 @@
                 case_sensitive:'Case sensitive',ocr_search:'OCR Search',
                 select_doc_hint:'Select a document from Library',cancel:'Cancel',jump:'Go',
                 draft:'Draft',notes_title:'Notes',clear:'Clear',delete:'Delete',
+                chat_edit:'Edit',chat_quote:'Quote',chat_quote_label:'Quote',chat_quote_prefix:'[Quoted] ',confirm_regenerate:'Regenerate this reply? This and the following messages will be replaced.',
                 recognize:'Recognize',save:'Save',lecture_tab:'Lectures',abstract_tab:'Abstracts',
                 course:'Course',click_new_course:'Tap to create a course',
                 seminar:'Seminar',click_new_seminar:'Tap to create a seminar',
@@ -5777,6 +5904,7 @@
                 case_sensitive:'Sensible à la casse',ocr_search:'Recherche OCR',
                 select_doc_hint:'Sélectionnez un document',cancel:'Annuler',jump:'Aller',
                 draft:'Brouillon',notes_title:'Notes',clear:'Effacer',delete:'Supprimer',
+                chat_edit:'Modifier',chat_quote:'Citer',chat_quote_label:'Citation',chat_quote_prefix:'[Cité] ',confirm_regenerate:'Régénérer cette réponse ? Ce message et les suivants seront remplacés.',
                 recognize:'Reconnaître',save:'Enregistrer',lecture_tab:'Cours',abstract_tab:'Résumés',
                 course:'Cours',click_new_course:'Toucher pour créer un cours',
                 seminar:'Séminaire',click_new_seminar:'Toucher pour créer un séminaire',
@@ -7416,6 +7544,11 @@
                 window._wrongAIChatOverride = false;
                 window._wrongAIContext = null;
                 window._wrongAIImages = null;
+            }
+            // 关闭阅读器AI对话时清理选区引用状态
+            if (id === 'readerChatModal') {
+                hideChatQuoteButton();
+                clearChatQuote();
             }
         }
 
@@ -11946,20 +12079,38 @@
                 if (msg.screenshot) {
                     contentHtml += `<img src="${msg.screenshot}" style="max-width:100%;border-radius:8px;margin-bottom:6px;cursor:pointer;" onclick="window.open(this.src)">`;
                 }
+                if (msg.quote) {
+                    contentHtml += `<div class="chat-quote-block">${escapeHtml(msg.quote)}</div>`;
+                }
                 if (isUser) {
                     contentHtml += escapeHtml(msg.content);
                 } else {
                     contentHtml += renderChatMarkdownLatex(msg.content);
                 }
 
+                // 头像旁的操作按钮：AI=重做+删除，用户=编辑+删除
+                const _redoIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>';
+                const _editIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+                const _delIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>';
+                let actionsHtml = '<div class="chat-msg-actions">';
+                if (isUser) {
+                    actionsHtml += `<button class="chat-msg-action" onclick="editReaderChatMessage(${index})" title="${escapeHtml(i18n('chat_edit'))}">${_editIcon}</button>`;
+                } else {
+                    actionsHtml += `<button class="chat-msg-action" onclick="regenerateReaderChatMessage(${index})" title="${escapeHtml(i18n('redo'))}">${_redoIcon}</button>`;
+                }
+                actionsHtml += `<button class="chat-msg-action danger" onclick="confirmDeleteReaderChatMessage(${index})" title="${escapeHtml(i18n('delete'))}">${_delIcon}</button>`;
+                actionsHtml += '</div>';
+
                 messageDiv.innerHTML = `
-                    <div class="chat-sender">${avatarHtml}<span class="chat-sender-name">${escapeHtml(displayName)}</span></div>
+                    <div class="chat-sender">${avatarHtml}${actionsHtml}<span class="chat-sender-name">${escapeHtml(displayName)}</span></div>
                     <div class="chat-bubble">${contentHtml}</div>
                 `;
                 container.appendChild(messageDiv);
 
-                setupReaderChatLongPress(messageDiv, index);
+                setupReaderChatMessage(messageDiv, index);
             });
+            ensureChatSelectionHandlers();
+            ensureChatHighlightOverlay();
             container.scrollTop = container.scrollHeight;
             renderLectureMath(container);
         }
@@ -12004,63 +12155,167 @@
             return '<p>' + html + '</p>';
         }
 
-        let readerChatLongPressTimer = null;
+        // ==================== 聊天消息：操作按钮 & 选区引用 ====================
+        let chatSelectedText = '';
+        let chatSelectionRange = null;
+        let readerChatQuote = '';
+        let chatQuoteShownAt = 0;
 
-        function setupReaderChatLongPress(element, msgIndex) {
+        function setupReaderChatMessage(element, msgIndex) {
+            // 抑制气泡内右键/长按原生菜单（选区操作由自定义"引用"按钮替代）
             const bubble = element.querySelector('.chat-bubble');
-            const avatar = element.querySelector('.chat-avatar');
-            const isUser = element.classList.contains('user');
-
-            // Suppress native long-press callout on the whole message
-            element.style.webkitTouchCallout = 'none';
-            element.style.webkitUserSelect = 'none';
-            element.style.userSelect = 'none';
-
-            // Long press on bubble: redo (AI = regenerate, User = edit)
-            if (bubble) {
-                let bubbleTimer = null;
-                let bubbleFired = false;
-                bubble.addEventListener('touchstart', (e) => {
-                    bubbleFired = false;
-                    bubbleTimer = setTimeout(() => {
-                        bubbleTimer = null;
-                        bubbleFired = true;
-                        if (isUser) {
-                            editReaderChatMessage(msgIndex);
-                        } else {
-                            regenerateReaderChatMessage(msgIndex);
-                        }
-                    }, 500);
-                }, { passive: false });
-                bubble.addEventListener('touchend', (e) => {
-                    if (bubbleTimer) { clearTimeout(bubbleTimer); bubbleTimer = null; }
-                    if (bubbleFired) { e.preventDefault(); }
-                });
-                bubble.addEventListener('touchmove', () => { if (bubbleTimer) clearTimeout(bubbleTimer); bubbleTimer = null; });
-                bubble.addEventListener('contextmenu', (e) => { e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); return false; });
+            if (bubble && !bubble._chatCtxBound) {
+                bubble._chatCtxBound = true;
+                bubble.addEventListener('contextmenu', (e) => { e.preventDefault(); e.stopPropagation(); });
             }
+        }
 
-            // Long press on avatar: delete
-            if (avatar) {
-                let avatarTimer = null;
-                let avatarFired = false;
-                avatar.addEventListener('touchstart', (e) => {
-                    avatarFired = false;
-                    avatarTimer = setTimeout(() => {
-                        avatarTimer = null;
-                        avatarFired = true;
-                        if (confirm(i18n('confirm_delete'))) {
-                            deleteReaderChatMessage(msgIndex);
-                        }
-                    }, 500);
-                }, { passive: false });
-                avatar.addEventListener('touchend', (e) => {
-                    if (avatarTimer) { clearTimeout(avatarTimer); avatarTimer = null; }
-                    if (avatarFired) { e.preventDefault(); }
-                });
-                avatar.addEventListener('touchmove', () => { if (avatarTimer) clearTimeout(avatarTimer); avatarTimer = null; });
-                avatar.addEventListener('contextmenu', (e) => { e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); return false; });
+        // 选区监听只绑定一次（容器级）
+        function ensureChatSelectionHandlers() {
+            const container = document.getElementById('readerChatContainer');
+            if (!container || container._chatSelBound) return;
+            container._chatSelBound = true;
+            container.addEventListener('mouseup', handleReaderChatSelection);
+            container.addEventListener('touchend', handleReaderChatSelection);
+            container.addEventListener('contextmenu', (e) => {
+                if (e.target.closest('.chat-bubble')) e.preventDefault();
+            });
+        }
+
+        // 高亮 overlay 每次 render 后重建（innerHTML 会清除旧 overlay）
+        function ensureChatHighlightOverlay() {
+            const container = document.getElementById('readerChatContainer');
+            if (!container) return null;
+            container.style.position = 'relative';
+            let overlay = container.querySelector('.chat-highlight-overlay');
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.className = 'chat-highlight-overlay';
+                overlay.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1;';
+                container.appendChild(overlay);
             }
+            return overlay;
+        }
+
+        function handleReaderChatSelection(e) {
+            // 延时让浏览器完成选区，但在弹出原生菜单前拦截
+            setTimeout(() => {
+                const selection = window.getSelection();
+                const text = selection ? selection.toString().trim() : '';
+                if (!text) return; // 空选区不主动隐藏，交给全局点击处理
+                // 选区必须落在聊天气泡内
+                const node = selection.anchorNode;
+                const anchorEl = node && (node.nodeType === 1 ? node : node.parentElement);
+                if (!anchorEl || !anchorEl.closest('.chat-bubble')) return;
+                chatSelectedText = text;
+                try {
+                    chatSelectionRange = selection.getRangeAt(0).cloneRange();
+                    highlightChatSelection(chatSelectionRange);
+                    showChatQuoteButton(chatSelectionRange);
+                } catch (err) {
+                    console.warn('Chat selection error:', err);
+                }
+                // 清除原生选区，干掉原生菜单
+                selection.removeAllRanges();
+            }, 50);
+        }
+
+        // 用绝对定位 div 覆盖高亮，不改 DOM 结构 —— 对 KaTeX 安全
+        function highlightChatSelection(range) {
+            const overlay = ensureChatHighlightOverlay();
+            if (!overlay) return;
+            overlay.innerHTML = '';
+            const container = document.getElementById('readerChatContainer');
+            const containerRect = container.getBoundingClientRect();
+            const scrollTop = container.scrollTop;
+            const scrollLeft = container.scrollLeft;
+            const rects = range.getClientRects();
+            for (let i = 0; i < rects.length; i++) {
+                const r = rects[i];
+                if (r.width === 0 && r.height === 0) continue;
+                const div = document.createElement('div');
+                div.style.cssText = 'position:absolute;background:rgba(0,122,255,0.22);border-radius:2px;pointer-events:none;'
+                    + `left:${r.left - containerRect.left + scrollLeft}px;`
+                    + `top:${r.top - containerRect.top + scrollTop}px;`
+                    + `width:${r.width}px;height:${r.height}px;`;
+                overlay.appendChild(div);
+            }
+        }
+
+        function clearChatHighlight() {
+            const overlay = document.querySelector('#readerChatContainer .chat-highlight-overlay');
+            if (overlay) overlay.innerHTML = '';
+        }
+
+        function showChatQuoteButton(range) {
+            const btn = document.getElementById('readerChatQuoteBtn');
+            if (!btn || !range) return;
+            const rect = range.getBoundingClientRect();
+            if (!rect || (rect.width === 0 && rect.height === 0)) return;
+            btn.classList.add('show');
+            chatQuoteShownAt = Date.now();
+            const btnW = btn.offsetWidth || 90;
+            const btnH = btn.offsetHeight || 34;
+            let left = rect.left + rect.width / 2 - btnW / 2;
+            left = Math.max(10, Math.min(left, window.innerWidth - btnW - 10));
+            let top = rect.top - btnH - 8;
+            if (top < 10) top = rect.bottom + 8; // 选区贴顶时显示在下方
+            btn.style.left = left + 'px';
+            btn.style.top = top + 'px';
+        }
+
+        function hideChatQuoteButton() {
+            const btn = document.getElementById('readerChatQuoteBtn');
+            if (btn) btn.classList.remove('show');
+            clearChatHighlight();
+        }
+
+        function quoteSelectedChatText() {
+            if (!chatSelectedText) return;
+            readerChatQuote = chatSelectedText;
+            const previewText = document.getElementById('readerChatQuotePreviewText');
+            const preview = document.getElementById('readerChatQuotePreview');
+            if (previewText) previewText.textContent = readerChatQuote;
+            if (preview) preview.style.display = 'flex';
+            hideChatQuoteButton();
+            chatSelectedText = '';
+            chatSelectionRange = null;
+            const inp = document.getElementById('readerChatInput');
+            if (inp) setTimeout(() => inp.focus(), 50);
+        }
+
+        function clearChatQuote() {
+            readerChatQuote = '';
+            const preview = document.getElementById('readerChatQuotePreview');
+            if (preview) preview.style.display = 'none';
+        }
+
+        function confirmDeleteReaderChatMessage(index) {
+            if (confirm(i18n('confirm_delete'))) {
+                deleteReaderChatMessage(index);
+            }
+        }
+
+        // 点击/触摸空白处隐藏"引用"按钮（刚弹出 300ms 内不关闭，避免选区结束的延迟回调误关）
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('.chat-quote-btn')) return;
+            if (Date.now() - chatQuoteShownAt < 300) return;
+            if (!window.getSelection().toString().trim()) hideChatQuoteButton();
+        });
+        document.addEventListener('touchstart', (e) => {
+            if (e.target.closest('.chat-quote-btn')) return;
+            setTimeout(() => {
+                if (Date.now() - chatQuoteShownAt < 300) return;
+                if (!window.getSelection().toString().trim()) hideChatQuoteButton();
+            }, 120);
+        });
+
+        // 构建发送给 AI 的消息：带引用的用户消息把引用内容并入正文
+        function buildReaderChatApiMessages(history) {
+            return history.map(h => ({
+                role: h.role,
+                content: h.quote ? `${i18n('chat_quote_prefix')}${h.quote}\n\n${h.content}` : h.content
+            }));
         }
 
         function editReaderChatMessage(index) {
@@ -12101,7 +12356,7 @@
                 } catch (e) { console.error('切出当前页PDF失败:', e); }
             }
 
-            const apiMessages = history.map(h => ({ role: h.role, content: h.content }));
+            const apiMessages = buildReaderChatApiMessages(history);
 
             const container = document.getElementById('readerChatContainer');
             const loadingDiv = document.createElement('div');
@@ -12136,7 +12391,7 @@
             if (index < 0 || index >= history.length) return;
             if (history[index].role !== 'assistant') return;
 
-            if (!confirm(i18n('confirm_delete'))) return;
+            if (!confirm(i18n('confirm_regenerate'))) return;
 
             // Remove this AI message and all subsequent messages
             history = history.slice(0, index);
@@ -12190,9 +12445,15 @@
 
             input.value = '';
 
+            // 附带引用内容（若有），随后清除引用预览
+            const quote = readerChatQuote;
+            clearChatQuote();
+
             // Add user message
             let history = loadReaderChatHistory(currentDoc.id);
-            history.push({ role: 'user', content: message });
+            const userMsg = { role: 'user', content: message };
+            if (quote) userMsg.quote = quote;
+            history.push(userMsg);
             saveReaderChatHistory(currentDoc.id, history);
             renderReaderChatHistory();
 
@@ -12213,7 +12474,7 @@
             const notesSummary = notes.map(n => n.text).filter(Boolean).join('; ');
             const systemPrompt = `${i18n('prompt_math_ai')}\n\n${i18n('prompt_user_notes')}${notesSummary || i18n('prompt_none')}\n${i18n('prompt_help_instruction')}\n${i18n('prompt_workflow')}`;
 
-            const apiMessages = history.map(h => ({ role: h.role, content: h.content }));
+            const apiMessages = buildReaderChatApiMessages(history);
 
             // Show typing indicator
             const container = document.getElementById('readerChatContainer');
@@ -12643,7 +12904,8 @@
                 messages: history.map((msg, i) => ({
                     index: i + 1,
                     role: msg.role,
-                    content: msg.content
+                    content: msg.content,
+                    quote: msg.quote || undefined
                 }))
             };
 
