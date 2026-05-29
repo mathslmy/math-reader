@@ -7538,6 +7538,11 @@
         }
 
         function hideModal(id) {
+            // 关闭阅读器AI对话前先保存浏览位置（隐藏后 scrollTop 失效）
+            if (id === 'readerChatModal') {
+                const _cc = document.getElementById('readerChatContainer');
+                if (_cc && currentDoc && _cc.scrollHeight > 0) saveReaderChatScroll(currentDoc.id, _cc.scrollTop);
+            }
             document.getElementById(id).classList.remove('show');
             // 关闭AI聊天弹窗时清除错题上下文
             if (id === 'aiChatModal') {
@@ -12046,6 +12051,36 @@
             }, 500);
         }
 
+        // ==================== 聊天浏览位置（本地存储，按文档区分）====================
+        let _chatScrollSaveTimer = null;
+        function saveReaderChatScroll(docId, scrollTop) {
+            if (!docId) return;
+            try { localStorage.setItem('mathreader_chat_scroll_' + docId, String(Math.max(0, Math.round(scrollTop)))); } catch (e) {}
+        }
+        function loadReaderChatScroll(docId) {
+            if (!docId) return null;
+            try {
+                const v = localStorage.getItem('mathreader_chat_scroll_' + docId);
+                return v === null ? null : parseInt(v, 10);
+            } catch (e) { return null; }
+        }
+        function restoreReaderChatScroll() {
+            const container = document.getElementById('readerChatContainer');
+            if (!container || !currentDoc) return;
+            const saved = loadReaderChatScroll(currentDoc.id);
+            const apply = () => {
+                if (saved !== null && !isNaN(saved) && saved >= 0) {
+                    container.scrollTop = Math.min(saved, container.scrollHeight);
+                } else {
+                    container.scrollTop = container.scrollHeight; // 无记录则默认到底部（最新消息）
+                }
+            };
+            // 模态显示 + KaTeX 渲染需要时间，多次定位更稳
+            requestAnimationFrame(apply);
+            setTimeout(apply, 120);
+            setTimeout(apply, 350);
+        }
+
         function renderReaderChatHistory() {
             if (!currentDoc) return;
             const container = document.getElementById('readerChatContainer');
@@ -12102,7 +12137,7 @@
                 actionsHtml += '</div>';
 
                 messageDiv.innerHTML = `
-                    <div class="chat-sender">${avatarHtml}${actionsHtml}<span class="chat-sender-name">${escapeHtml(displayName)}</span></div>
+                    <div class="chat-sender">${avatarHtml}<span class="chat-sender-name">${escapeHtml(displayName)}</span>${actionsHtml}</div>
                     <div class="chat-bubble">${contentHtml}</div>
                 `;
                 container.appendChild(messageDiv);
@@ -12180,6 +12215,12 @@
             container.addEventListener('contextmenu', (e) => {
                 if (e.target.closest('.chat-bubble')) e.preventDefault();
             });
+            // 记录浏览位置（防抖）
+            container.addEventListener('scroll', () => {
+                if (!currentDoc) return;
+                clearTimeout(_chatScrollSaveTimer);
+                _chatScrollSaveTimer = setTimeout(() => saveReaderChatScroll(currentDoc.id, container.scrollTop), 200);
+            }, { passive: true });
         }
 
         // 高亮 overlay 每次 render 后重建（innerHTML 会清除旧 overlay）
@@ -12435,6 +12476,7 @@
 
             renderReaderChatHistory();
             showModal('readerChatModal');
+            restoreReaderChatScroll(); // 模态显示后恢复上次浏览位置
             setTimeout(() => document.getElementById('readerChatInput').focus(), 300);
         }
 
