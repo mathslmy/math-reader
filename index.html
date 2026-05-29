@@ -2655,8 +2655,21 @@
             min-width: 0;
             overflow: hidden;
             -webkit-touch-callout: none;
+            /* 桌面端默认可选中文字（鼠标拖拽不影响滚动）；触摸设备见下方媒体查询 */
             -webkit-user-select: text;
             user-select: text;
+        }
+
+        /* 触摸设备：气泡默认不可选中，保证上下滑动流畅；长按某条气泡才临时进入可选中状态进行「引用」 */
+        @media (pointer: coarse) {
+            .chat-bubble {
+                -webkit-user-select: none;
+                user-select: none;
+            }
+            .chat-bubble.selectable {
+                -webkit-user-select: text;
+                user-select: text;
+            }
         }
 
         .chat-message.user .chat-bubble {
@@ -12215,12 +12228,50 @@
             container.addEventListener('contextmenu', (e) => {
                 if (e.target.closest('.chat-bubble')) e.preventDefault();
             });
-            // 记录浏览位置（防抖）
+
+            // 触摸设备长按才允许选中气泡文字：默认气泡不可选中以保证上下滑动流畅，
+            // 手指在某条气泡上按住 350ms 不移动才把该气泡设为可选中，随后原生选区/「引用」流程接管。
+            // 一旦发生移动（即滚动意图）立即取消，滑动不受影响。
+            container.addEventListener('touchstart', (e) => {
+                clearTimeout(_chatLpTimer);
+                clearChatSelectableBubbles(); // 新手势开始：先恢复不可选中，滑动流畅
+                const bubble = e.target.closest && e.target.closest('.chat-bubble');
+                if (!bubble || !e.touches || e.touches.length !== 1) { _chatLpStart = null; return; }
+                const t = e.touches[0];
+                _chatLpStart = { x: t.clientX, y: t.clientY };
+                _chatLpTimer = setTimeout(() => { bubble.classList.add('selectable'); }, 350);
+            }, { passive: true });
+            container.addEventListener('touchmove', (e) => {
+                if (!_chatLpStart || !e.touches || !e.touches.length) return;
+                const t = e.touches[0];
+                if (Math.abs(t.clientX - _chatLpStart.x) > 8 || Math.abs(t.clientY - _chatLpStart.y) > 8) {
+                    clearTimeout(_chatLpTimer); // 判定为滚动，取消长按选中
+                    _chatLpStart = null;
+                }
+            }, { passive: true });
+            container.addEventListener('touchend', () => {
+                clearTimeout(_chatLpTimer);
+                _chatLpStart = null;
+            }, { passive: true });
+
+            // 记录浏览位置（防抖）；滚动时清除可选中状态，避免影响后续滑动
             container.addEventListener('scroll', () => {
+                clearChatSelectableBubbles();
                 if (!currentDoc) return;
                 clearTimeout(_chatScrollSaveTimer);
                 _chatScrollSaveTimer = setTimeout(() => saveReaderChatScroll(currentDoc.id, container.scrollTop), 200);
             }, { passive: true });
+        }
+
+        let _chatLpTimer = null;
+        let _chatLpStart = null;
+        // 清除所有气泡的临时可选中状态（恢复流畅滑动）
+        function clearChatSelectableBubbles() {
+            const c = document.getElementById('readerChatContainer');
+            if (!c) return;
+            const sel = c.querySelector('.chat-bubble.selectable');
+            if (!sel) return; // 没有任何可选中气泡时直接返回，避免滚动时多余开销
+            c.querySelectorAll('.chat-bubble.selectable').forEach(b => b.classList.remove('selectable'));
         }
 
         // 高亮 overlay 每次 render 后重建（innerHTML 会清除旧 overlay）
@@ -12309,6 +12360,7 @@
             const btn = document.getElementById('readerChatQuoteBtn');
             if (btn) btn.classList.remove('show');
             clearChatHighlight();
+            clearChatSelectableBubbles(); // 恢复气泡不可选中，保证后续滑动流畅
         }
 
         function quoteSelectedChatText() {
