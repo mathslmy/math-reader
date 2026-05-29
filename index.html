@@ -2458,6 +2458,7 @@
             flex: 1;
             overflow-y: auto;
             overflow-x: hidden;
+            -webkit-overflow-scrolling: touch;
             padding: 8px;
             display: flex;
             flex-direction: column;
@@ -12211,7 +12212,7 @@
             if (!container || container._chatSelBound) return;
             container._chatSelBound = true;
             container.addEventListener('mouseup', handleReaderChatSelection);
-            container.addEventListener('touchend', handleReaderChatSelection);
+            container.addEventListener('touchend', handleReaderChatSelection, { passive: true });
             container.addEventListener('contextmenu', (e) => {
                 if (e.target.closest('.chat-bubble')) e.preventDefault();
             });
@@ -12349,7 +12350,7 @@
                 if (Date.now() - chatQuoteShownAt < 300) return;
                 if (!window.getSelection().toString().trim()) hideChatQuoteButton();
             }, 120);
-        });
+        }, { passive: true });
 
         // 构建发送给 AI 的消息：带引用的用户消息把引用内容并入正文
         function buildReaderChatApiMessages(history) {
@@ -13610,7 +13611,17 @@ ${i18n('prompt_lecture_gen')}`;
             }
         }
 
+        // 滚动时用 rAF 合并多次事件，避免每个 scroll tick 都读 scrollHeight/clientHeight
+        // 触发同步布局（layout thrash），保证阅读滚动顺滑
+        let _lectureProgressRaf = 0;
         function updateLectureProgress() {
+            if (_lectureProgressRaf) return;
+            _lectureProgressRaf = requestAnimationFrame(() => {
+                _lectureProgressRaf = 0;
+                _updateLectureProgressNow();
+            });
+        }
+        function _updateLectureProgressNow() {
             if (!currentLecture) return;
             // Classroom notes have their own progress handler
             if (currentLecture.isClassroomNote) { updateClassroomNoteProgress(); return; }
@@ -14764,7 +14775,7 @@ ${i18n('prompt_lecture_gen')}`;
             if (!content._lectureSelBound) {
                 content._lectureSelBound = true;
                 content.addEventListener('mouseup', handleLectureSelection);
-                content.addEventListener('touchend', handleLectureSelection);
+                content.addEventListener('touchend', handleLectureSelection, { passive: true });
                 content.addEventListener('contextmenu', e => e.preventDefault());
             }
 
@@ -14891,7 +14902,7 @@ ${i18n('prompt_lecture_gen')}`;
                     }
                 }, 100);
             }
-        });
+        }, { passive: true });
 
         async function askAIAboutSelection() {
             if (!lectureSelectedText) return;
@@ -14993,7 +15004,7 @@ ${i18n('prompt_lecture_gen')}`;
             if (!qDiv || qDiv._exSelBound) return;
             qDiv._exSelBound = true;
             qDiv.addEventListener('mouseup', handleExerciseSelection);
-            qDiv.addEventListener('touchend', handleExerciseSelection);
+            qDiv.addEventListener('touchend', handleExerciseSelection, { passive: true });
         }
 
         function handleExerciseSelection(e) {
@@ -15048,7 +15059,7 @@ ${i18n('prompt_lecture_gen')}`;
                     }
                 }, 100);
             }
-        });
+        }, { passive: true });
 
         // 回车发送
         document.addEventListener('keydown', (e) => {
@@ -16448,9 +16459,10 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                 });
             }
 
-            // Update scroll progress
+            // Update scroll progress —— 经 rAF 节流的 updateLectureProgress 统一调度，
+            // 避免直接在每个 scroll tick 读布局并同步写盘造成卡顿
             container.onscroll = function() {
-                updateClassroomNoteProgress();
+                updateLectureProgress();
             };
         }
 
@@ -16474,7 +16486,9 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
             const note = session.notes[noteIndex];
             note.progress = progress;
             if (progress > (note.maxProgress || 0)) note.maxProgress = progress;
-            saveData();
+            // 延迟保存，避免滚动期间每帧同步写盘
+            clearTimeout(window.lectureProgressSaveTimeout);
+            window.lectureProgressSaveTimeout = setTimeout(() => saveData(), 1000);
         }
 
         function viewClassroomSource(type, folderId, sessionId, ref) {
