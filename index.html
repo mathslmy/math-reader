@@ -1305,6 +1305,53 @@
             border: 1px solid var(--border-color);
         }
 
+        .classroom-action-btn.mic {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            position: relative;
+        }
+
+        .classroom-action-btn.mic.recording {
+            background: #ef4444;
+            color: #fff;
+            border-color: #ef4444;
+            animation: micPulse 1.4s ease-in-out infinite;
+        }
+
+        @keyframes micPulse {
+            0%, 100% { box-shadow: 0 2px 8px rgba(239,68,68,0.4); }
+            50% { box-shadow: 0 0 0 8px rgba(239,68,68,0.18); }
+        }
+
+        .classroom-rec-timer {
+            position: fixed;
+            bottom: 110px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #ef4444;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 6px 14px;
+            border-radius: 20px;
+            z-index: 260;
+            display: none;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+
+        .classroom-rec-timer.show { display: flex; }
+
+        .classroom-rec-timer .rec-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #fff;
+            animation: micPulse 1.4s ease-in-out infinite;
+        }
+
         .classroom-source-section {
             margin-top: 16px;
             padding-top: 12px;
@@ -1324,6 +1371,39 @@
             padding: 14px;
             margin-bottom: 10px;
             cursor: pointer;
+        }
+
+        /* 录音转写纪要：蓝底区分于普通讲义 */
+        .classroom-note-card.recording-note {
+            background: #e8f0fe;
+            border: 1px solid #c5d9fb;
+        }
+        body.dark-theme .classroom-note-card.recording-note {
+            background: #1e2a44;
+            border-color: #314a78;
+        }
+        .classroom-note-card.recording-note .classroom-note-card-title {
+            color: #1a56db;
+        }
+        body.dark-theme .classroom-note-card.recording-note .classroom-note-card-title {
+            color: #93b4f5;
+        }
+        .classroom-note-card .rec-note-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 10px;
+            font-weight: 600;
+            color: #1a56db;
+            background: rgba(26,86,219,0.12);
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-left: 6px;
+            vertical-align: middle;
+        }
+        body.dark-theme .classroom-note-card .rec-note-badge {
+            color: #93b4f5;
+            background: rgba(147,180,245,0.18);
         }
 
         .classroom-note-card-title {
@@ -4502,8 +4582,14 @@
         </div>
     </div>
 
-    <!-- Classroom action bar (camera + file upload) -->
+    <!-- Recording timer indicator -->
+    <div class="classroom-rec-timer" id="classroomRecTimer"><span class="rec-dot"></span><span id="classroomRecTime">00:00</span></div>
+
+    <!-- Classroom action bar (mic + camera + file upload) -->
     <div class="classroom-action-bar" id="classroomActionBar">
+        <button class="classroom-action-btn mic" id="classroomMicBtn" onclick="classroomToggleRecording()" data-i18n-attr="title" data-i18n="rec_start" title="开始录音">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        </button>
         <button class="classroom-action-btn upload-file" onclick="classroomUploadFile()" title="上传文件">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         </button>
@@ -5561,6 +5647,12 @@
                 prompt_abstract_original:'原摘要：',
                 prompt_note_sys:'你是一个专业的学术笔记整理助手。请将上传的{0}内容转换成清晰易读的笔记。\n\n笔记格式要求：\n1. 主标题：笔记内容总览（一句话概括）\n2. 使用多个次级标题组织内容，每个次级标题格式为：## [标题内容] {ref:{1}}\n3. 内容要条理清晰，补充必要的解释\n4. 使用LaTeX格式：行内公式用 $...$ ，独立公式用 $$...$$\n5. 保持学术严谨性',
                 prompt_note_user:'请整理以下内容为笔记。来源：{0} - {1}，引用编号：{2}',
+                rec_start:'开始录音',rec_stop:'停止录音（点击结束）',rec_mic_denied:'无法访问麦克风，请检查权限设置',
+                rec_unsupported:'当前浏览器不支持录音',rec_too_short:'录音时间太短，已取消',rec_saving:'正在保存录音...',
+                rec_transcribing:'正在生成录音转写纪要...',rec_done:'录音转写纪要已生成',rec_note_badge:'录音纪要',
+                rec_material_name:'课堂录音 {0}',rec_keep_awake_hint:'录音中，请保持页面打开',
+                prompt_rec_sys:'你是一个专业的课堂/会议录音转写与纪要整理助手。请仔细聆听音频，先准确转写其中的语音内容，再整理成一份详细、条理清晰的录音转写纪要。\n\n纪要格式要求：\n1. 主标题：本次录音内容总览（一句话概括）\n2. 使用多个次级标题组织内容，每个次级标题格式为：## [小节标题] {ref:{0}}\n3. 在"逐段转写"小节中，按时间顺序详细记录讲述/讨论的主要内容，尽量保留关键论述、例子和结论\n4. 在"要点总结"小节中，提炼核心知识点、结论与待办事项\n5. 数学公式用 LaTeX：行内 $...$，独立 $$...$$\n6. 若音频中有多位说话者，请尽量区分发言者\n7. 内容详实、严谨，忠实于音频原意，不要编造未出现的内容',
+                prompt_rec_user:'请转写并整理这段录音的详细纪要。来源：{0} - {1}，引用编号：{2}',
                 storage_status_yes:'✅ 已持久化',storage_status_no:'⚠️ 未持久化（可能被清理）',
                 storage_usage:'已用 {0} MB / {1} GB',authorized:'已授权',
                 draft_suffix:' - 草稿',char_count:'{0} 字',
@@ -5725,6 +5817,12 @@
                 prompt_abstract_original:'Original abstract: ',
                 prompt_note_sys:'You are a professional academic note-taking assistant. Convert the uploaded {0} content into clear, readable notes.\n\nFormat:\n1. Main title: one-line overview\n2. Subtitles formatted as: ## [Title] {ref:{1}}\n3. Clear organization with explanations\n4. LaTeX: $...$ inline, $$...$$ display\n5. Academic rigor',
                 prompt_note_user:'Organize into notes. Source: {0} - {1}, ref: {2}',
+                rec_start:'Start recording',rec_stop:'Stop recording (tap to finish)',rec_mic_denied:'Cannot access microphone, please check permissions',
+                rec_unsupported:'Recording is not supported in this browser',rec_too_short:'Recording too short, cancelled',rec_saving:'Saving recording...',
+                rec_transcribing:'Generating recording transcript minutes...',rec_done:'Recording minutes generated',rec_note_badge:'Recording minutes',
+                rec_material_name:'Class recording {0}',rec_keep_awake_hint:'Recording, please keep this page open',
+                prompt_rec_sys:'You are a professional assistant for transcribing classroom/meeting recordings and producing minutes. Listen carefully to the audio, accurately transcribe the speech, then organize it into detailed, well-structured recording minutes.\n\nFormat:\n1. Main title: one-line overview of the recording\n2. Subtitles formatted as: ## [Section title] {ref:{0}}\n3. In a "Transcript" section, record the main content chronologically, preserving key arguments, examples and conclusions\n4. In a "Key points" section, distill core takeaways, conclusions and action items\n5. LaTeX: $...$ inline, $$...$$ display\n6. If there are multiple speakers, try to distinguish them\n7. Be detailed, rigorous and faithful to the audio; do not fabricate content',
+                prompt_rec_user:'Transcribe and produce detailed minutes for this recording. Source: {0} - {1}, ref: {2}',
                 storage_status_yes:'✅ Persisted',storage_status_no:'⚠️ Not persisted',
                 storage_usage:'{0} MB / {1} GB used',authorized:'Authorized',
                 draft_suffix:' - Draft',char_count:'{0} chars',
@@ -5889,6 +5987,12 @@
                 prompt_abstract_original:'Résumé original : ',
                 prompt_note_sys:'Tu es un assistant de prise de notes académiques. Convertis le contenu {0} en notes claires.\n\nFormat :\n1. Titre principal : aperçu en une ligne\n2. Sous-titres : ## [Titre] {ref:{1}}\n3. Organisation claire\n4. LaTeX : $...$ en ligne, $$...$$ en bloc\n5. Rigueur académique',
                 prompt_note_user:'Organise en notes. Source : {0} - {1}, réf : {2}',
+                rec_start:'Démarrer l\'enregistrement',rec_stop:'Arrêter (toucher pour terminer)',rec_mic_denied:'Impossible d\'accéder au micro, vérifiez les autorisations',
+                rec_unsupported:'L\'enregistrement n\'est pas pris en charge',rec_too_short:'Enregistrement trop court, annulé',rec_saving:'Enregistrement en cours de sauvegarde...',
+                rec_transcribing:'Génération du compte rendu de l\'enregistrement...',rec_done:'Compte rendu généré',rec_note_badge:'Compte rendu',
+                rec_material_name:'Enregistrement {0}',rec_keep_awake_hint:'Enregistrement, gardez cette page ouverte',
+                prompt_rec_sys:'Tu es un assistant professionnel pour transcrire des enregistrements de cours/réunions et produire des comptes rendus. Écoute attentivement l\'audio, transcris fidèlement la parole, puis organise un compte rendu détaillé et structuré.\n\nFormat :\n1. Titre principal : aperçu en une ligne\n2. Sous-titres : ## [Titre de section] {ref:{0}}\n3. Dans une section « Transcription », note le contenu chronologiquement en conservant les arguments, exemples et conclusions clés\n4. Dans une section « Points clés », dégage les conclusions et actions à mener\n5. LaTeX : $...$ en ligne, $$...$$ en bloc\n6. Distingue les locuteurs si possible\n7. Sois détaillé, rigoureux et fidèle à l\'audio ; n\'invente rien',
+                prompt_rec_user:'Transcris et produis un compte rendu détaillé de cet enregistrement. Source : {0} - {1}, réf : {2}',
                 storage_status_yes:'✅ Persisté',storage_status_no:'⚠️ Non persisté',
                 storage_usage:'{0} Mo / {1} Go utilisés',authorized:'Autorisé',
                 draft_suffix:' - Brouillon',char_count:'{0} car.',
@@ -10621,6 +10725,7 @@
                             ((appData.classroom || {})[lk] || []).forEach(f => {
                                 (f.sessions || []).forEach(s => {
                                     (s.sourceFolder || []).forEach(m => {
+                                        if (m.type === 'recording') return; // 录音不云同步
                                         if (m.id && !cloudMatIds.has(m.id)) newMatIds.push(m.id);
                                     });
                                 });
@@ -11359,6 +11464,7 @@
                     for (const folder of (appData.classroom?.[listKey] || [])) {
                         for (const session of (folder.sessions || [])) {
                             for (const mat of (session.sourceFolder || [])) {
+                                if (mat.type === 'recording') continue; // 录音不云同步
                                 const matData = mat.data || await getFileData('classroom_' + mat.id).catch(() => null);
                                 if (matData) {
                                     const matKey = 'classroom/' + mat.id;
@@ -11690,6 +11796,7 @@
                     for (const folder of (appData.classroom?.[listKey] || [])) {
                         for (const session of (folder.sessions || [])) {
                             for (const mat of (session.sourceFolder || [])) {
+                                if (mat.type === 'recording') continue; // 录音不云同步
                                 const localMat = await getFileData('classroom_' + mat.id).catch(() => null);
                                 if (!localMat) {
                                     try {
@@ -11876,6 +11983,7 @@
                     for (const folder of (appData.classroom?.[listKey] || [])) {
                         for (const session of (folder.sessions || [])) {
                             for (const mat of (session.sourceFolder || [])) {
+                                if (mat.type === 'recording') continue; // 录音不云同步
                                 const matKey = 'classroom/' + mat.id;
                                 try {
                                     const matData = await r2GetObject(matKey);
@@ -12692,6 +12800,22 @@
                 }
             }
 
+            // 把内部统一的 audio 内容块转换为 OpenAI 的 input_audio 格式
+            finalMessages = finalMessages.map(m => {
+                if (!Array.isArray(m.content)) return m;
+                return {
+                    role: m.role,
+                    content: m.content.map(item => {
+                        if (item.type === 'audio' && item.audio?.data) {
+                            let fmt = item.audio.format || (item.audio.mimeType || '').split('/')[1] || 'wav';
+                            fmt = fmt.replace('mpeg', 'mp3').replace('x-m4a', 'm4a');
+                            return { type: 'input_audio', input_audio: { data: item.audio.data, format: fmt } };
+                        }
+                        return item;
+                    })
+                };
+            });
+
             const requestBody = {
                 model: config.model,
                 messages: [
@@ -12815,6 +12939,13 @@
             return btoa(binary);
         }
 
+        function base64ToUint8(base64) {
+            const raw = atob(base64);
+            const arr = new Uint8Array(raw.length);
+            for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+            return arr;
+        }
+
         // Google Gemini 原生协议调用
         // - URL: {base}/models/{model}:generateContent?key={key}
         // - 鉴权走 URL 的 key 参数
@@ -12833,9 +12964,11 @@
             if (options.pdfAttachment) {
                 contents = await buildGeminiContentsWithPdf(base, config.key, messages, options.pdfAttachment);
             } else {
-                contents = messages.map(m => {
+                contents = [];
+                const inlineAudioThreshold = 18 * 1024 * 1024; // 18 MB
+                for (const m of messages) {
                     const role = m.role === 'assistant' ? 'model' : 'user';
-                    // 处理多模态内容(content为数组时，包含image_url和text)
+                    // 处理多模态内容(content为数组时，包含image_url、audio和text)
                     if (Array.isArray(m.content)) {
                         const parts = [];
                         for (const item of m.content) {
@@ -12847,13 +12980,31 @@
                                 if (match) {
                                     parts.push({ inline_data: { mime_type: match[1], data: match[2] } });
                                 }
+                            } else if (item.type === 'audio' && item.audio?.data) {
+                                const mime = item.audio.mimeType || 'audio/webm';
+                                const b64 = item.audio.data;
+                                // 估算字节大小，过大时走 Gemini Files API
+                                const approxBytes = Math.floor(b64.length * 3 / 4);
+                                if (approxBytes > inlineAudioThreshold) {
+                                    try {
+                                        const bytes = base64ToUint8(b64);
+                                        const fileRef = await geminiUploadFile(base, config.key, bytes, mime, 'recording');
+                                        parts.push({ file_data: { mime_type: fileRef.mime_type, file_uri: fileRef.file_uri } });
+                                    } catch (e) {
+                                        console.warn('音频 Files API 上传失败，回退 inline:', e);
+                                        parts.push({ inline_data: { mime_type: mime, data: b64 } });
+                                    }
+                                } else {
+                                    parts.push({ inline_data: { mime_type: mime, data: b64 } });
+                                }
                             }
                         }
                         if (parts.length === 0) parts.push({ text: '' });
-                        return { role, parts };
+                        contents.push({ role, parts });
+                    } else {
+                        contents.push({ role, parts: [{ text: String(m.content || '') }] });
                     }
-                    return { role, parts: [{ text: String(m.content || '') }] };
-                });
+                }
             }
 
             const body = {
@@ -16002,8 +16153,10 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                             }
                         });
                     }
-                    html += `<div class="classroom-note-card" style="${orphanStyle}" onclick="openClassroomNote('${type}','${folder.id}','${session.id}',${idx})" oncontextmenu="event.preventDefault();if(!('ontouchstart' in window))showClassroomNoteLongPress(event,'${type}','${folder.id}','${session.id}',${idx})" ontouchstart="startClassroomNoteLongPress(event,'${type}','${folder.id}','${session.id}',${idx})" ontouchend="cancelClassroomLongPress()" ontouchmove="cancelClassroomLongPress()">
-                        <div class="classroom-note-card-title">${escapeHtml(note.title || '笔记')}${hasSource ? '' : '<span style="color:#ef4444;font-size:11px;margin-left:6px;">源素材已删除</span>'}</div>
+                    const recNoteClass = note.isRecordingNote ? ' recording-note' : '';
+                    const recBadge = note.isRecordingNote ? `<span class="rec-note-badge"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/></svg>${escapeHtml(i18n('rec_note_badge'))}</span>` : '';
+                    html += `<div class="classroom-note-card${recNoteClass}" style="${orphanStyle}" onclick="openClassroomNote('${type}','${folder.id}','${session.id}',${idx})" oncontextmenu="event.preventDefault();if(!('ontouchstart' in window))showClassroomNoteLongPress(event,'${type}','${folder.id}','${session.id}',${idx})" ontouchstart="startClassroomNoteLongPress(event,'${type}','${folder.id}','${session.id}',${idx})" ontouchend="cancelClassroomLongPress()" ontouchmove="cancelClassroomLongPress()">
+                        <div class="classroom-note-card-title">${escapeHtml(note.title || '笔记')}${recBadge}${hasSource ? '' : '<span style="color:#ef4444;font-size:11px;margin-left:6px;">源素材已删除</span>'}</div>
                         ${uniqueRefs.map(ref =>
                             `<div class="classroom-note-card-sub" onclick="event.stopPropagation();viewClassroomSource('${type}','${folder.id}','${session.id}','${ref}')">${escapeHtml(ref)}</div>`
                         ).join('')}
@@ -16023,14 +16176,23 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
             } else {
                 session.sourceFolder.forEach(mat => {
                     const isImg = mat.type === 'image';
+                    const isRec = mat.type === 'recording';
+                    let matIcon;
+                    if (isRec) {
+                        matIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
+                    } else if (isImg) {
+                        matIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>';
+                    } else {
+                        matIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
+                    }
+                    const durLabel = isRec && mat.duration ? ` · ${String(Math.floor(mat.duration/60)).padStart(2,'0')}:${String(mat.duration%60).padStart(2,'0')}` : '';
                     html += `<div class="classroom-material-card" onclick="viewClassroomSourceItem('${type}','${folder.id}','${session.id}','${mat.id}')" oncontextmenu="event.preventDefault();if(!('ontouchstart' in window))showClassroomMatLongPress(event,'${type}','${folder.id}','${session.id}','${mat.id}')" ontouchstart="startClassroomMatLongPress(event,'${type}','${folder.id}','${session.id}','${mat.id}')" ontouchend="cancelClassroomLongPress()" ontouchmove="cancelClassroomLongPress()">
                         <div class="classroom-material-icon">
-                            ${isImg ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>'
-                                    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'}
+                            ${matIcon}
                         </div>
                         <div class="classroom-material-info">
                             <div class="classroom-material-name">${escapeHtml(mat.name)}</div>
-                            <div class="classroom-material-ref">${escapeHtml(mat.ref)}</div>
+                            <div class="classroom-material-ref">${escapeHtml(mat.ref)}${durLabel}</div>
                         </div>
                     </div>`;
                 });
@@ -16226,6 +16388,276 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
             oldInput.parentNode.replaceChild(newInput, oldInput);
             newInput.addEventListener('change', onClassroomFileUpload);
             newInput.click();
+        }
+
+        // ==================== 课堂录音 ====================
+        let classroomRecorder = null;       // MediaRecorder 实例
+        let classroomRecChunks = [];        // 录音数据块
+        let classroomRecStream = null;      // 麦克风音频流
+        let classroomRecWakeLock = null;    // 屏幕常亮锁
+        let classroomRecStartTime = 0;      // 录音开始时间戳
+        let classroomRecTimerInterval = null;
+        let classroomRecSession = null;     // 录音开始时所属的会话引用 {type, folderId, sessionId}
+
+        function pickRecorderMimeType() {
+            // 优先选择各 AI 渠道（尤其 Gemini）较好支持的音频格式
+            const candidates = [
+                'audio/mp4',                 // Safari 默认 (aac)
+                'audio/ogg;codecs=opus',
+                'audio/webm;codecs=opus',
+                'audio/webm'
+            ];
+            if (typeof MediaRecorder === 'undefined' || !MediaRecorder.isTypeSupported) return '';
+            for (const t of candidates) {
+                if (MediaRecorder.isTypeSupported(t)) return t;
+            }
+            return '';
+        }
+
+        async function classroomRequestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    classroomRecWakeLock = await navigator.wakeLock.request('screen');
+                    // 页面从后台回到前台时自动重新申请
+                    document.addEventListener('visibilitychange', classroomReacquireWakeLock);
+                }
+            } catch (e) {
+                console.warn('Wake Lock 申请失败:', e);
+            }
+        }
+
+        async function classroomReacquireWakeLock() {
+            if (classroomRecorder && classroomRecorder.state === 'recording' &&
+                document.visibilityState === 'visible' && 'wakeLock' in navigator) {
+                try { classroomRecWakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
+            }
+        }
+
+        function classroomReleaseWakeLock() {
+            document.removeEventListener('visibilitychange', classroomReacquireWakeLock);
+            if (classroomRecWakeLock) {
+                try { classroomRecWakeLock.release(); } catch (e) {}
+                classroomRecWakeLock = null;
+            }
+        }
+
+        function classroomUpdateRecTimer() {
+            const el = document.getElementById('classroomRecTime');
+            if (!el) return;
+            const sec = Math.floor((Date.now() - classroomRecStartTime) / 1000);
+            const m = String(Math.floor(sec / 60)).padStart(2, '0');
+            const s = String(sec % 60).padStart(2, '0');
+            el.textContent = m + ':' + s;
+        }
+
+        function classroomSetRecUI(recording) {
+            const btn = document.getElementById('classroomMicBtn');
+            const timer = document.getElementById('classroomRecTimer');
+            if (btn) {
+                btn.classList.toggle('recording', recording);
+                btn.title = i18n(recording ? 'rec_stop' : 'rec_start');
+            }
+            if (timer) timer.classList.toggle('show', recording);
+        }
+
+        async function classroomToggleRecording() {
+            // 正在录音 → 停止
+            if (classroomRecorder && classroomRecorder.state === 'recording') {
+                stopClassroomRecording();
+                return;
+            }
+            // 否则 → 开始录音
+            if (!currentClassroomSession) { showToast(i18n('toast_open_doc_first')); return; }
+            if (typeof MediaRecorder === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                showToast(i18n('rec_unsupported'));
+                return;
+            }
+            try {
+                classroomRecStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            } catch (e) {
+                console.warn('getUserMedia 失败:', e);
+                showToast(i18n('rec_mic_denied'));
+                return;
+            }
+
+            const mimeType = pickRecorderMimeType();
+            try {
+                classroomRecorder = mimeType ? new MediaRecorder(classroomRecStream, { mimeType }) : new MediaRecorder(classroomRecStream);
+            } catch (e) {
+                console.warn('MediaRecorder 创建失败:', e);
+                classroomRecorder = new MediaRecorder(classroomRecStream);
+            }
+
+            classroomRecChunks = [];
+            classroomRecSession = { ...currentClassroomSession };
+            classroomRecorder.ondataavailable = (ev) => { if (ev.data && ev.data.size > 0) classroomRecChunks.push(ev.data); };
+            classroomRecorder.onstop = onClassroomRecordingStop;
+            // 每秒切片，降低长时间录音内存中断风险
+            classroomRecorder.start(1000);
+
+            classroomRecStartTime = Date.now();
+            classroomSetRecUI(true);
+            classroomUpdateRecTimer();
+            classroomRecTimerInterval = setInterval(classroomUpdateRecTimer, 1000);
+            await classroomRequestWakeLock();
+            showToast(i18n('rec_keep_awake_hint'));
+        }
+
+        function stopClassroomRecording() {
+            if (!classroomRecorder) return;
+            try {
+                if (classroomRecorder.state !== 'inactive') classroomRecorder.stop();
+            } catch (e) { console.warn('停止录音失败:', e); }
+            if (classroomRecTimerInterval) { clearInterval(classroomRecTimerInterval); classroomRecTimerInterval = null; }
+            classroomSetRecUI(false);
+            classroomReleaseWakeLock();
+            // 关闭麦克风轨道
+            if (classroomRecStream) {
+                classroomRecStream.getTracks().forEach(t => { try { t.stop(); } catch (e) {} });
+                classroomRecStream = null;
+            }
+        }
+
+        async function onClassroomRecordingStop() {
+            const durationSec = Math.floor((Date.now() - classroomRecStartTime) / 1000);
+            const mimeType = (classroomRecorder && classroomRecorder.mimeType) || 'audio/webm';
+            const recSession = classroomRecSession;
+            classroomRecorder = null;
+            classroomRecSession = null;
+
+            const blob = new Blob(classroomRecChunks, { type: mimeType });
+            classroomRecChunks = [];
+
+            if (durationSec < 1 || blob.size < 1000) {
+                showToast(i18n('rec_too_short'));
+                return;
+            }
+            if (!recSession) return;
+
+            const folder = getClassroomFolder(recSession.type, recSession.folderId);
+            if (!folder) return;
+            const session = (folder.sessions || []).find(s => s.id === recSession.sessionId);
+            if (!session) return;
+            if (!session.sourceFolder) session.sourceFolder = [];
+
+            showToast(i18n('rec_saving'));
+
+            // 读取为 base64
+            const base64 = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+
+            const matId = 'mat_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+            const ref = generateClassroomRef(folder, session, 0);
+            // 录音文件存入 IndexedDB（与其它源素材相同的本地存储逻辑）
+            try {
+                await saveFileData('classroom_' + matId, base64);
+            } catch (e) {
+                console.error('保存录音到 IndexedDB 失败:', e);
+            }
+
+            const now = new Date();
+            const stamp = now.toLocaleString();
+            const material = {
+                id: matId,
+                name: i18n('rec_material_name', stamp),
+                ref: ref,
+                type: 'recording',   // 标记为录音类型：本地存储但不云同步
+                mimeType: mimeType,
+                data: base64,
+                duration: durationSec,
+                uploadedAt: now.toISOString(),
+                retentionStart: null
+            };
+            session.sourceFolder.push(material);
+
+            saveData();
+            // 注意：录音文件不云同步，因此不调用 triggerSyncOnFileChange。
+            // 但素材元数据会随 classroom 元数据同步（占位），转写纪要正常云同步。
+            debouncedChatSync();
+            renderClassroomSessionDetail(folder, session, recSession.type);
+
+            // 生成详细的课堂/会议录音转写纪要
+            const matIndex = session.sourceFolder.length - 1;
+            generateClassroomRecordingNote(recSession.type, recSession.folderId, recSession.sessionId, matIndex);
+        }
+
+        async function generateClassroomRecordingNote(type, folderId, sessionId, materialIndex) {
+            const folder = getClassroomFolder(type, folderId);
+            if (!folder) return;
+            const session = (folder.sessions || []).find(s => s.id === sessionId);
+            if (!session || !session.sourceFolder[materialIndex]) return;
+            const material = session.sourceFolder[materialIndex];
+
+            await ensureMaterialData(material);
+            if (!material.data) { showToast(i18n('toast_gen_failed')); return; }
+
+            showToast(i18n('rec_transcribing'));
+
+            const systemPrompt = i18n('prompt_rec_sys', material.ref);
+            const userMsg = i18n('prompt_rec_user', folder.name, session.title, material.ref);
+            const base64Data = material.data.split(',')[1];
+            const audioMime = (material.mimeType || 'audio/webm').split(';')[0];
+
+            try {
+                const msgContent = [{
+                    role: 'user',
+                    content: [
+                        { type: 'audio', audio: { data: base64Data, mimeType: audioMime, format: audioMime.split('/')[1] || 'webm' } },
+                        { type: 'text', text: userMsg }
+                    ]
+                }];
+                const result = await callAI(systemPrompt, msgContent, { maxTokens: 8192 });
+                if (!result) { showToast(i18n('toast_gen_failed')); return; }
+
+                // 解析纪要：主标题 + 带 ref 的次级标题
+                const lines = result.split('\n');
+                let mainTitle = '';
+                const subtitles = [];
+                for (const line of lines) {
+                    const trimmed = line.trim();
+                    if (!mainTitle && (trimmed.startsWith('# ') || trimmed.startsWith('## '))) {
+                        mainTitle = trimmed.replace(/^#+\s*/, '').replace(/\{ref:[^}]*\}/g, '').trim();
+                    }
+                    const refMatch = trimmed.match(/\{ref:([^}]+)\}/);
+                    if (refMatch && trimmed.startsWith('## ')) {
+                        subtitles.push({
+                            text: trimmed.replace(/^#+\s*/, '').replace(/\{ref:[^}]*\}/g, '').trim(),
+                            ref: refMatch[1]
+                        });
+                    }
+                }
+                if (!mainTitle) mainTitle = material.ref + ' ' + i18n('rec_note_badge');
+
+                if (!session.notes) session.notes = [];
+                session.notes.push({
+                    id: 'cnote_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+                    title: mainTitle,
+                    subtitles: subtitles,
+                    content: result,
+                    materialRef: material.ref,
+                    materialId: material.id,
+                    isRecordingNote: true,   // 录音纪要：渲染时用蓝底区分
+                    generatedAt: new Date().toISOString(),
+                    progress: 0,
+                    maxProgress: 0,
+                    status: 'ready'
+                });
+
+                saveData();
+                debouncedChatSync();   // 纪要随元数据云同步
+                showToast(i18n('rec_done'));
+
+                if (currentClassroomSession && currentClassroomSession.sessionId === sessionId) {
+                    renderClassroomSessionDetail(folder, session, type);
+                }
+            } catch (err) {
+                console.error('生成录音纪要失败:', err);
+                showToast(i18n('toast_gen_failed') + err.message);
+            }
         }
 
         async function onClassroomCameraCapture(e) {
@@ -16550,7 +16982,23 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
             // 懒加载base64数据
             await ensureMaterialData(mat);
 
-            if (mat.type === 'image' && mat.data) {
+            if (mat.type === 'recording' && mat.data) {
+                // 播放录音
+                const overlay = document.createElement('div');
+                overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;cursor:pointer;';
+                overlay.onclick = (ev) => { if (ev.target === overlay) overlay.remove(); };
+                const label = document.createElement('div');
+                label.textContent = mat.name || mat.ref;
+                label.style.cssText = 'color:white;font-size:14px;background:rgba(0,0,0,0.5);padding:6px 16px;border-radius:8px;max-width:90%;text-align:center;';
+                const audio = document.createElement('audio');
+                audio.src = mat.data;
+                audio.controls = true;
+                audio.autoplay = true;
+                audio.style.cssText = 'width:90%;max-width:480px;';
+                overlay.appendChild(label);
+                overlay.appendChild(audio);
+                document.body.appendChild(overlay);
+            } else if (mat.type === 'image' && mat.data) {
                 // Show image in a simple modal
                 const overlay = document.createElement('div');
                 overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9000;display:flex;align-items:center;justify-content:center;cursor:pointer;';
@@ -16582,9 +17030,14 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
             // Find the material
             const matIdx = (session.sourceFolder || []).findIndex(m => m.id === note.materialId);
             if (matIdx >= 0) {
+                const isRec = note.isRecordingNote || session.sourceFolder[matIdx].type === 'recording';
                 session.notes.splice(noteIndex, 1);
                 saveData();
-                generateClassroomNoteForMaterial(classroomType, folderId, sessionId, matIdx);
+                if (isRec) {
+                    generateClassroomRecordingNote(classroomType, folderId, sessionId, matIdx);
+                } else {
+                    generateClassroomNoteForMaterial(classroomType, folderId, sessionId, matIdx);
+                }
                 closeLectureViewer();
             }
         }
