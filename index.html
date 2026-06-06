@@ -988,6 +988,22 @@
         body.eink-mode .reader-container {
             overflow: hidden !important;
         }
+        body.eink-mode .pdf-canvas-wrapper {
+            padding: 0;
+            gap: 0;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        body.eink-mode .pdf-page-placeholder,
+        body.eink-mode .pdf-page-wrapper {
+            display: none !important;
+        }
+        body.eink-mode .pdf-page-placeholder.eink-visible,
+        body.eink-mode .pdf-page-wrapper.eink-visible {
+            display: block !important;
+        }
         body.eink-mode .lecture-content {
             overflow: hidden !important;
         }
@@ -8265,22 +8281,26 @@
                 wrapper.appendChild(placeholder);
             }
 
-            // 渲染可见页面和附近页面
-            await renderVisiblePages();
+            if (einkMode) {
+                isRenderingAllPages = false;
+                setupEinkReaderTapZones();
+                einkShowPage(currentPage || 1);
+            } else {
+                // 渲染可见页面和附近页面
+                await renderVisiblePages();
 
-            // 滚动到当前页
-            if (currentPage > 1 && pageElements[currentPage]) {
-                const targetEl = pageElements[currentPage].placeholder;
-                const container = document.getElementById('readerContainer');
-                container.scrollTop = targetEl.offsetTop - 12;
+                // 滚动到当前页
+                if (currentPage > 1 && pageElements[currentPage]) {
+                    const targetEl = pageElements[currentPage].placeholder;
+                    const container = document.getElementById('readerContainer');
+                    container.scrollTop = targetEl.offsetTop - 12;
+                }
+
+                isRenderingAllPages = false;
             }
 
-            isRenderingAllPages = false;
-            
             // 设置滚动监听
             setupScrollListener();
-            // 墨水屏模式：设置翻页点击区域
-            if (einkMode) setupEinkReaderTapZones();
         }
 
         async function renderVisiblePages() {
@@ -8722,29 +8742,79 @@
         // 跳转到指定页面（连续滚动模式）
         function scrollToPage(pageNum) {
             if (pageNum < 1 || pageNum > totalPages) return;
-            
+
+            if (einkMode) {
+                einkShowPage(pageNum);
+                return;
+            }
+
             const pageData = pageElements[pageNum];
             if (!pageData) return;
-            
+
             const container = document.getElementById('readerContainer');
             const targetEl = pageData.placeholder;
             container.scrollTo({
                 top: targetEl.offsetTop - 12,
-                behavior: einkMode ? 'auto' : 'smooth'
+                behavior: 'smooth'
             });
 
             currentPage = pageNum;
             document.getElementById('pageInfo').textContent = `${currentPage} / ${totalPages}`;
 
-            // 程序化翻页（按钮/跳页/书签/搜索等）必须立刻把进度写回 doc，
-            // 否则 scroll 事件的防抖写回会因为 newCurrentPage === currentPage 而跳过，
-            // 导致退出重进后回到第 1 页。
             if (!suppressScrollWriteback && !isRenderingAllPages && currentDoc && totalPages > 0) {
                 if (currentDoc.currentPage !== pageNum) {
                     currentDoc.currentPage = pageNum;
                     currentDoc.progress = Math.round((pageNum / totalPages) * 100);
                     currentDoc.progressUpdatedAt = Date.now();
                     saveData();
+                }
+            }
+        }
+
+        function einkShowPage(pageNum) {
+            if (pageNum < 1 || pageNum > totalPages) return;
+            for (let i = 1; i <= totalPages; i++) {
+                const pd = pageElements[i];
+                if (pd && pd.placeholder) pd.placeholder.classList.remove('eink-visible');
+            }
+            const pageData = pageElements[pageNum];
+            if (!pageData) return;
+            pageData.placeholder.classList.add('eink-visible');
+            if (!pageData.rendered) renderSinglePage(pageNum);
+            einkFitPage(pageData);
+            currentPage = pageNum;
+            document.getElementById('pageInfo').textContent = `${currentPage} / ${totalPages}`;
+            if (!suppressScrollWriteback && !isRenderingAllPages && currentDoc && totalPages > 0) {
+                currentDoc.currentPage = pageNum;
+                currentDoc.progress = Math.round((pageNum / totalPages) * 100);
+                currentDoc.progressUpdatedAt = Date.now();
+                saveData();
+            }
+        }
+
+        function einkFitPage(pageData) {
+            const container = document.getElementById('readerContainer');
+            if (!container || !pageData || !pageData.placeholder) return;
+            const el = pageData.placeholder;
+            el.style.transform = '';
+            el.style.transformOrigin = '';
+            const containerW = container.clientWidth;
+            const containerH = container.clientHeight;
+            const pageW = pageData.viewport.width;
+            const pageH = pageData.viewport.height;
+            if (pageW <= 0 || pageH <= 0) return;
+            const scale = Math.min(containerW / pageW, containerH / pageH) * 0.95;
+            el.style.transform = 'scale(' + scale + ')';
+            el.style.transformOrigin = 'center center';
+        }
+
+        function einkExitReaderMode() {
+            for (let i = 1; i <= totalPages; i++) {
+                const pd = pageElements[i];
+                if (pd && pd.placeholder) {
+                    pd.placeholder.classList.remove('eink-visible');
+                    pd.placeholder.style.transform = '';
+                    pd.placeholder.style.transformOrigin = '';
                 }
             }
         }
@@ -10609,6 +10679,14 @@
             try {
                 localStorage.setItem('einkMode', einkMode ? 'true' : 'false');
             } catch(e) {}
+            if (!einkMode && totalPages > 0) {
+                einkExitReaderMode();
+                if (currentPage >= 1) {
+                    const container = document.getElementById('readerContainer');
+                    const pd = pageElements[currentPage];
+                    if (container && pd) container.scrollTop = pd.placeholder.offsetTop - 12;
+                }
+            }
             setupEinkReaderTapZones();
             setupEinkLectureTapZones();
             showToast(einkMode ? i18n('toast_eink_on') : i18n('toast_eink_off'));
@@ -10645,7 +10723,7 @@
                 leftZone.style.display = '';
                 rightZone.style.display = '';
                 if (currentPage >= 1 && totalPages > 0) {
-                    scrollToPage(currentPage);
+                    einkShowPage(currentPage);
                 }
             } else {
                 if (leftZone) leftZone.style.display = 'none';
