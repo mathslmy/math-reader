@@ -984,6 +984,67 @@
             transform-origin: 0 0;
         }
 
+        /* ==================== E-Ink Mode ==================== */
+        body.eink-mode .reader-container {
+            overflow: hidden !important;
+        }
+        body.eink-mode .lecture-content {
+            overflow: hidden !important;
+        }
+        .eink-tap-zone {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            z-index: 35;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .eink-tap-zone.left {
+            left: 0;
+            width: 40%;
+        }
+        .eink-tap-zone.right {
+            right: 0;
+            width: 60%;
+        }
+        .eink-tap-zone:active {
+            background: rgba(0,0,0,0.03);
+        }
+        .eink-lecture-tap-zone {
+            position: absolute;
+            bottom: 0;
+            z-index: 205;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .eink-lecture-tap-zone.left {
+            left: 0;
+            width: 40%;
+        }
+        .eink-lecture-tap-zone.right {
+            right: 0;
+            width: 60%;
+        }
+        .eink-lecture-tap-zone:active {
+            background: rgba(0,0,0,0.03);
+        }
+        .eink-page-indicator {
+            position: fixed;
+            bottom: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.6);
+            color: #fff;
+            padding: 4px 14px;
+            border-radius: 12px;
+            font-size: 12px;
+            z-index: 210;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .eink-page-indicator.show {
+            opacity: 1;
+        }
+
         /* ==================== Page 3: Notes Collection ==================== */
         #page3 { padding: 0; }
         #page3.active { display: flex; flex-direction: column; }
@@ -4771,6 +4832,23 @@
                 </div>
             </div>
 
+            <div class="setting-item">
+                <div class="setting-item-left">
+                    <div class="setting-item-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                    </div>
+                    <div>
+                        <div class="setting-item-label" data-i18n="eink_mode">墨水屏模式</div>
+                        <div class="setting-item-desc" data-i18n="eink_mode_desc">点击屏幕翻页，适合墨水屏设备</div>
+                    </div>
+                </div>
+                <div class="setting-item-right">
+                    <div class="toggle" id="einkModeToggle" onclick="toggleEinkMode()">
+                        <div class="toggle-knob"></div>
+                    </div>
+                </div>
+            </div>
+
             <div class="setting-item" onclick="manualRequestPersist()">
                 <div class="setting-item-left">
                     <div class="setting-item-icon">
@@ -5526,6 +5604,9 @@
                 settings_title:'设置',user_settings:'用户设置',api_setting:'API Setting',api_setting_desc:'配置 AI 和同步服务',
                 notification:'通知推送',notification_desc:'Web Push Notification',photo_retention:'照片储存天数',photo_retention_desc:'0 = 永不删除',
                 apple_pencil:'Apple Pencil 模式',apple_pencil_desc:'仅 Pencil 书写，手指仅翻页缩放',
+                eink_mode:'墨水屏模式',eink_mode_desc:'点击屏幕翻页，适合墨水屏设备',
+                toast_eink_on:'墨水屏模式已开启',toast_eink_off:'墨水屏模式已关闭',
+                eink_prev_page:'上一页',eink_next_page:'下一页',eink_page_indicator:'第 {0} 页 / 共 {1} 页',
                 storage_persist:'存储持久化',storage_persist_checking:'检测中…',storage_persist_btn:'请求授权',
                 ai_settings:'AI 设置',ai_avatar:'AI 头像',ai_name_label:'AI 名称',
                 ai_persona:'AI 人设',ai_persona_desc:'仅在"不知道，给我建议"时生效',
@@ -5696,6 +5777,9 @@
                 settings_title:'Settings',user_settings:'User Settings',api_setting:'API Setting',api_setting_desc:'Configure AI & sync services',
                 notification:'Push Notifications',notification_desc:'Web Push Notification',photo_retention:'Photo Retention Days',photo_retention_desc:'0 = Never delete',
                 apple_pencil:'Apple Pencil Mode',apple_pencil_desc:'Only Pencil writes; finger scrolls/zooms',
+                eink_mode:'E-Ink Mode',eink_mode_desc:'Tap screen to turn pages, for e-ink devices',
+                toast_eink_on:'E-Ink mode enabled',toast_eink_off:'E-Ink mode disabled',
+                eink_prev_page:'Previous',eink_next_page:'Next',eink_page_indicator:'Page {0} / {1}',
                 storage_persist:'Storage Persistence',storage_persist_checking:'Checking…',storage_persist_btn:'Request Permission',
                 ai_settings:'AI Settings',ai_avatar:'AI Avatar',ai_name_label:'AI Name',
                 ai_persona:'AI Persona',ai_persona_desc:'Only active in "I don\'t know, suggest" chat',
@@ -5866,6 +5950,9 @@
                 settings_title:'Réglages',user_settings:'Paramètres utilisateur',api_setting:'Paramètres API',api_setting_desc:'Configurer l\'IA et la synchronisation',
                 notification:'Notifications push',notification_desc:'Web Push Notification',photo_retention:'Rétention photos (jours)',photo_retention_desc:'0 = Ne jamais supprimer',
                 apple_pencil:'Mode Apple Pencil',apple_pencil_desc:'Seul le Pencil écrit ; le doigt fait défiler/zoom',
+                eink_mode:'Mode E-Ink',eink_mode_desc:'Touchez l\'écran pour tourner les pages',
+                toast_eink_on:'Mode E-Ink activé',toast_eink_off:'Mode E-Ink désactivé',
+                eink_prev_page:'Précédent',eink_next_page:'Suivant',eink_page_indicator:'Page {0} / {1}',
                 storage_persist:'Persistance du stockage',storage_persist_checking:'Vérification…',storage_persist_btn:'Demander l\'autorisation',
                 ai_settings:'Paramètres IA',ai_avatar:'Avatar IA',ai_name_label:'Nom de l\'IA',
                 ai_persona:'Personnalité IA',ai_persona_desc:'Actif uniquement dans le chat "Je ne sais pas"',
@@ -8192,6 +8279,8 @@
             
             // 设置滚动监听
             setupScrollListener();
+            // 墨水屏模式：设置翻页点击区域
+            if (einkMode) setupEinkReaderTapZones();
         }
 
         async function renderVisiblePages() {
@@ -8641,9 +8730,9 @@
             const targetEl = pageData.placeholder;
             container.scrollTo({
                 top: targetEl.offsetTop - 12,
-                behavior: 'smooth'
+                behavior: einkMode ? 'auto' : 'smooth'
             });
-            
+
             currentPage = pageNum;
             document.getElementById('pageInfo').textContent = `${currentPage} / ${totalPages}`;
 
@@ -9884,10 +9973,16 @@
             // 显示讲义阅读器
             document.getElementById('lectureViewer').classList.add('show');
             document.body.classList.add('lecture-active');
-            
+
             // 隐藏导航按钮（摘要是单页内容）
             document.getElementById('lectureFooter').style.display = 'none';
-            
+
+            // 墨水屏模式：重置并设置翻页
+            if (einkMode) {
+                einkLectureCurrentPage = 0;
+                setTimeout(function() { setupEinkLectureTapZones(); einkUpdateLecturePages(); }, 200);
+            }
+
             // 保存当前查看状态（用于返回）
             currentLecture = {
                 isPaperAbstract: true,
@@ -10048,6 +10143,16 @@
             const apToggle = document.getElementById('applePencilToggle');
             if (apToggle) apToggle.classList.toggle('on', applePencilMode);
             document.body.classList.toggle('apple-pencil-mode', applePencilMode);
+
+            // 墨水屏模式（仅本地存储，不参与云同步）
+            try {
+                einkMode = localStorage.getItem('einkMode') === 'true';
+            } catch(e) { einkMode = false; }
+            const einkToggle = document.getElementById('einkModeToggle');
+            if (einkToggle) einkToggle.classList.toggle('on', einkMode);
+            document.body.classList.toggle('eink-mode', einkMode);
+            setupEinkReaderTapZones();
+            setupEinkLectureTapZones();
         }
 
         function saveSettings() {
@@ -10493,6 +10598,159 @@
                 localStorage.setItem('applePencilMode', applePencilMode ? 'true' : 'false');
             } catch(e) {}
             showToast(applePencilMode ? i18n('toast_pencil_on') : i18n('toast_pencil_off'));
+        }
+
+        // ==================== E-Ink Mode ====================
+        function toggleEinkMode() {
+            einkMode = !einkMode;
+            const toggle = document.getElementById('einkModeToggle');
+            if (toggle) toggle.classList.toggle('on', einkMode);
+            document.body.classList.toggle('eink-mode', einkMode);
+            try {
+                localStorage.setItem('einkMode', einkMode ? 'true' : 'false');
+            } catch(e) {}
+            setupEinkReaderTapZones();
+            setupEinkLectureTapZones();
+            showToast(einkMode ? i18n('toast_eink_on') : i18n('toast_eink_off'));
+        }
+
+        function setupEinkReaderTapZones() {
+            const container = document.getElementById('readerContainer');
+            if (!container) return;
+            let leftZone = document.getElementById('einkReaderTapLeft');
+            let rightZone = document.getElementById('einkReaderTapRight');
+            if (einkMode) {
+                if (!leftZone) {
+                    leftZone = document.createElement('div');
+                    leftZone.id = 'einkReaderTapLeft';
+                    leftZone.className = 'eink-tap-zone left';
+                    leftZone.addEventListener('click', function(e) {
+                        if (!einkMode || penMode) return;
+                        e.stopPropagation();
+                        prevPage();
+                    });
+                    container.appendChild(leftZone);
+                }
+                if (!rightZone) {
+                    rightZone = document.createElement('div');
+                    rightZone.id = 'einkReaderTapRight';
+                    rightZone.className = 'eink-tap-zone right';
+                    rightZone.addEventListener('click', function(e) {
+                        if (!einkMode || penMode) return;
+                        e.stopPropagation();
+                        nextPage();
+                    });
+                    container.appendChild(rightZone);
+                }
+                leftZone.style.display = '';
+                rightZone.style.display = '';
+                if (currentPage >= 1 && totalPages > 0) {
+                    scrollToPage(currentPage);
+                }
+            } else {
+                if (leftZone) leftZone.style.display = 'none';
+                if (rightZone) rightZone.style.display = 'none';
+            }
+        }
+
+        function setupEinkLectureTapZones() {
+            const viewer = document.getElementById('lectureViewer');
+            const content = document.getElementById('lectureViewerContent');
+            if (!viewer || !content) return;
+            let leftZone = document.getElementById('einkLectureTapLeft');
+            let rightZone = document.getElementById('einkLectureTapRight');
+            let indicator = document.getElementById('einkLecturePageIndicator');
+            if (einkMode) {
+                const header = viewer.querySelector('.lecture-header');
+                const headerH = header ? header.offsetHeight : 44;
+                if (!leftZone) {
+                    leftZone = document.createElement('div');
+                    leftZone.id = 'einkLectureTapLeft';
+                    leftZone.className = 'eink-lecture-tap-zone left';
+                    leftZone.addEventListener('click', function(e) {
+                        if (!einkMode || lecturePenMode) return;
+                        e.stopPropagation();
+                        einkLecturePrev();
+                    });
+                    viewer.appendChild(leftZone);
+                }
+                if (!rightZone) {
+                    rightZone = document.createElement('div');
+                    rightZone.id = 'einkLectureTapRight';
+                    rightZone.className = 'eink-lecture-tap-zone right';
+                    rightZone.addEventListener('click', function(e) {
+                        if (!einkMode || lecturePenMode) return;
+                        e.stopPropagation();
+                        einkLectureNext();
+                    });
+                    viewer.appendChild(rightZone);
+                }
+                if (!indicator) {
+                    indicator = document.createElement('div');
+                    indicator.id = 'einkLecturePageIndicator';
+                    indicator.className = 'eink-page-indicator';
+                    document.body.appendChild(indicator);
+                }
+                leftZone.style.top = headerH + 'px';
+                rightZone.style.top = headerH + 'px';
+                leftZone.style.display = '';
+                rightZone.style.display = '';
+                einkLectureCurrentPage = 0;
+                einkUpdateLecturePages();
+            } else {
+                if (leftZone) leftZone.style.display = 'none';
+                if (rightZone) rightZone.style.display = 'none';
+                if (indicator) indicator.style.display = 'none';
+            }
+        }
+
+        function einkUpdateLecturePages() {
+            const content = document.getElementById('lectureViewerContent');
+            if (!content) return;
+            const viewH = content.clientHeight;
+            if (viewH <= 0) {
+                einkLectureTotalPages = 1;
+                return;
+            }
+            einkLectureTotalPages = Math.max(1, Math.ceil(content.scrollHeight / viewH));
+        }
+
+        function einkLectureNext() {
+            const content = document.getElementById('lectureViewerContent');
+            if (!content) return;
+            einkUpdateLecturePages();
+            if (einkLectureCurrentPage < einkLectureTotalPages - 1) {
+                einkLectureCurrentPage++;
+                content.scrollTo({ top: einkLectureCurrentPage * content.clientHeight, behavior: 'auto' });
+                einkShowLecturePageIndicator();
+            }
+        }
+
+        function einkLecturePrev() {
+            const content = document.getElementById('lectureViewerContent');
+            if (!content) return;
+            einkUpdateLecturePages();
+            if (einkLectureCurrentPage > 0) {
+                einkLectureCurrentPage--;
+                content.scrollTo({ top: einkLectureCurrentPage * content.clientHeight, behavior: 'auto' });
+                einkShowLecturePageIndicator();
+            }
+        }
+
+        let einkIndicatorTimeout = null;
+        function einkShowLecturePageIndicator() {
+            const indicator = document.getElementById('einkLecturePageIndicator');
+            if (!indicator) return;
+            const text = i18n('eink_page_indicator')
+                .replace('{0}', einkLectureCurrentPage + 1)
+                .replace('{1}', einkLectureTotalPages);
+            indicator.textContent = text;
+            indicator.style.display = '';
+            indicator.classList.add('show');
+            clearTimeout(einkIndicatorTimeout);
+            einkIndicatorTimeout = setTimeout(() => {
+                indicator.classList.remove('show');
+            }, 1500);
         }
 
         // ==================== Supabase Sync ====================
@@ -13565,6 +13823,11 @@ ${i18n('prompt_lecture_gen')}`;
             initLectureFontsize();
             // 重新初始化选择功能（overlay需要在新内容上重建）
             setTimeout(initLectureSelection, 100);
+            // 墨水屏模式：重置并设置翻页
+            if (einkMode) {
+                einkLectureCurrentPage = 0;
+                setTimeout(function() { setupEinkLectureTapZones(); einkUpdateLecturePages(); }, 200);
+            }
         }
 
         async function displayLectureContent() {
@@ -13701,8 +13964,14 @@ ${i18n('prompt_lecture_gen')}`;
             renderLectureMath(container);
             
             // 恢复滚动位置
-            const savedScroll = chapter.scrollPosition || 0;
-            container.scrollTop = savedScroll;
+            if (einkMode) {
+                einkLectureCurrentPage = 0;
+                container.scrollTop = 0;
+                setTimeout(function() { einkUpdateLecturePages(); }, 100);
+            } else {
+                const savedScroll = chapter.scrollPosition || 0;
+                container.scrollTop = savedScroll;
+            }
         }
         
         function renderLectureMath(element) {
@@ -13952,6 +14221,10 @@ ${i18n('prompt_lecture_gen')}`;
         let lectureCurrentStroke = null;
         // Apple Pencil 模式（仅本地存储，不云同步）
         let applePencilMode = false;
+        // 墨水屏模式（仅本地存储，不云同步）
+        let einkMode = false;
+        let einkLectureCurrentPage = 0;
+        let einkLectureTotalPages = 1;
         // 讲义双指滑动支持
         let lecturePinching = false;
 
@@ -16849,6 +17122,12 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
             document.getElementById('lectureViewer').classList.add('show');
             document.body.classList.add('lecture-active');
 
+            // 墨水屏模式：重置并设置翻页
+            if (einkMode) {
+                einkLectureCurrentPage = 0;
+                setTimeout(function() { setupEinkLectureTapZones(); einkUpdateLecturePages(); }, 200);
+            }
+
             // Navigation between notes
             const noteCount = session.notes.length;
             const hasPrev = noteIndex > 0;
@@ -16930,6 +17209,13 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                     ],
                     throwOnError: false
                 });
+            }
+
+            // 墨水屏模式：重置翻页
+            if (einkMode) {
+                einkLectureCurrentPage = 0;
+                container.scrollTop = 0;
+                setTimeout(function() { einkUpdateLecturePages(); }, 100);
             }
 
             // Update scroll progress
