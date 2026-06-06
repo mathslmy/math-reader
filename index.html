@@ -999,6 +999,7 @@
         body.eink-mode .pdf-page-placeholder,
         body.eink-mode .pdf-page-wrapper {
             display: none !important;
+            box-shadow: none !important;
         }
         body.eink-mode .pdf-page-placeholder.eink-visible,
         body.eink-mode .pdf-page-wrapper.eink-visible {
@@ -8803,7 +8804,7 @@
             const pageW = pageData.viewport.width;
             const pageH = pageData.viewport.height;
             if (pageW <= 0 || pageH <= 0) return;
-            const scale = Math.min(containerW / pageW, containerH / pageH) * 0.95;
+            const scale = Math.min(containerW / pageW, containerH / pageH);
             el.style.transform = 'scale(' + scale + ')';
             el.style.transformOrigin = 'center center';
         }
