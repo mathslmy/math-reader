@@ -8804,9 +8804,37 @@
             const pageW = pageData.viewport.width;
             const pageH = pageData.viewport.height;
             if (pageW <= 0 || pageH <= 0) return;
-            const scale = Math.min(containerW / pageW, containerH / pageH);
+            const baseScale = Math.min(containerW / pageW, containerH / pageH);
+            const docZoom = currentDoc ? getEinkDocZoom(currentDoc.id) : 1;
+            const scale = baseScale * docZoom;
             el.style.transform = 'scale(' + scale + ')';
             el.style.transformOrigin = 'center center';
+        }
+
+        function getEinkDocZoom(docId) {
+            try {
+                const data = JSON.parse(localStorage.getItem('einkDocZoom') || '{}');
+                return data[docId] || 1;
+            } catch(e) { return 1; }
+        }
+
+        function setEinkDocZoom(docId, zoom) {
+            try {
+                const data = JSON.parse(localStorage.getItem('einkDocZoom') || '{}');
+                data[docId] = Math.round(zoom * 100) / 100;
+                localStorage.setItem('einkDocZoom', JSON.stringify(data));
+            } catch(e) {}
+        }
+
+        function einkApplyPinchZoom(pinchScale) {
+            if (!currentDoc) return;
+            const oldZoom = getEinkDocZoom(currentDoc.id);
+            let newZoom = oldZoom * pinchScale;
+            newZoom = Math.max(0.5, Math.min(4, newZoom));
+            if (newZoom > 0.9 && newZoom < 1.1 && Math.abs(pinchScale - 1) < 0.15) newZoom = 1;
+            setEinkDocZoom(currentDoc.id, newZoom);
+            const pageData = pageElements[currentPage];
+            if (pageData) einkFitPage(pageData);
         }
 
         function einkExitReaderMode() {
@@ -16088,17 +16116,19 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                     setTimeout(() => { isPinching = false; }, 150);
 
                     if (wasPinchZoom && wrapper) {
-                        let newZoom = baseZoom * finalLiveScale;
-                        newZoom = Math.max(minZoom, Math.min(maxZoom, newZoom));
-                        // 缩放到接近1就弹回1
-                        if (newZoom > 0.9 && newZoom < 1.1) newZoom = 1;
-
-                        if (Math.abs(newZoom - userZoom) < 0.02) {
-                            // 没实际变化，去掉预览
-                            wrapper.style.transform = '';
-                            wrapper.style.transformOrigin = '';
+                        wrapper.style.transform = '';
+                        wrapper.style.transformOrigin = '';
+                        if (einkMode) {
+                            if (Math.abs(finalLiveScale - 1) > 0.02) {
+                                einkApplyPinchZoom(finalLiveScale);
+                            }
                         } else {
-                            rebuildPagesForZoom(newZoom, pinchFocusPageNum);
+                            let newZoom = baseZoom * finalLiveScale;
+                            newZoom = Math.max(minZoom, Math.min(maxZoom, newZoom));
+                            if (newZoom > 0.9 && newZoom < 1.1) newZoom = 1;
+                            if (Math.abs(newZoom - userZoom) >= 0.02) {
+                                rebuildPagesForZoom(newZoom, pinchFocusPageNum);
+                            }
                         }
                         liveScale = 1;
                     }
@@ -16113,6 +16143,10 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                 e.preventDefault();
 
                 const delta = -e.deltaY * 0.01;
+                if (einkMode) {
+                    einkApplyPinchZoom(1 + delta);
+                    return;
+                }
                 let newZoom = userZoom * (1 + delta);
                 newZoom = Math.max(minZoom, Math.min(maxZoom, newZoom));
                 if (newZoom > 0.9 && newZoom < 1.1 && Math.abs(delta) < 0.05) newZoom = 1;
@@ -16149,6 +16183,13 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                 const container = document.getElementById('readerContainer');
                 if (!container || !container.closest('.page.active')) return;
                 e.preventDefault();
+                if (einkMode) {
+                    wrapper = document.getElementById('pdfCanvasWrapper');
+                    if (wrapper) { wrapper.style.transform = ''; wrapper.style.transformOrigin = ''; }
+                    if (Math.abs(e.scale - 1) > 0.02) einkApplyPinchZoom(e.scale);
+                    liveScale = 1;
+                    return;
+                }
                 let newZoom = gestureBaseZoom * e.scale;
                 newZoom = Math.max(minZoom, Math.min(maxZoom, newZoom));
                 if (newZoom > 0.9 && newZoom < 1.1) newZoom = 1;
