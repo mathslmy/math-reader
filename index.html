@@ -19842,7 +19842,7 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
             openExerciseDoing(folderId, taskId, startIdx, false);
         }
 
-        function openExerciseDoing(folderId, taskId, questionIndex, isWrong) {
+        async function openExerciseDoing(folderId, taskId, questionIndex, isWrong) {
             const data = getExercisesData();
             let questions, title;
 
@@ -19886,6 +19886,12 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
 
             if (isWrong && !q._redoing) {
                 // 错题模式：未点重做前，只显示题目和之前的作答结果，隐藏画布
+                // 如果 userDrawing 被 strip 了（云同步后），从 IndexedDB 恢复
+                if (!q.userDrawing) {
+                    const drawKey = `exercise_drawing_${taskId}_${q.questionIndex}`;
+                    const idbDraw = await getFileData(drawKey).catch(() => null);
+                    if (idbDraw) q.userDrawing = idbDraw;
+                }
                 const scoreColor = q.score >= 8 ? '#22c55e' : q.score >= 6 ? '#eab308' : '#ef4444';
                 const timeUsedStr = q.timeUsedSeconds ? formatExTime(q.timeUsedSeconds) : '';
                 let html = `<div class="lecture-body" style="font-size:15px;line-height:1.8;padding:0;">${renderChatMarkdownLatex(q.latex || '')}</div>`;
@@ -20503,14 +20509,19 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
             window._wrongAIContext = questionsText;
             window._wrongAIChatOverride = true;
 
-            // 收集选中错题的手写图片用于发送
+            // 收集选中错题的手写图片用于发送（优先内存，fallback IDB）
             const wrongImages = [];
             for (const item of wrongSelectedItems) {
                 const wt = wrongTasks.find(t => t.taskId === item.taskId);
                 if (!wt) continue;
                 const q = wt.questions[item.qIdx];
-                if (q && q.userDrawing && !isCanvasBlank(q.userDrawing)) {
-                    wrongImages.push({ qIndex: q.questionIndex, drawing: q.userDrawing });
+                if (!q) continue;
+                let drawing = q.userDrawing;
+                if (!drawing) {
+                    drawing = await getFileData(`exercise_drawing_${item.taskId}_${q.questionIndex}`).catch(() => null);
+                }
+                if (drawing && !isCanvasBlank(drawing)) {
+                    wrongImages.push({ qIndex: q.questionIndex, drawing });
                 }
             }
             window._wrongAIImages = wrongImages;
