@@ -11323,20 +11323,7 @@
                         if (!appData.exercises.wrongByFolder) appData.exercises.wrongByFolder = {};
                         if (!appData.exercises.archivedWrong) appData.exercises.archivedWrong = {};
 
-                        // 合并本地有但云端没有的归档错题
-                        for (const fId of Object.keys(localExercises.archivedWrong || {})) {
-                            if (!appData.exercises.archivedWrong[fId]) {
-                                appData.exercises.archivedWrong[fId] = localExercises.archivedWrong[fId];
-                            } else {
-                                const cloudArchived = appData.exercises.archivedWrong[fId];
-                                for (const localItem of (localExercises.archivedWrong[fId] || [])) {
-                                    const exists = cloudArchived.some(ci => ci.taskId === localItem.taskId && ci.questionIndex === localItem.questionIndex && ci.archivedAt === localItem.archivedAt);
-                                    if (!exists) cloudArchived.push(localItem);
-                                }
-                            }
-                        }
-
-                        // 把本地有但云端没有的 folder 和 task 合并进来
+                        // 合并本地有但云端没有的 folder / task
                         for (const localFolder of (localExercises.folders || [])) {
                             if (!cloudFolderIds.has(localFolder.id)) {
                                 appData.exercises.folders.push(localFolder);
@@ -11348,6 +11335,39 @@
                                             mergedFolder.tasks.push(localTask);
                                         }
                                     }
+                                }
+                            }
+                        }
+
+                        // 合并本地有但云端没有的 wrongByFolder 错题
+                        for (const fId of Object.keys(localExercises.wrongByFolder || {})) {
+                            if (!appData.exercises.wrongByFolder[fId]) {
+                                appData.exercises.wrongByFolder[fId] = localExercises.wrongByFolder[fId];
+                            } else {
+                                const cloudWrong = appData.exercises.wrongByFolder[fId];
+                                for (const localWt of (localExercises.wrongByFolder[fId] || [])) {
+                                    let cWt = cloudWrong.find(t => t.taskId === localWt.taskId);
+                                    if (!cWt) {
+                                        cloudWrong.push(localWt);
+                                    } else {
+                                        for (const lq of (localWt.questions || [])) {
+                                            const exists = (cWt.questions || []).some(cq => cq.questionIndex === lq.questionIndex);
+                                            if (!exists) { if (!cWt.questions) cWt.questions = []; cWt.questions.push(lq); }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // 合并本地有但云端没有的归档错题
+                        for (const fId of Object.keys(localExercises.archivedWrong || {})) {
+                            if (!appData.exercises.archivedWrong[fId]) {
+                                appData.exercises.archivedWrong[fId] = localExercises.archivedWrong[fId];
+                            } else {
+                                const cloudArchived = appData.exercises.archivedWrong[fId];
+                                for (const localItem of (localExercises.archivedWrong[fId] || [])) {
+                                    const exists = cloudArchived.some(ci => ci.taskId === localItem.taskId && ci.questionIndex === localItem.questionIndex && ci.archivedAt === localItem.archivedAt);
+                                    if (!exists) cloudArchived.push(localItem);
                                 }
                             }
                         }
@@ -12537,9 +12557,67 @@
                     cloudSyncedAtMs
                 );
                 appData.lectureDrafts = metadata.lectureDrafts || appData.lectureDrafts || {};
-                // 合并习题数据：云端覆盖本地（简单策略）
+                // 合并习题数据：与 performAutoSync 一致的智能合并策略
                 if (metadata.exercises) {
-                    appData.exercises = metadata.exercises;
+                    const cloudEx = metadata.exercises;
+                    const localEx = appData.exercises || { folders: [], wrongByFolder: {}, archivedWrong: {} };
+                    const cloudFolderIds = new Set((cloudEx.folders || []).map(f => f.id));
+                    const cloudTaskIds = new Set();
+                    (cloudEx.folders || []).forEach(f => {
+                        (f.tasks || []).forEach(t => { if (t.id) cloudTaskIds.add(t.id); });
+                    });
+
+                    appData.exercises = cloudEx;
+                    if (!appData.exercises.folders) appData.exercises.folders = [];
+                    if (!appData.exercises.wrongByFolder) appData.exercises.wrongByFolder = {};
+                    if (!appData.exercises.archivedWrong) appData.exercises.archivedWrong = {};
+
+                    // 合并本地有但云端没有的 folder / task
+                    for (const localFolder of (localEx.folders || [])) {
+                        if (!cloudFolderIds.has(localFolder.id)) {
+                            appData.exercises.folders.push(localFolder);
+                        } else {
+                            const merged = appData.exercises.folders.find(f => f.id === localFolder.id);
+                            if (merged) {
+                                for (const lt of (localFolder.tasks || [])) {
+                                    if (!cloudTaskIds.has(lt.id)) merged.tasks.push(lt);
+                                }
+                            }
+                        }
+                    }
+
+                    // 合并本地有但云端没有的 wrongByFolder 错题
+                    for (const fId of Object.keys(localEx.wrongByFolder || {})) {
+                        if (!appData.exercises.wrongByFolder[fId]) {
+                            appData.exercises.wrongByFolder[fId] = localEx.wrongByFolder[fId];
+                        } else {
+                            const cloudWrong = appData.exercises.wrongByFolder[fId];
+                            for (const localWt of (localEx.wrongByFolder[fId] || [])) {
+                                let cWt = cloudWrong.find(t => t.taskId === localWt.taskId);
+                                if (!cWt) {
+                                    cloudWrong.push(localWt);
+                                } else {
+                                    for (const lq of (localWt.questions || [])) {
+                                        const exists = (cWt.questions || []).some(cq => cq.questionIndex === lq.questionIndex);
+                                        if (!exists) { if (!cWt.questions) cWt.questions = []; cWt.questions.push(lq); }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 合并本地有但云端没有的 archivedWrong
+                    for (const fId of Object.keys(localEx.archivedWrong || {})) {
+                        if (!appData.exercises.archivedWrong[fId]) {
+                            appData.exercises.archivedWrong[fId] = localEx.archivedWrong[fId];
+                        } else {
+                            const cloudArch = appData.exercises.archivedWrong[fId];
+                            for (const li of (localEx.archivedWrong[fId] || [])) {
+                                const exists = cloudArch.some(ci => ci.taskId === li.taskId && ci.questionIndex === li.questionIndex && ci.archivedAt === li.archivedAt);
+                                if (!exists) cloudArch.push(li);
+                            }
+                        }
+                    }
                 }
                 if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {}, archivedWrong: {} };
                 // API 设置仅保留本地值，不被云端覆盖
@@ -12775,7 +12853,8 @@
                 appData.lectures = metadata.lectures || {};
                 appData.drafts = metadata.drafts || {};
                 appData.classroom = metadata.classroom || { courses: [], seminars: [] };
-                appData.exercises = metadata.exercises || { folders: [], wrongByFolder: {} };
+                appData.exercises = metadata.exercises || { folders: [], wrongByFolder: {}, archivedWrong: {} };
+                if (!appData.exercises.archivedWrong) appData.exercises.archivedWrong = {};
                 appData.settings = { ...metadata.settings, ...localApiSettings, r2Config: localR2Config };
                 
                 saveData();
