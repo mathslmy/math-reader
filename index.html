@@ -5766,7 +5766,8 @@
             },
             exercises: {
                 folders: [],   // [{ id, name, createdAt, archived, tasks: [{ id, name, questions: [{latex, status, score, userDrawing, aiComment}], sourceFiles: [{id,name,type,mimeType}] }] }]
-                wrongByFolder: {}  // { folderId: [{ taskId, taskName, questions: [{questionIndex, latex, score, userDrawing, aiComment, redoDrawings:[]}] }] }
+                wrongByFolder: {},  // { folderId: [{ taskId, taskName, questions: [{questionIndex, latex, score, userDrawing, aiComment, redoDrawings:[]}] }] }
+                archivedWrongByFolder: {}  // same structure as wrongByFolder, for archived wrong questions
             },
             settings: {
                 supabaseUrl: '',
@@ -6951,7 +6952,7 @@
                     if (!appData.notes) appData.notes = {};
                     if (!appData.archived) appData.archived = [];
                     if (!appData.classroom) appData.classroom = { courses: [], seminars: [] };
-                    if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {} };
+                    if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {}, archivedWrongByFolder: {} };
                     if (!appData.settings) appData.settings = {};
                     if (appData.settings.photoRetentionDays === undefined) appData.settings.photoRetentionDays = 0;
                 } catch(e) {
@@ -6971,6 +6972,7 @@
                     appData.exercises = exData;
                     if (!appData.exercises.folders) appData.exercises.folders = [];
                     if (!appData.exercises.wrongByFolder) appData.exercises.wrongByFolder = {};
+                    if (!appData.exercises.archivedWrongByFolder) appData.exercises.archivedWrongByFolder = {};
                     console.log('[loadExercisesFromIDB] 习题数据已从 IndexedDB 加载');
                 }
             } catch(e) {
@@ -6997,7 +6999,7 @@
             } catch(e) {
                 console.warn('[migrate] 习题迁移失败:', e);
             }
-            if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {} };
+            if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {}, archivedWrongByFolder: {} };
             // 标记习题已加载，此后才允许把本地习题写回云端
             exercisesLoaded = true;
         }
@@ -7016,7 +7018,7 @@
                         if (!appData.archived) appData.archived = [];
                         if (!appData.classroom) appData.classroom = { courses: [], seminars: [] };
                         if (!appData.settings) appData.settings = {};
-                        if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {} };
+                        if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {}, archivedWrongByFolder: {} };
                         // 写回 localStorage（不含 exercises）
                         try { localStorage.setItem('mathReader', JSON.stringify(appData)); } catch(e2) {}
                         console.log('[loadData] 已从 IndexedDB 备份恢复数据');
@@ -7111,6 +7113,14 @@
                     });
                 });
                 Object.values(exercisesToIDB.wrongByFolder || {}).forEach(wrongTasks => {
+                    (wrongTasks || []).forEach(wt => {
+                        (wt.questions || []).forEach(q => {
+                            delete q.userDrawing;
+                            (q.redoDrawings || []).forEach(rd => { delete rd.drawing; });
+                        });
+                    });
+                });
+                Object.values(exercisesToIDB.archivedWrongByFolder || {}).forEach(wrongTasks => {
                     (wrongTasks || []).forEach(wt => {
                         (wt.questions || []).forEach(q => {
                             delete q.userDrawing;
@@ -11285,8 +11295,8 @@
 
                         // 合并习题数据：按 folder/task 双向合并，同一 task 取更完整/更新的一份，
                         // 避免空题目或旧数据把另一端覆盖清空。
-                        const cloudExercises = metadata.exercises || { folders: [], wrongByFolder: {} };
-                        const localExercises = appData.exercises || { folders: [], wrongByFolder: {} };
+                        const cloudExercises = metadata.exercises || { folders: [], wrongByFolder: {}, archivedWrongByFolder: {} };
+                        const localExercises = appData.exercises || { folders: [], wrongByFolder: {}, archivedWrongByFolder: {} };
 
                         // 收集云端已有的习题文件 id（后面用于决定哪些文件需要上传/拉取）
                         cloudExFileIds = new Set();
@@ -11469,6 +11479,14 @@
                 });
             });
             Object.values(e.wrongByFolder || {}).forEach(wrongTasks => {
+                (wrongTasks || []).forEach(wt => {
+                    (wt.questions || []).forEach(q => {
+                        delete q.userDrawing;
+                        (q.redoDrawings || []).forEach(rd => { delete rd.drawing; });
+                    });
+                });
+            });
+            Object.values(e.archivedWrongByFolder || {}).forEach(wrongTasks => {
                 (wrongTasks || []).forEach(wt => {
                     (wt.questions || []).forEach(q => {
                         delete q.userDrawing;
@@ -12356,8 +12374,8 @@
         // cloudSyncedAtMs：云端 metadata.syncedAt 的毫秒时间戳，用于区分"本地新增还没上传"
         // 和"已在别处删除"——前者保留、后者丢弃，避免删掉的习题被复活（与书籍合并同一套规则）。
         function mergeExercisesData(cloudExercises, localExercises, cloudSyncedAtMs) {
-            const cloud = (cloudExercises && typeof cloudExercises === 'object') ? cloudExercises : { folders: [], wrongByFolder: {} };
-            const local = (localExercises && typeof localExercises === 'object') ? localExercises : { folders: [], wrongByFolder: {} };
+            const cloud = (cloudExercises && typeof cloudExercises === 'object') ? cloudExercises : { folders: [], wrongByFolder: {}, archivedWrongByFolder: {} };
+            const local = (localExercises && typeof localExercises === 'object') ? localExercises : { folders: [], wrongByFolder: {}, archivedWrongByFolder: {} };
             const cloudFolders = Array.isArray(cloud.folders) ? cloud.folders : [];
             const localFolders = Array.isArray(local.folders) ? local.folders : [];
             const baseline = Number(cloudSyncedAtMs) || 0;
@@ -12370,7 +12388,7 @@
                 return false;
             };
 
-            const merged = { folders: [], wrongByFolder: {} };
+            const merged = { folders: [], wrongByFolder: {}, archivedWrongByFolder: {} };
             const folderById = new Map();
 
             // 1) 先放入云端 folder（深拷贝，避免引用污染原对象）
@@ -12424,6 +12442,9 @@
 
             // 3) 合并错题本（wrongByFolder）
             merged.wrongByFolder = mergeExerciseWrongData(cloud.wrongByFolder, local.wrongByFolder);
+
+            // 4) 合并归档错题（archivedWrongByFolder）
+            merged.archivedWrongByFolder = mergeExerciseWrongData(cloud.archivedWrongByFolder, local.archivedWrongByFolder);
 
             return merged;
         }
@@ -12715,7 +12736,7 @@
                 appData.lectures = metadata.lectures || {};
                 appData.drafts = metadata.drafts || {};
                 appData.classroom = metadata.classroom || { courses: [], seminars: [] };
-                appData.exercises = metadata.exercises || { folders: [], wrongByFolder: {} };
+                appData.exercises = metadata.exercises || { folders: [], wrongByFolder: {}, archivedWrongByFolder: {} };
                 appData.settings = { ...metadata.settings, ...localApiSettings, r2Config: localR2Config };
                 
                 saveData();
@@ -12857,8 +12878,8 @@
             if (confirm(i18n('confirm_clear_all'))) {
                 localStorage.removeItem('mathReader');
                 // 清除 IndexedDB 中的习题数据
-                saveFileData('__exercises_data__', '{"folders":[],"wrongByFolder":{}}').catch(()=>{});
-                appData = { books: [], papers: [], notes: {}, archived: [], settings: appData.settings, exercises: { folders: [], wrongByFolder: {} } };
+                saveFileData('__exercises_data__', '{"folders":[],"wrongByFolder":{},"archivedWrongByFolder":{}}').catch(()=>{});
+                appData = { books: [], papers: [], notes: {}, archived: [], settings: appData.settings, exercises: { folders: [], wrongByFolder: {}, archivedWrongByFolder: {} } };
                 saveData();
                 renderLibrary();
                 renderNotesPage();
@@ -17922,9 +17943,10 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
         let exDrawingCache = {};
 
         function getExercisesData() {
-            if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {} };
+            if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {}, archivedWrongByFolder: {} };
             if (!appData.exercises.folders) appData.exercises.folders = [];
             if (!appData.exercises.wrongByFolder) appData.exercises.wrongByFolder = {};
+            if (!appData.exercises.archivedWrongByFolder) appData.exercises.archivedWrongByFolder = {};
             return appData.exercises;
         }
 
@@ -18097,6 +18119,7 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                 });
                 data.folders.splice(idx, 1);
                 delete data.wrongByFolder[folderId];
+                delete data.archivedWrongByFolder[folderId];
                 saveData();
                 debouncedChatSync();
                 renderExercisesPage();
@@ -18243,6 +18266,10 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
             const wrongTasks = data.wrongByFolder[folderId] || [];
             const wtIdx = wrongTasks.findIndex(wt => wt.taskId === taskId);
             if (wtIdx >= 0) wrongTasks.splice(wtIdx, 1);
+            // Clean archived wrong questions for this task
+            const archivedTasks = data.archivedWrongByFolder[folderId] || [];
+            const awtIdx = archivedTasks.findIndex(wt => wt.taskId === taskId);
+            if (awtIdx >= 0) archivedTasks.splice(awtIdx, 1);
             saveData();
             debouncedChatSync();
             renderExerciseFolderContent(folder);
@@ -20272,6 +20299,7 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                 html += `<button onclick="wrongAskAI('${folderId}')" style="border:none;background:var(--accent);color:#fff;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">问AI (${wrongSelectedItems.length})</button>`;
                 html += `<button onclick="toggleWrongSelectMode('${folderId}')" style="border:none;background:var(--bg-tertiary);padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;">取消</button>`;
             } else {
+                html += `<button onclick="openWrongArchive('${folderId}')" style="border:none;background:var(--bg-secondary);padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;color:var(--text-secondary);">归档</button>`;
                 html += `<button onclick="toggleWrongSelectMode('${folderId}')" style="border:none;background:var(--bg-tertiary);padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;">选择</button>`;
             }
             html += `</div></div>`;
@@ -20301,7 +20329,9 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                             </div>
                         </div>`;
                     } else {
-                        html += `<div class="exercise-task-card" style="border-left:3px solid ${scoreColor};" onclick="openWrongExerciseDoing('${folderId}','${wt.taskId}',${qIdx})">
+                        html += `<div class="exercise-task-card" style="border-left:3px solid ${scoreColor};" onclick="openWrongExerciseDoing('${folderId}','${wt.taskId}',${qIdx})"
+                            oncontextmenu="event.preventDefault();event.stopPropagation();if(!('ontouchstart' in window))showWrongQuestionMenu(event,'${folderId}','${wt.taskId}',${q.questionIndex})"
+                            ontouchstart="startWrongQLongPress(event,'${folderId}','${wt.taskId}',${q.questionIndex})" ontouchend="cancelWrongQLongPress()" ontouchmove="cancelWrongQLongPress()">
                             <div class="exercise-task-title" style="font-size:13px;">第${q.questionIndex + 1}题</div>
                             <div style="display:flex;align-items:center;gap:6px;">
                                 <span class="wrong-exercise-score" style="background:${scoreColor};font-size:11px;">${q.score}/10</span>
@@ -20435,6 +20465,170 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                 renderExercisesPage();
                 showToast(i18n('toast_restored'));
             }
+        }
+
+        // ==================== 错题长按菜单（删除/归档） ====================
+        let _wrongQLPTimer = null;
+        function cancelWrongQLongPress() { if (_wrongQLPTimer) { clearTimeout(_wrongQLPTimer); _wrongQLPTimer = null; } }
+        function startWrongQLongPress(e, folderId, taskId, questionIndex) {
+            cancelWrongQLongPress();
+            const t = e.touches ? e.touches[0] : e;
+            const cx = t.clientX, cy = t.clientY;
+            _wrongQLPTimer = setTimeout(() => {
+                _wrongQLPTimer = null;
+                showWrongQuestionMenu({ clientX: cx, clientY: cy }, folderId, taskId, questionIndex);
+            }, 500);
+        }
+
+        function showWrongQuestionMenu(e, folderId, taskId, questionIndex) {
+            closeLongPressMenu();
+            const overlay = document.createElement('div');
+            overlay.className = 'longpress-overlay';
+            overlay.onclick = closeLongPressMenu;
+            const menu = document.createElement('div');
+            menu.className = 'longpress-menu';
+            menu.id = 'longpressMenu';
+            menu.innerHTML = `
+                <button class="longpress-menu-item" onclick="archiveWrongQuestion('${folderId}','${taskId}',${questionIndex})">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+                    归档
+                </button>
+                <button class="longpress-menu-item danger" onclick="deleteWrongQuestion('${folderId}','${taskId}',${questionIndex})">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                    删除
+                </button>`;
+            document.body.appendChild(overlay);
+            document.body.appendChild(menu);
+            let x = e.clientX || 100, y = e.clientY || 100;
+            if (x + 140 > window.innerWidth) x = window.innerWidth - 150;
+            if (y + 120 > window.innerHeight) y = window.innerHeight - 130;
+            menu.style.left = x + 'px';
+            menu.style.top = y + 'px';
+        }
+
+        function deleteWrongQuestion(folderId, taskId, questionIndex) {
+            closeLongPressMenu();
+            if (!confirm('确定删除此错题？')) return;
+            const data = getExercisesData();
+            const wrongTasks = data.wrongByFolder[folderId];
+            if (!wrongTasks) return;
+            const wt = wrongTasks.find(t => t.taskId === taskId);
+            if (!wt) return;
+            wt.questions = (wt.questions || []).filter(q => q.questionIndex !== questionIndex);
+            if (wt.questions.length === 0) {
+                data.wrongByFolder[folderId] = wrongTasks.filter(t => t.taskId !== taskId);
+            }
+            saveData();
+            debouncedChatSync();
+            const folder = data.folders.find(f => f.id === folderId);
+            const remaining = data.wrongByFolder[folderId] || [];
+            if (remaining.length === 0 || remaining.every(t => !t.questions || t.questions.length === 0)) {
+                renderExercisesPage();
+            } else {
+                renderWrongFolderContent(folderId, folder, remaining);
+            }
+            showToast('已删除');
+        }
+
+        function archiveWrongQuestion(folderId, taskId, questionIndex) {
+            closeLongPressMenu();
+            const data = getExercisesData();
+            const wrongTasks = data.wrongByFolder[folderId];
+            if (!wrongTasks) return;
+            const wt = wrongTasks.find(t => t.taskId === taskId);
+            if (!wt) return;
+            const qIdx = (wt.questions || []).findIndex(q => q.questionIndex === questionIndex);
+            if (qIdx < 0) return;
+            const question = wt.questions.splice(qIdx, 1)[0];
+
+            // Move to archivedWrongByFolder
+            if (!data.archivedWrongByFolder[folderId]) data.archivedWrongByFolder[folderId] = [];
+            let archivedTask = data.archivedWrongByFolder[folderId].find(t => t.taskId === taskId);
+            if (!archivedTask) {
+                archivedTask = { taskId, taskName: wt.taskName, questions: [] };
+                data.archivedWrongByFolder[folderId].push(archivedTask);
+            }
+            archivedTask.questions.push(question);
+
+            // Clean empty task from active list
+            if (wt.questions.length === 0) {
+                data.wrongByFolder[folderId] = wrongTasks.filter(t => t.taskId !== taskId);
+            }
+
+            saveData();
+            debouncedChatSync();
+            const folder = data.folders.find(f => f.id === folderId);
+            const remaining = data.wrongByFolder[folderId] || [];
+            if (remaining.length === 0 || remaining.every(t => !t.questions || t.questions.length === 0)) {
+                renderExercisesPage();
+            } else {
+                renderWrongFolderContent(folderId, folder, remaining);
+            }
+            showToast('已归档');
+        }
+
+        function openWrongArchive(folderId) {
+            const data = getExercisesData();
+            const archivedTasks = data.archivedWrongByFolder[folderId] || [];
+            const folder = data.folders.find(f => f.id === folderId);
+            const view = document.getElementById('exerciseArchiveView');
+            view.classList.add('show');
+            const content = document.getElementById('exerciseArchiveContent');
+            const totalArchived = archivedTasks.reduce((s, t) => s + (t.questions || []).length, 0);
+            if (totalArchived === 0) {
+                content.innerHTML = '<div class="empty-state"><p>暂无归档错题</p></div>';
+            } else {
+                let html = `<div style="font-size:15px;font-weight:600;margin-bottom:12px;">${escapeHtml(folder ? folder.name : '')} - 归档错题</div>`;
+                archivedTasks.forEach(wt => {
+                    if (!wt.questions || wt.questions.length === 0) return;
+                    html += `<div style="margin-bottom:12px;">
+                        <div style="font-size:14px;font-weight:500;margin-bottom:8px;">${escapeHtml(wt.taskName)}</div>`;
+                    wt.questions.forEach(q => {
+                        const scoreColor = q.score >= 8 ? '#22c55e' : q.score >= 6 ? '#eab308' : '#ef4444';
+                        html += `<div class="exercise-task-card" style="border-left:3px solid ${scoreColor};">
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <div>
+                                    <div class="exercise-task-title" style="font-size:13px;">第${q.questionIndex + 1}题</div>
+                                    <span class="wrong-exercise-score" style="background:${scoreColor};font-size:11px;">${q.score}/10</span>
+                                </div>
+                                <button onclick="unarchiveWrongQuestion('${folderId}','${wt.taskId}',${q.questionIndex})" style="border:none;background:var(--bg-tertiary);padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;">恢复</button>
+                            </div>
+                        </div>`;
+                    });
+                    html += `</div>`;
+                });
+                content.innerHTML = html;
+            }
+        }
+
+        function unarchiveWrongQuestion(folderId, taskId, questionIndex) {
+            const data = getExercisesData();
+            const archivedTasks = data.archivedWrongByFolder[folderId];
+            if (!archivedTasks) return;
+            const wt = archivedTasks.find(t => t.taskId === taskId);
+            if (!wt) return;
+            const qIdx = (wt.questions || []).findIndex(q => q.questionIndex === questionIndex);
+            if (qIdx < 0) return;
+            const question = wt.questions.splice(qIdx, 1)[0];
+
+            // Move back to wrongByFolder
+            if (!data.wrongByFolder[folderId]) data.wrongByFolder[folderId] = [];
+            let activeTask = data.wrongByFolder[folderId].find(t => t.taskId === taskId);
+            if (!activeTask) {
+                activeTask = { taskId, taskName: wt.taskName, questions: [] };
+                data.wrongByFolder[folderId].push(activeTask);
+            }
+            activeTask.questions.push(question);
+
+            // Clean empty task from archived list
+            if (wt.questions.length === 0) {
+                data.archivedWrongByFolder[folderId] = archivedTasks.filter(t => t.taskId !== taskId);
+            }
+
+            saveData();
+            debouncedChatSync();
+            openWrongArchive(folderId);
+            showToast('已恢复');
         }
 
         // ==================== Service Worker ====================
