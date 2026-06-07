@@ -11278,11 +11278,11 @@
                             });
                         });
 
-                        // 合并习题数据：以云端为基础，保留本地新增的 folder/task
+                        // 合并习题数据：与书籍/课堂一致，用时间戳合并而非覆盖，
+                        // 避免本地新上传但云端还没有的习题被云端旧数据冲掉。
                         const cloudExercises = metadata.exercises || { folders: [], wrongByFolder: {} };
-                        const localExercises = appData.exercises || { folders: [], wrongByFolder: {} };
 
-                        // 收集云端已有的习题文件 id
+                        // 收集云端已有的习题文件 id（供后续双向同步文件用）
                         cloudExFileIds = new Set();
                         (cloudExercises.folders || []).forEach(f => {
                             (f.tasks || []).forEach(t => {
@@ -11290,33 +11290,9 @@
                             });
                         });
 
-                        // 收集云端已有的 folder id 和 task id
-                        const cloudFolderIds = new Set((cloudExercises.folders || []).map(f => f.id));
-                        const cloudTaskIds = new Set();
-                        (cloudExercises.folders || []).forEach(f => {
-                            (f.tasks || []).forEach(t => { if (t.id) cloudTaskIds.add(t.id); });
-                        });
-
-                        // 以云端为基础
-                        appData.exercises = cloudExercises;
+                        appData.exercises = mergeExercisesData(cloudExercises, appData.exercises, cloudSyncedAtMs);
                         if (!appData.exercises.folders) appData.exercises.folders = [];
                         if (!appData.exercises.wrongByFolder) appData.exercises.wrongByFolder = {};
-
-                        // 把本地有但云端没有的 folder 和 task 合并进来
-                        for (const localFolder of (localExercises.folders || [])) {
-                            if (!cloudFolderIds.has(localFolder.id)) {
-                                appData.exercises.folders.push(localFolder);
-                            } else {
-                                const mergedFolder = appData.exercises.folders.find(f => f.id === localFolder.id);
-                                if (mergedFolder) {
-                                    for (const localTask of (localFolder.tasks || [])) {
-                                        if (!cloudTaskIds.has(localTask.id)) {
-                                            mergedFolder.tasks.push(localTask);
-                                        }
-                                    }
-                                }
-                            }
-                        }
 
                         saveData();
                         refreshAllUIFromAppData();
@@ -12347,6 +12323,84 @@
             return merged;
         }
 
+        // ==================== 习题数据合并 ====================
+        // 与书籍/课堂一致：用时间戳合并，绝不让任何一方直接覆盖另一方。
+        // 这是修复"上传习题后过一会被清空"的关键：启动同步、定时同步过去用
+        // "云端覆盖本地"的简单策略，会把本地刚上传、云端还没有的习题冲掉。
+        // 策略：
+        //   - folder 按 id 合并；本地有云端没有且 createdAt > cloudSyncedAtMs 视为本地新加，保留
+        //   - task 按 id 合并；同上（共有的以云端为准，云端是已同步的权威）
+        //   - 没有 createdAt 的旧数据一律保留，宁可不删也不误删
+        //   - wrongByFolder 按 folderId 取并集，错题来自本地作答尽量保留
+        function mergeExercisesData(cloudExercises, localExercises, cloudSyncedAtMs) {
+            const cloud = cloudExercises || { folders: [], wrongByFolder: {} };
+            const local = localExercises || { folders: [], wrongByFolder: {} };
+            const baseline = Number(cloudSyncedAtMs) || 0;
+
+            const cloudFolders = cloud.folders || [];
+            const localFolders = local.folders || [];
+            const localFolderMap = {};
+            localFolders.forEach(f => { if (f && f.id) localFolderMap[f.id] = f; });
+            const cloudFolderIds = new Set(cloudFolders.map(f => f && f.id).filter(Boolean));
+
+            // 以云端 folder 列表为基础，合并本地新增的 task
+            const mergedFolders = cloudFolders.map(cf => {
+                if (!cf || !cf.id) return cf;
+                const lf = localFolderMap[cf.id];
+                if (!lf) return cf; // 云端有、本地没有 → 用云端
+                return { ...cf, tasks: mergeExerciseTasks(cf.tasks, lf.tasks, baseline) };
+            });
+
+            // 本地有、云端没有的 folder：createdAt > baseline（或无 createdAt）视为本地新加，保留
+            localFolders.forEach(lf => {
+                if (!lf || !lf.id || cloudFolderIds.has(lf.id)) return;
+                const createdMs = lf.createdAt ? Date.parse(lf.createdAt) : NaN;
+                if (isNaN(createdMs) || createdMs > baseline) {
+                    mergedFolders.push(lf);
+                }
+            });
+
+            return {
+                folders: mergedFolders,
+                wrongByFolder: mergeExerciseWrong(cloud.wrongByFolder, local.wrongByFolder)
+            };
+        }
+
+        function mergeExerciseTasks(cloudTasks, localTasks, baseline) {
+            const ct = cloudTasks || [];
+            const lt = localTasks || [];
+            const cloudIds = new Set(ct.map(t => t && t.id).filter(Boolean));
+            const merged = [...ct];
+            // 本地有、云端没有的 task：createdAt > baseline（或无 createdAt）视为本地新加，保留
+            lt.forEach(lTask => {
+                if (!lTask || !lTask.id || cloudIds.has(lTask.id)) return;
+                const createdMs = lTask.createdAt ? Date.parse(lTask.createdAt) : NaN;
+                if (isNaN(createdMs) || createdMs > baseline) {
+                    merged.push(lTask);
+                }
+            });
+            return merged;
+        }
+
+        function mergeExerciseWrong(cloudWrong, localWrong) {
+            const cw = cloudWrong || {};
+            const lw = localWrong || {};
+            const result = {};
+            const allKeys = new Set([...Object.keys(cw), ...Object.keys(lw)]);
+            allKeys.forEach(folderId => {
+                const cloudList = cw[folderId] || [];
+                const localList = lw[folderId] || [];
+                const cloudIds = new Set(cloudList.map(t => t && t.id).filter(Boolean));
+                const merged = [...cloudList];
+                localList.forEach(lt => {
+                    if (!lt || !lt.id || cloudIds.has(lt.id)) return;
+                    merged.push(lt); // 错题来自本地作答，尽量保留
+                });
+                if (merged.length) result[folderId] = merged;
+            });
+            return result;
+        }
+
         async function autoSyncFromR2OnStartup() {
             const config = appData.settings && appData.settings.r2Config;
             if (!config || !config.accessKeyId || !config.autoSyncEnabled) return;
@@ -12393,11 +12447,11 @@
                     cloudSyncedAtMs
                 );
                 appData.lectureDrafts = metadata.lectureDrafts || appData.lectureDrafts || {};
-                // 合并习题数据：云端覆盖本地（简单策略）
-                if (metadata.exercises) {
-                    appData.exercises = metadata.exercises;
-                }
-                if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {} };
+                // 合并习题数据：用时间戳合并，保留本地刚上传、云端还没有的习题，
+                // 不再让云端旧数据覆盖本地（这是"上传习题后被清空"的根因）。
+                appData.exercises = mergeExercisesData(metadata.exercises, appData.exercises, cloudSyncedAtMs);
+                if (!appData.exercises.folders) appData.exercises.folders = [];
+                if (!appData.exercises.wrongByFolder) appData.exercises.wrongByFolder = {};
                 // API 设置仅保留本地值，不被云端覆盖
                 appData.settings = { ...metadata.settings, ...localApiSettings, r2Config: localR2Config };
                 saveData();
