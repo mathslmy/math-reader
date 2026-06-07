@@ -6951,7 +6951,7 @@
                     if (!appData.notes) appData.notes = {};
                     if (!appData.archived) appData.archived = [];
                     if (!appData.classroom) appData.classroom = { courses: [], seminars: [] };
-                    if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {} };
+                    appData.exercises = normalizeExercisesData(appData.exercises);
                     if (!appData.settings) appData.settings = {};
                     if (appData.settings.photoRetentionDays === undefined) appData.settings.photoRetentionDays = 0;
                 } catch(e) {
@@ -6962,16 +6962,25 @@
             }
         }
 
+        function normalizeExercisesData(exercises) {
+            const normalized = exercises && typeof exercises === 'object' ? JSON.parse(JSON.stringify(exercises)) : {};
+            if (!Array.isArray(normalized.folders)) normalized.folders = [];
+            if (!normalized.wrongByFolder || typeof normalized.wrongByFolder !== 'object' || Array.isArray(normalized.wrongByFolder)) {
+                normalized.wrongByFolder = {};
+            }
+            if (!Array.isArray(normalized.deletedWrongQuestions)) normalized.deletedWrongQuestions = [];
+            normalized.deletedWrongQuestions = compactWrongTombstones(normalized.deletedWrongQuestions);
+            return normalized;
+        }
+
         // 从 IndexedDB 加载习题数据，并迁移 localStorage 中的残留
         async function loadExercisesFromIDB() {
+            let loadedFromIDB = false;
             try {
                 const exStr = await getFileData('__exercises_data__');
                 if (exStr) {
-                    const exData = JSON.parse(exStr);
-                    appData.exercises = exData;
-                    if (!appData.exercises.folders) appData.exercises.folders = [];
-                    if (!appData.exercises.wrongByFolder) appData.exercises.wrongByFolder = {};
-                    if (!appData.exercises.deletedWrongQuestions) appData.exercises.deletedWrongQuestions = [];
+                    appData.exercises = normalizeExercisesData(JSON.parse(exStr));
+                    loadedFromIDB = true;
                     console.log('[loadExercisesFromIDB] 习题数据已从 IndexedDB 加载');
                 }
             } catch(e) {
@@ -6982,23 +6991,29 @@
                 const raw = localStorage.getItem('mathReader');
                 if (raw) {
                     const parsed = JSON.parse(raw);
-                    if (parsed.exercises && (parsed.exercises.folders?.length || Object.keys(parsed.exercises.wrongByFolder || {}).length)) {
-                        // localStorage 中有习题数据，迁移到 IDB
-                        if (!appData.exercises || !appData.exercises.folders?.length) {
-                            appData.exercises = parsed.exercises;
-                            console.log('[migrate] 习题数据从 localStorage 迁移到 IndexedDB');
-                        }
-                        // 从 localStorage 中删掉 exercises 字段并写回
+                    const legacyExercises = normalizeExercisesData(parsed.exercises);
+                    const hasLegacyExercises = parsed.exercises && (
+                        legacyExercises.folders.length > 0 ||
+                        Object.keys(legacyExercises.wrongByFolder).length > 0 ||
+                        legacyExercises.deletedWrongQuestions.length > 0
+                    );
+                    if (hasLegacyExercises && !loadedFromIDB) {
+                        // localStorage 中有习题数据且 IDB 为空，迁移到 IDB
+                        appData.exercises = legacyExercises;
+                        await saveFileData('__exercises_data__', JSON.stringify(appData.exercises));
+                        loadedFromIDB = true;
+                        console.log('[migrate] 习题数据从 localStorage 迁移到 IndexedDB');
+                    }
+                    if (parsed.exercises !== undefined) {
+                        // 无论是否迁移，都从 localStorage 中删掉 exercises 字段，避免后续 merge/rebase 冲突和旧数据覆盖 IDB
                         delete parsed.exercises;
                         try { localStorage.setItem('mathReader', JSON.stringify(parsed)); } catch(e2) {}
-                        // 保存到 IDB
-                        await saveFileData('__exercises_data__', JSON.stringify(appData.exercises));
                     }
                 }
             } catch(e) {
                 console.warn('[migrate] 习题迁移失败:', e);
             }
-            if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {} };
+            appData.exercises = normalizeExercisesData(appData.exercises);
         }
 
         // 从 IndexedDB 备份恢复 appData
@@ -7015,7 +7030,7 @@
                         if (!appData.archived) appData.archived = [];
                         if (!appData.classroom) appData.classroom = { courses: [], seminars: [] };
                         if (!appData.settings) appData.settings = {};
-                        if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {} };
+                        appData.exercises = normalizeExercisesData(appData.exercises);
                         // 写回 localStorage（不含 exercises）
                         try { localStorage.setItem('mathReader', JSON.stringify(appData)); } catch(e2) {}
                         console.log('[loadData] 已从 IndexedDB 备份恢复数据');
@@ -7099,7 +7114,7 @@
             // 剔除标注大数据、草稿画布、截图（已迁移到 IndexedDB）
             stripBlobsFromSaveData(toSave);
             // 习题数据完全存入 IndexedDB，不放 localStorage
-            const exercisesToIDB = toSave.exercises ? JSON.parse(JSON.stringify(toSave.exercises)) : null;
+            const exercisesToIDB = toSave.exercises ? normalizeExercisesData(toSave.exercises) : null;
             delete toSave.exercises;
             if (exercisesToIDB) {
                 // 剔除 userDrawing / sourceFiles.data 等大字段再存 IDB
@@ -12475,13 +12490,14 @@
         // 习题/错题和书籍、课堂一样不能在启动同步时被云端旧 metadata 直接覆盖。
         // 按 id 合并，并保留本地晚于云端 syncedAt 的新增 folder/task/wrong；错题删除用 tombstone 避免被旧云端复活。
         function mergeExercisesData(cloudExercises, localExercises, cloudSyncedAtMs) {
-            const cloud = cloudExercises || { folders: [], wrongByFolder: {} };
-            const local = localExercises || { folders: [], wrongByFolder: {} };
+            const cloud = normalizeExercisesData(cloudExercises);
+            const local = normalizeExercisesData(localExercises);
             const baseline = Number(cloudSyncedAtMs) || 0;
+            const deletedWrongQuestions = compactWrongTombstones([...(cloud.deletedWrongQuestions || []), ...(local.deletedWrongQuestions || [])]);
             const result = {
                 folders: mergeExerciseFolders(cloud.folders || [], local.folders || [], baseline),
-                wrongByFolder: mergeWrongByFolder(cloud.wrongByFolder || {}, local.wrongByFolder || {}, local.deletedWrongQuestions || []),
-                deletedWrongQuestions: compactWrongTombstones([...(cloud.deletedWrongQuestions || []), ...(local.deletedWrongQuestions || [])])
+                wrongByFolder: mergeWrongByFolder(cloud.wrongByFolder || {}, local.wrongByFolder || {}, deletedWrongQuestions),
+                deletedWrongQuestions
             };
             return result;
         }
@@ -13000,8 +13016,8 @@
             if (confirm(i18n('confirm_clear_all'))) {
                 localStorage.removeItem('mathReader');
                 // 清除 IndexedDB 中的习题数据
-                saveFileData('__exercises_data__', '{"folders":[],"wrongByFolder":{}}').catch(()=>{});
-                appData = { books: [], papers: [], notes: {}, archived: [], settings: appData.settings, exercises: { folders: [], wrongByFolder: {} } };
+                saveFileData('__exercises_data__', '{"folders":[],"wrongByFolder":{},"deletedWrongQuestions":[]}').catch(()=>{});
+                appData = { books: [], papers: [], notes: {}, archived: [], settings: appData.settings, exercises: { folders: [], wrongByFolder: {}, deletedWrongQuestions: [] } };
                 saveData();
                 renderLibrary();
                 renderNotesPage();
@@ -18082,7 +18098,7 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
         let exDrawingCache = {};
 
         function getExercisesData() {
-            if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {} };
+            appData.exercises = normalizeExercisesData(appData.exercises);
             if (!appData.exercises.folders) appData.exercises.folders = [];
             if (!appData.exercises.wrongByFolder) appData.exercises.wrongByFolder = {};
             if (!appData.exercises.deletedWrongQuestions) appData.exercises.deletedWrongQuestions = [];
