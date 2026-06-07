@@ -18853,8 +18853,10 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
             const folder = data.folders.find(f => f.id === currentExerciseFolder.folderId);
             if (!folder) return;
 
-            closeBatchPanel();
+            const pdfBytes = batchState.pdfBytes;
+            const pageImagesSnapshot = batchState.pageImages.slice();
             const baseName = (batchState.pdfFileName || 'exercise').replace(/\.[^/.]+$/, '');
+            closeBatchPanel();
 
             for (const [exIdx, pages] of Object.entries(groups)) {
                 pages.sort((a, b) => a - b);
@@ -18863,7 +18865,7 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
 
                 try {
                     if (!window.PDFLib) throw new Error('pdf-lib 未加载');
-                    const src = await PDFLib.PDFDocument.load(batchState.pdfBytes);
+                    const src = await PDFLib.PDFDocument.load(pdfBytes);
                     const out = await PDFLib.PDFDocument.create();
                     const indices = pages.map(p => p - 1);
                     const copiedPages = await out.copyPages(src, indices);
@@ -18889,8 +18891,8 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
 
                     const pageImages = [];
                     for (const p of pages) {
-                        if (batchState.pageImages[p - 1]) {
-                            pageImages.push(batchState.pageImages[p - 1]);
+                        if (pageImagesSnapshot[p - 1]) {
+                            pageImages.push(pageImagesSnapshot[p - 1]);
                         }
                     }
                     if (pageImages.length === 0) {
