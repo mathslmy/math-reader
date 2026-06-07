@@ -1752,6 +1752,136 @@
 
         .exercise-upload-btn svg { width: 20px; height: 20px; }
 
+        /* ==================== Exercise Batch Upload Panel ==================== */
+        .exercise-batch-panel {
+            position: fixed;
+            inset: 0;
+            z-index: 600;
+            background: var(--bg-primary);
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .exercise-batch-panel.show { display: flex; }
+        .batch-header {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            gap: 12px;
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+        .batch-header-back {
+            width: 32px; height: 32px; border: none; background: none;
+            cursor: pointer; color: var(--text-primary); display: flex;
+            align-items: center; justify-content: center;
+        }
+        .batch-header-title { font-size: 18px; font-weight: 600; flex: 1; }
+        .batch-quickcut {
+            display: flex;
+            align-items: center;
+            padding: 10px 16px;
+            gap: 8px;
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+            flex-wrap: wrap;
+        }
+        .batch-quickcut label { font-size: 14px; color: var(--text-secondary); white-space: nowrap; }
+        .batch-quickcut-input {
+            width: 48px; padding: 4px 8px; border-radius: 8px;
+            border: 1px solid var(--border-color); background: var(--bg-secondary);
+            color: var(--text-primary); text-align: center; font-size: 14px;
+        }
+        .batch-quickcut-btn {
+            padding: 4px 14px; border-radius: 8px; border: none;
+            background: var(--accent); color: white; font-size: 13px;
+            cursor: pointer; white-space: nowrap;
+        }
+        body.dark-theme .batch-quickcut-btn { color: #000; }
+        .batch-page-grid {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+            gap: 8px;
+            align-content: start;
+        }
+        .batch-page-item {
+            position: relative;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: border-color 0.15s;
+            aspect-ratio: 3/4;
+            background: var(--bg-secondary);
+        }
+        .batch-page-item.selected { border-color: var(--accent); }
+        .batch-page-item img {
+            width: 100%; height: 100%; object-fit: cover; display: block;
+        }
+        .batch-page-num {
+            position: absolute; bottom: 2px; left: 2px;
+            background: rgba(0,0,0,0.55); color: #fff;
+            font-size: 10px; padding: 1px 5px; border-radius: 4px;
+        }
+        .batch-page-badge {
+            position: absolute; top: 2px; right: 2px;
+            font-size: 10px; padding: 1px 6px; border-radius: 4px;
+            font-weight: 600; line-height: 1.4;
+        }
+        .batch-page-badge[data-type="exercise"] { background: #3b82f6; color: #fff; }
+        .batch-page-badge[data-type="skip"] { background: #9ca3af; color: #fff; }
+        .batch-page-badge[data-type="discard"] { background: #ef4444; color: #fff; }
+        .batch-page-skeleton {
+            width: 100%; height: 100%;
+            background: linear-gradient(90deg, var(--bg-secondary) 25%, var(--bg-primary) 50%, var(--bg-secondary) 75%);
+            background-size: 200% 100%;
+            animation: batchShimmer 1.5s infinite;
+        }
+        @keyframes batchShimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+        .batch-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 12px;
+            overflow-x: auto;
+            border-top: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+        .batch-tool-btn {
+            padding: 5px 12px; border-radius: 16px; border: 1.5px solid var(--border-color);
+            background: var(--bg-secondary); color: var(--text-primary);
+            font-size: 12px; cursor: pointer; white-space: nowrap; flex-shrink: 0;
+        }
+        .batch-tool-btn.active { border-color: var(--accent); background: var(--accent); color: #fff; }
+        body.dark-theme .batch-tool-btn.active { color: #000; }
+        .batch-tool-btn.skip-tool.active { background: #9ca3af; border-color: #9ca3af; color: #fff; }
+        .batch-tool-btn.discard-tool.active { background: #ef4444; border-color: #ef4444; color: #fff; }
+        .batch-tool-add {
+            padding: 5px 10px; border-radius: 16px; border: 1.5px dashed var(--border-color);
+            background: none; color: var(--text-secondary); font-size: 12px;
+            cursor: pointer; white-space: nowrap; flex-shrink: 0;
+        }
+        .batch-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 16px;
+            border-top: 1px solid var(--border-color);
+            flex-shrink: 0;
+            gap: 12px;
+        }
+        .batch-summary { font-size: 13px; color: var(--text-secondary); flex: 1; }
+        .batch-confirm-btn {
+            padding: 8px 24px; border-radius: 20px; border: none;
+            background: var(--accent); color: white; font-size: 14px;
+            font-weight: 600; cursor: pointer;
+        }
+        body.dark-theme .batch-confirm-btn { color: #000; }
+        .batch-confirm-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
         /* ==================== Exercise Doing View ==================== */
         .exercise-doing-view {
             position: fixed;
@@ -4712,11 +4842,37 @@
 
     <!-- Exercise upload bar -->
     <div class="exercise-upload-bar" id="exerciseUploadBar">
+        <button class="exercise-upload-btn" onclick="exerciseBatchUpload()" title="习题集上传" style="background:var(--bg-secondary);color:var(--text-primary);box-shadow:0 1px 4px rgba(0,0,0,0.1);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="18" rx="2"/><line x1="2" y1="9" x2="22" y2="9"/><line x1="8" y1="3" x2="8" y2="21"/></svg>
+        </button>
         <button class="exercise-upload-btn" onclick="exerciseUploadFiles()" title="上传习题">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         </button>
     </div>
     <input type="file" id="exerciseFileInput" accept="image/*,.pdf" multiple style="display:none;">
+    <input type="file" id="exerciseBatchFileInput" accept=".pdf,application/pdf" style="display:none;">
+
+    <!-- Exercise batch upload panel -->
+    <div class="exercise-batch-panel" id="exerciseBatchPanel">
+        <div class="batch-header">
+            <button class="batch-header-back" onclick="closeBatchPanel()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <span class="batch-header-title">习题集上传</span>
+        </div>
+        <div class="batch-quickcut">
+            <label>快速裁切：每</label>
+            <input type="number" class="batch-quickcut-input" id="batchQuickCutInput" value="2" min="1" max="100">
+            <label>页一份习题</label>
+            <button class="batch-quickcut-btn" onclick="applyBatchQuickCut()">应用</button>
+        </div>
+        <div class="batch-page-grid" id="batchPageGrid"></div>
+        <div class="batch-toolbar" id="batchToolbar"></div>
+        <div class="batch-footer">
+            <span class="batch-summary" id="batchSummary"></span>
+            <button class="batch-confirm-btn" id="batchConfirmBtn" onclick="confirmBatchUpload()" disabled>确认生成</button>
+        </div>
+    </div>
 
     <!-- Exercise doing view (fullscreen) -->
     <div class="exercise-doing-view" id="exerciseDoingView">
@@ -6216,6 +6372,7 @@
 
             // Exercise file input
             document.getElementById('exerciseFileInput').addEventListener('change', onExerciseFileUpload);
+            document.getElementById('exerciseBatchFileInput').addEventListener('change', onBatchFileSelected);
 
             // 初始化R2自动同步
             initR2AutoSync();
@@ -18502,6 +18659,335 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                 reader.onerror = () => reject(new Error('读取文件失败'));
                 reader.readAsDataURL(file);
             });
+        }
+
+        // ==================== Exercise Batch Upload ====================
+        let batchState = {
+            pdfBytes: null,
+            pdfDataUrl: null,
+            totalPages: 0,
+            pageImages: [],
+            assignments: {},
+            exerciseCount: 0,
+            selectedTool: null
+        };
+
+        const BATCH_COLORS = ['#3b82f6','#10b981','#f59e0b','#8b5cf6','#ec4899','#06b6d4','#f97316','#6366f1'];
+
+        function exerciseBatchUpload() {
+            if (!currentExerciseFolder) { showToast(i18n('toast_open_doc_first')); return; }
+            document.getElementById('exerciseBatchFileInput').click();
+        }
+
+        async function onBatchFileSelected(e) {
+            const file = e.target.files && e.target.files[0];
+            e.target.value = '';
+            if (!file || file.type !== 'application/pdf') return;
+
+            showToast('正在加载PDF...');
+            try {
+                const dataUrl = await readFileAsDataURL(file);
+                const base64 = dataUrl.split(',')[1];
+                const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+                const pdf = await pdfjsLib.getDocument({ data: bytes.slice(0) }).promise;
+
+                batchState = {
+                    pdfBytes: bytes,
+                    pdfDataUrl: dataUrl,
+                    pdfFileName: file.name,
+                    totalPages: pdf.numPages,
+                    pageImages: new Array(pdf.numPages).fill(null),
+                    assignments: {},
+                    exerciseCount: 0,
+                    selectedTool: null
+                };
+
+                openBatchPanel();
+                renderBatchPageGrid();
+                renderBatchToolbar();
+                updateBatchSummary();
+
+                for (let p = 1; p <= pdf.numPages; p++) {
+                    const page = await pdf.getPage(p);
+                    const viewport = page.getViewport({ scale: 0.4 });
+                    const canvas = document.createElement('canvas');
+                    canvas.width = viewport.width;
+                    canvas.height = viewport.height;
+                    const ctx = canvas.getContext('2d');
+                    await page.render({ canvasContext: ctx, viewport }).promise;
+                    batchState.pageImages[p - 1] = canvas.toDataURL('image/jpeg', 0.6);
+                    const img = document.querySelector(`#batchPageGrid .batch-page-item[data-page="${p}"] img`);
+                    if (img) img.src = batchState.pageImages[p - 1];
+                    const skel = document.querySelector(`#batchPageGrid .batch-page-item[data-page="${p}"] .batch-page-skeleton`);
+                    if (skel) skel.remove();
+                }
+            } catch (err) {
+                console.error('加载PDF失败:', err);
+                showToast('加载PDF失败: ' + err.message);
+            }
+        }
+
+        function openBatchPanel() {
+            document.getElementById('exerciseBatchPanel').classList.add('show');
+        }
+
+        function closeBatchPanel() {
+            document.getElementById('exerciseBatchPanel').classList.remove('show');
+            batchState = { pdfBytes:null, pdfDataUrl:null, totalPages:0, pageImages:[], assignments:{}, exerciseCount:0, selectedTool:null };
+        }
+
+        function renderBatchPageGrid() {
+            const grid = document.getElementById('batchPageGrid');
+            let html = '';
+            for (let p = 1; p <= batchState.totalPages; p++) {
+                const a = batchState.assignments[p];
+                const img = batchState.pageImages[p - 1];
+                const badgeHtml = a ? `<span class="batch-page-badge" data-type="${a.type}" style="${a.type==='exercise'?'background:'+BATCH_COLORS[(a.index-1)%BATCH_COLORS.length]:''}">${a.label}</span>` : '';
+                html += `<div class="batch-page-item${a?' selected':''}" data-page="${p}" onclick="onBatchPageClick(${p})">`;
+                if (img) {
+                    html += `<img src="${img}" alt="Page ${p}">`;
+                } else {
+                    html += `<img src="" alt="Page ${p}" style="display:none;"><div class="batch-page-skeleton"></div>`;
+                }
+                html += `<span class="batch-page-num">${p}</span>${badgeHtml}</div>`;
+            }
+            grid.innerHTML = html;
+        }
+
+        function renderBatchToolbar() {
+            const tb = document.getElementById('batchToolbar');
+            let html = '';
+            for (let i = 1; i <= batchState.exerciseCount; i++) {
+                const active = batchState.selectedTool === i ? ' active' : '';
+                const color = BATCH_COLORS[(i - 1) % BATCH_COLORS.length];
+                const style = batchState.selectedTool === i ? `background:${color};border-color:${color};color:#fff;` : `border-color:${color};color:${color};`;
+                html += `<button class="batch-tool-btn${active}" style="${style}" onclick="selectBatchTool(${i})">习题${i}</button>`;
+            }
+            html += `<button class="batch-tool-add" onclick="addBatchExercise()">+ 新建</button>`;
+            const skipActive = batchState.selectedTool === 'skip' ? ' active' : '';
+            const discardActive = batchState.selectedTool === 'discard' ? ' active' : '';
+            html += `<button class="batch-tool-btn skip-tool${skipActive}" onclick="selectBatchTool('skip')">跳过</button>`;
+            html += `<button class="batch-tool-btn discard-tool${discardActive}" onclick="selectBatchTool('discard')">放弃</button>`;
+            tb.innerHTML = html;
+        }
+
+        function selectBatchTool(tool) {
+            batchState.selectedTool = batchState.selectedTool === tool ? null : tool;
+            renderBatchToolbar();
+        }
+
+        function addBatchExercise() {
+            batchState.exerciseCount++;
+            batchState.selectedTool = batchState.exerciseCount;
+            renderBatchToolbar();
+        }
+
+        function onBatchPageClick(pageNum) {
+            const tool = batchState.selectedTool;
+            if (!tool) {
+                showToast('请先在下方选择一个习题分组或点击"+ 新建"');
+                return;
+            }
+            const current = batchState.assignments[pageNum];
+            if (current && current.type === (typeof tool === 'number' ? 'exercise' : tool) && (typeof tool !== 'number' || current.index === tool)) {
+                delete batchState.assignments[pageNum];
+            } else {
+                if (typeof tool === 'number') {
+                    batchState.assignments[pageNum] = { type: 'exercise', index: tool, label: '题' + tool };
+                } else {
+                    batchState.assignments[pageNum] = { type: tool, index: 0, label: tool === 'skip' ? '跳过' : '放弃' };
+                }
+            }
+            renderBatchPageGrid();
+            updateBatchSummary();
+        }
+
+        function applyBatchQuickCut() {
+            const x = parseInt(document.getElementById('batchQuickCutInput').value) || 2;
+            if (x < 1) return;
+            batchState.assignments = {};
+            batchState.exerciseCount = 0;
+            let exIdx = 0;
+            for (let p = 1; p <= batchState.totalPages; p += x) {
+                exIdx++;
+                for (let j = p; j < p + x && j <= batchState.totalPages; j++) {
+                    batchState.assignments[j] = { type: 'exercise', index: exIdx, label: '题' + exIdx };
+                }
+            }
+            batchState.exerciseCount = exIdx;
+            batchState.selectedTool = null;
+            renderBatchPageGrid();
+            renderBatchToolbar();
+            updateBatchSummary();
+        }
+
+        function updateBatchSummary() {
+            const groups = {};
+            for (const [page, a] of Object.entries(batchState.assignments)) {
+                if (a.type === 'exercise') {
+                    if (!groups[a.index]) groups[a.index] = [];
+                    groups[a.index].push(parseInt(page));
+                }
+            }
+            const count = Object.keys(groups).length;
+            const total = Object.values(groups).reduce((s, g) => s + g.length, 0);
+            document.getElementById('batchSummary').textContent = count > 0
+                ? `将生成 ${count} 份习题，共 ${total} 页`
+                : '请分配页面到习题分组';
+            document.getElementById('batchConfirmBtn').disabled = count === 0;
+        }
+
+        async function confirmBatchUpload() {
+            if (!currentExerciseFolder) { showToast(i18n('toast_open_doc_first')); return; }
+
+            const groups = {};
+            for (const [page, a] of Object.entries(batchState.assignments)) {
+                if (a.type === 'exercise') {
+                    if (!groups[a.index]) groups[a.index] = [];
+                    groups[a.index].push(parseInt(page));
+                }
+            }
+            if (Object.keys(groups).length === 0) return;
+
+            const data = getExercisesData();
+            const folder = data.folders.find(f => f.id === currentExerciseFolder.folderId);
+            if (!folder) return;
+
+            closeBatchPanel();
+            const baseName = (batchState.pdfFileName || 'exercise').replace(/\.[^/.]+$/, '');
+
+            for (const [exIdx, pages] of Object.entries(groups)) {
+                pages.sort((a, b) => a - b);
+                const label = `${baseName}_习题${exIdx}(p${pages[0]}-${pages[pages.length-1]})`;
+                showToast(`正在处理: ${label}`);
+
+                try {
+                    if (!window.PDFLib) throw new Error('pdf-lib 未加载');
+                    const src = await PDFLib.PDFDocument.load(batchState.pdfBytes);
+                    const out = await PDFLib.PDFDocument.create();
+                    const indices = pages.map(p => p - 1);
+                    const copiedPages = await out.copyPages(src, indices);
+                    copiedPages.forEach(p => out.addPage(p));
+                    const slicedBytes = await out.save();
+                    const slicedBase64 = uint8ToBase64(slicedBytes);
+                    const slicedDataUrl = 'data:application/pdf;base64,' + slicedBase64;
+
+                    const fileId = 'exfile_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+                    await saveFileData('exercise_' + fileId, slicedDataUrl);
+
+                    const taskId = 'extask_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+                    const task = {
+                        id: taskId,
+                        name: label,
+                        questions: [],
+                        sourceFiles: [{ id: fileId, name: label + '.pdf', type: 'pdf', mimeType: 'application/pdf' }],
+                        createdAt: new Date().toISOString()
+                    };
+                    folder.tasks.push(task);
+                    saveData();
+                    renderExerciseFolderContent(folder);
+
+                    const pageImages = [];
+                    for (const p of pages) {
+                        if (batchState.pageImages[p - 1]) {
+                            pageImages.push(batchState.pageImages[p - 1]);
+                        }
+                    }
+                    if (pageImages.length === 0) {
+                        const hiRes = await renderPdfPagesToImages(slicedBytes, 1.5);
+                        pageImages.push(...hiRes);
+                    }
+
+                    extractExerciseFromImages(folder.id, taskId, pageImages, pages.length);
+
+                    for (const sf of task.sourceFiles) {
+                        triggerSyncOnFileChange(sf.id, 'exercise_upload');
+                    }
+                } catch (err) {
+                    console.error(`习题${exIdx}处理失败:`, err);
+                    showToast(`习题${exIdx}处理失败: ` + err.message);
+                }
+            }
+            debouncedChatSync();
+        }
+
+        async function extractExerciseFromImages(folderId, taskId, pageImages, pageCount) {
+            const systemPrompt = `你是一个数学习题解析助手。请仔细识别上传的习题文件，将其中的每一道题目完整拆解出来。
+
+要求：
+1. 必须识别出所有题目，不能遗漏任何一道
+2. 每道题目单独返回，使用LaTeX格式
+3. 行内公式用 $...$ ，独立公式用 $$...$$
+4. 保留题号
+5. 严格按照原题内容，不要修改或补充
+
+严格要求：只输出一个纯JSON数组，不要输出任何其他文字、解释、markdown标记。
+格式：["题目1的完整文本", "题目2的完整文本", ...]
+注意：JSON字符串内的换行请用\\n表示，引号用\\"转义。
+重要：确保输出完整的JSON数组，以 ] 结尾，不要中途截断。`;
+
+            try {
+                let msgContent;
+                if (pageImages.length > 0) {
+                    const contentParts = [];
+                    for (const img of pageImages) {
+                        contentParts.push({ type: 'image_url', image_url: { url: img } });
+                    }
+                    contentParts.push({ type: 'text', text: `以上是习题的全部${pageCount}页，请识别并拆解其中的所有数学题目，一道都不能遗漏，按要求返回JSON数组。` });
+                    msgContent = [{ role: 'user', content: contentParts }];
+                } else {
+                    showToast('无页面图片可用');
+                    return;
+                }
+
+                let result = await callAI(systemPrompt, msgContent, { maxTokens: 16384, temperature: 0.3 });
+                if (!result) { showToast(i18n('toast_ai_return_parse_fail')); return; }
+
+                result = await autoFixTruncatedArray(result, systemPrompt, msgContent);
+
+                let questions;
+                try {
+                    questions = robustParseJSONArray(result);
+                } catch (e) {
+                    try { questions = splitQuestionsByNumber(result); } catch (e2) {
+                        showToast(i18n('toast_ai_return_parse_fail'));
+                        return;
+                    }
+                }
+
+                if (!Array.isArray(questions) || questions.length === 0) {
+                    showToast(i18n('toast_ai_no_valid_outline'));
+                    return;
+                }
+
+                questions = questions.filter(q => typeof q === 'string' && q.trim().length > 2);
+
+                const data = getExercisesData();
+                const folder = data.folders.find(f => f.id === folderId);
+                if (!folder) return;
+                const task = folder.tasks.find(t => t.id === taskId);
+                if (!task) return;
+
+                task.questions = questions.map((q, idx) => ({
+                    index: idx,
+                    latex: q,
+                    status: 'pending',
+                    score: null,
+                    userDrawing: null,
+                    aiComment: null
+                }));
+
+                saveData();
+                debouncedChatSync();
+                showToast(`已识别 ${questions.length} 道题目`);
+
+                if (currentExerciseFolder && currentExerciseFolder.folderId === folderId) {
+                    renderExerciseFolderContent(folder);
+                }
+            } catch (err) {
+                console.error('AI解析习题失败:', err);
+                showToast(i18n('toast_failed') + err.message);
+            }
         }
 
         // ==================== Robust JSON Parsing Utilities ====================
