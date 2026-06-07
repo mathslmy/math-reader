@@ -11115,7 +11115,7 @@
         let r2AutoSyncTimer = null;
         let r2LastSyncTime = null;
         let r2SyncInProgress = false;
-        let r2PendingSyncTask = null; // 排队等待的文件变更同步任务
+        let r2PendingSyncQueue = []; // 排队等待的文件变更同步任务队列
 
         function loadR2Config() {
             const config = appData.settings.r2Config || {};
@@ -11222,6 +11222,7 @@
                 // 阅读进度按时间戳合并保留较新的值。合并完再把结果写回云端。
                 let newlyAddedIds = [];
                 let newMatIds = [];
+                let cloudExFileIds = new Set();
                 try {
                     const metadataStr = await r2GetObject('metadata.json');
                     if (metadataStr) {
@@ -11270,12 +11271,52 @@
                             ((appData.classroom || {})[lk] || []).forEach(f => {
                                 (f.sessions || []).forEach(s => {
                                     (s.sourceFolder || []).forEach(m => {
-                                        if (m.type === 'recording') return; // 录音不云同步
+                                        if (m.type === 'recording') return;
                                         if (m.id && !cloudMatIds.has(m.id)) newMatIds.push(m.id);
                                     });
                                 });
                             });
                         });
+
+                        // 合并习题数据：以云端为基础，保留本地新增的 folder/task
+                        const cloudExercises = metadata.exercises || { folders: [], wrongByFolder: {} };
+                        const localExercises = appData.exercises || { folders: [], wrongByFolder: {} };
+
+                        // 收集云端已有的习题文件 id
+                        cloudExFileIds = new Set();
+                        (cloudExercises.folders || []).forEach(f => {
+                            (f.tasks || []).forEach(t => {
+                                (t.sourceFiles || []).forEach(sf => { if (sf.id) cloudExFileIds.add(sf.id); });
+                            });
+                        });
+
+                        // 收集云端已有的 folder id 和 task id
+                        const cloudFolderIds = new Set((cloudExercises.folders || []).map(f => f.id));
+                        const cloudTaskIds = new Set();
+                        (cloudExercises.folders || []).forEach(f => {
+                            (f.tasks || []).forEach(t => { if (t.id) cloudTaskIds.add(t.id); });
+                        });
+
+                        // 以云端为基础
+                        appData.exercises = cloudExercises;
+                        if (!appData.exercises.folders) appData.exercises.folders = [];
+                        if (!appData.exercises.wrongByFolder) appData.exercises.wrongByFolder = {};
+
+                        // 把本地有但云端没有的 folder 和 task 合并进来
+                        for (const localFolder of (localExercises.folders || [])) {
+                            if (!cloudFolderIds.has(localFolder.id)) {
+                                appData.exercises.folders.push(localFolder);
+                            } else {
+                                const mergedFolder = appData.exercises.folders.find(f => f.id === localFolder.id);
+                                if (mergedFolder) {
+                                    for (const localTask of (localFolder.tasks || [])) {
+                                        if (!cloudTaskIds.has(localTask.id)) {
+                                            mergedFolder.tasks.push(localTask);
+                                        }
+                                    }
+                                }
+                            }
+                        }
 
                         saveData();
                         refreshAllUIFromAppData();
@@ -11311,6 +11352,36 @@
                         console.warn('上传新课堂素材失败:', matId, e);
                     }
                 }
+
+                // 把本地有但云端没有的习题文件上传；同时拉取云端有但本地没有的习题文件
+                for (const folder of (appData.exercises?.folders || [])) {
+                    for (const task of (folder.tasks || [])) {
+                        for (const sf of (task.sourceFiles || [])) {
+                            if (!cloudExFileIds.has(sf.id)) {
+                                try {
+                                    const exData = await getFileData('exercise_' + sf.id).catch(() => null);
+                                    if (exData) {
+                                        await r2PutObject('exercises/' + sf.id, exData, 'application/octet-stream');
+                                    }
+                                } catch (e) {
+                                    console.warn('上传新习题文件失败:', sf.id, e);
+                                }
+                            } else {
+                                const localEx = await getFileData('exercise_' + sf.id).catch(() => null);
+                                if (!localEx) {
+                                    try {
+                                        const cloudEx = await r2GetObject('exercises/' + sf.id);
+                                        if (cloudEx) {
+                                            await saveFileData('exercise_' + sf.id, cloudEx);
+                                        }
+                                    } catch (e) {
+                                        console.warn('拉取云端习题文件失败:', sf.id, e);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
                 
                 // 更新上次同步时间
                 config.lastSyncTime = new Date().toISOString();
@@ -11323,9 +11394,8 @@
             } finally {
                 r2SyncInProgress = false;
                 // 检查是否有排队的文件变更同步任务
-                if (r2PendingSyncTask) {
-                    const pending = r2PendingSyncTask;
-                    r2PendingSyncTask = null;
+                if (r2PendingSyncQueue.length > 0) {
+                    const pending = r2PendingSyncQueue.shift();
                     triggerSyncOnFileChange(pending.fileId, pending.action);
                 }
             }
@@ -11417,8 +11487,10 @@
             }
             
             if (r2SyncInProgress) {
-                // 有同步正在进行，排队等待，完成后自动执行
-                r2PendingSyncTask = { fileId, action };
+                // 有同步正在进行，排队等待，完成后自动执行（去重）
+                if (!r2PendingSyncQueue.some(t => t.fileId === fileId && t.action === action)) {
+                    r2PendingSyncQueue.push({ fileId, action });
+                }
                 return;
             }
             
@@ -11518,9 +11590,8 @@
             } finally {
                 r2SyncInProgress = false;
                 // 检查是否有排队的同步任务
-                if (r2PendingSyncTask) {
-                    const pending = r2PendingSyncTask;
-                    r2PendingSyncTask = null;
+                if (r2PendingSyncQueue.length > 0) {
+                    const pending = r2PendingSyncQueue.shift();
                     triggerSyncOnFileChange(pending.fileId, pending.action);
                 }
             }
@@ -12443,9 +12514,8 @@
             } finally {
                 r2SyncInProgress = false;
                 // 检查是否有排队的文件变更同步任务
-                if (r2PendingSyncTask) {
-                    const pending = r2PendingSyncTask;
-                    r2PendingSyncTask = null;
+                if (r2PendingSyncQueue.length > 0) {
+                    const pending = r2PendingSyncQueue.shift();
                     triggerSyncOnFileChange(pending.fileId, pending.action);
                 }
             }
@@ -18633,6 +18703,8 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
             const folder = data.folders.find(f => f.id === currentExerciseFolder.folderId);
             if (!folder) return;
 
+            const newFileIds = [];
+
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
                 const isImage = file.type.startsWith('image/');
@@ -18647,6 +18719,8 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
 
                     // Save to IndexedDB
                     await saveFileData('exercise_' + fileId, dataUrl);
+
+                    newFileIds.push(fileId);
 
                     // Create task
                     const taskId = 'extask_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
@@ -18678,16 +18752,9 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
 
             e.target.value = '';
             debouncedChatSync();
-            // 同步每个新上传的习题文件到云端
-            if (currentExerciseFolder) {
-                const syncFolder = data.folders.find(f => f.id === currentExerciseFolder.folderId);
-                if (syncFolder) {
-                    for (const task of (syncFolder.tasks || [])) {
-                        for (const sf of (task.sourceFiles || [])) {
-                            triggerSyncOnFileChange(sf.id, 'exercise_upload');
-                        }
-                    }
-                }
+            // 只同步本次新上传的习题文件到云端
+            for (const fid of newFileIds) {
+                triggerSyncOnFileChange(fid, 'exercise_upload');
             }
         }
 
