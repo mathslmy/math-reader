@@ -17793,6 +17793,26 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
             return `${m}:${String(s).padStart(2,'0')}`;
         }
 
+        function getActiveWrongCount(wrongTasks) {
+            return (wrongTasks || []).reduce((sum, task) => {
+                return sum + (task.questions || []).filter(q => !q.archived).length;
+            }, 0);
+        }
+
+        function getArchivedWrongItems(data) {
+            const items = [];
+            (data.folders || []).forEach(folder => {
+                const wrongTasks = data.wrongByFolder?.[folder.id] || [];
+                wrongTasks.forEach(wrongTask => {
+                    (wrongTask.questions || []).forEach((question, qIdx) => {
+                        if (!question.archived) return;
+                        items.push({ folder, wrongTask, question, qIdx });
+                    });
+                });
+            });
+            return items;
+        }
+
         function renderExercisesPage() {
             currentExerciseFolder = null;
             currentExerciseTask = null;
@@ -17830,7 +17850,7 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
             } else {
                 wrongList.innerHTML = folders.map(f => {
                     const wrong = data.wrongByFolder[f.id] || [];
-                    const totalWrong = wrong.reduce((s, t) => s + (t.questions || []).length, 0);
+                    const totalWrong = getActiveWrongCount(wrong);
                     return `<div class="exercise-folder-card" onclick="event.stopPropagation();enterWrongFolder('${f.id}')" style="${totalWrong === 0 ? 'opacity:0.5;' : ''}">
                         <div class="exercise-folder-card-name">${escapeHtml(f.name)}</div>
                         <div class="exercise-folder-card-meta">${totalWrong > 0 ? totalWrong + ' 道错题' : '暂无错题'}</div>
@@ -20089,13 +20109,111 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
         // Wrong exercises folder
         let wrongSelectMode = false;
         let wrongSelectedItems = []; // [{folderId, taskId, qIdx, question}]
+        let _wrongExerciseLPTimer = null;
+        let _wrongExerciseLongPressed = false;
+
+        function cancelWrongExerciseLongPress() {
+            if (_wrongExerciseLPTimer) {
+                clearTimeout(_wrongExerciseLPTimer);
+                _wrongExerciseLPTimer = null;
+            }
+            setTimeout(() => { _wrongExerciseLongPressed = false; }, 250);
+        }
+
+        function startWrongExerciseLongPress(e, folderId, taskId, qIdx) {
+            cancelWrongExerciseLongPress();
+            const touch = e.touches ? e.touches[0] : e;
+            const cx = touch.clientX;
+            const cy = touch.clientY;
+            _wrongExerciseLPTimer = setTimeout(() => {
+                _wrongExerciseLPTimer = null;
+                _wrongExerciseLongPressed = true;
+                showWrongExerciseMenu({ clientX: cx, clientY: cy }, folderId, taskId, qIdx);
+            }, 500);
+        }
+
+        function showWrongExerciseMenu(e, folderId, taskId, qIdx) {
+            closeLongPressMenu();
+            const overlay = document.createElement('div');
+            overlay.className = 'longpress-overlay';
+            overlay.onclick = closeLongPressMenu;
+            const menu = document.createElement('div');
+            menu.className = 'longpress-menu';
+            menu.id = 'longpressMenu';
+            menu.innerHTML = `
+                <button class="longpress-menu-item" onclick="archiveWrongExercise('${folderId}','${taskId}',${qIdx})">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+                    归档
+                </button>
+                <button class="longpress-menu-item danger" onclick="deleteWrongExercise('${folderId}','${taskId}',${qIdx})">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                    删除
+                </button>`;
+            document.body.appendChild(overlay);
+            document.body.appendChild(menu);
+            let x = e.clientX || 100;
+            let y = e.clientY || 100;
+            if (x + 140 > window.innerWidth) x = window.innerWidth - 150;
+            if (y + 100 > window.innerHeight) y = window.innerHeight - 110;
+            menu.style.left = x + 'px';
+            menu.style.top = y + 'px';
+        }
+
+        function getWrongQuestionRef(data, folderId, taskId, qIdx) {
+            const wrongTasks = data.wrongByFolder?.[folderId] || [];
+            const task = wrongTasks.find(t => t.taskId === taskId);
+            if (!task || !task.questions || !task.questions[qIdx]) return null;
+            return { wrongTasks, task, question: task.questions[qIdx] };
+        }
+
+        function refreshWrongFolderAfterChange(folderId) {
+            const data = getExercisesData();
+            const folder = data.folders.find(f => f.id === folderId);
+            if (!folder || getActiveWrongCount(data.wrongByFolder[folderId] || []) === 0) {
+                renderExercisesPage();
+                return;
+            }
+            renderWrongFolderContent(folderId, folder, data.wrongByFolder[folderId] || []);
+        }
+
+        function archiveWrongExercise(folderId, taskId, qIdx) {
+            closeLongPressMenu();
+            const data = getExercisesData();
+            const ref = getWrongQuestionRef(data, folderId, taskId, qIdx);
+            if (!ref) return;
+            ref.question.archived = true;
+            ref.question.archivedAt = new Date().toISOString();
+            wrongSelectedItems = wrongSelectedItems.filter(s => !(s.folderId === folderId && s.taskId === taskId && s.qIdx === qIdx));
+            saveData();
+            debouncedChatSync();
+            refreshWrongFolderAfterChange(folderId);
+            showToast(i18n('toast_archived'));
+        }
+
+        function deleteWrongExercise(folderId, taskId, qIdx) {
+            closeLongPressMenu();
+            if (!confirm(i18n('confirm_delete'))) return;
+            const data = getExercisesData();
+            const ref = getWrongQuestionRef(data, folderId, taskId, qIdx);
+            if (!ref) return;
+            ref.task.questions.splice(qIdx, 1);
+            if (ref.task.questions.length === 0) {
+                const taskIdx = ref.wrongTasks.findIndex(t => t.taskId === taskId);
+                if (taskIdx >= 0) ref.wrongTasks.splice(taskIdx, 1);
+            }
+            wrongSelectedItems = wrongSelectedItems.filter(s => !(s.folderId === folderId && s.taskId === taskId && s.qIdx === qIdx));
+            saveData();
+            debouncedChatSync();
+            refreshWrongFolderAfterChange(folderId);
+            showToast(i18n('toast_deleted'));
+        }
 
         function enterWrongFolder(folderId) {
             const data = getExercisesData();
             const folder = data.folders.find(f => f.id === folderId);
             if (!folder) return;
             const wrongTasks = data.wrongByFolder[folderId] || [];
-            if (wrongTasks.length === 0) { showToast(i18n('empty_wrong')); return; }
+            if (getActiveWrongCount(wrongTasks) === 0) { showToast(i18n('empty_wrong')); return; }
 
             wrongSelectMode = false;
             wrongSelectedItems = [];
@@ -20126,10 +20244,11 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
             html += `</div></div>`;
 
             wrongTasks.forEach(wt => {
-                if (!wt.questions || wt.questions.length === 0) return;
+                if (!wt.questions || wt.questions.filter(q => !q.archived).length === 0) return;
                 html += `<div style="margin-bottom:12px;">
                     <div style="font-size:14px;font-weight:500;margin-bottom:8px;">${escapeHtml(wt.taskName)}</div>`;
                 wt.questions.forEach((q, qIdx) => {
+                    if (q.archived) return;
                     const scoreColor = q.score >= 8 ? '#22c55e' : q.score >= 6 ? '#eab308' : '#ef4444';
                     const timeUsed = q.timeUsedSeconds ? formatExTime(q.timeUsedSeconds) : '';
                     const isSelected = wrongSelectedItems.some(s => s.taskId === wt.taskId && s.qIdx === qIdx);
@@ -20150,7 +20269,9 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                             </div>
                         </div>`;
                     } else {
-                        html += `<div class="exercise-task-card" style="border-left:3px solid ${scoreColor};" onclick="openWrongExerciseDoing('${folderId}','${wt.taskId}',${qIdx})">
+                        html += `<div class="exercise-task-card" style="border-left:3px solid ${scoreColor};" onclick="openWrongExerciseCard(event,'${folderId}','${wt.taskId}',${qIdx})"
+                            oncontextmenu="event.preventDefault();if(!('ontouchstart' in window))showWrongExerciseMenu(event,'${folderId}','${wt.taskId}',${qIdx})"
+                            ontouchstart="startWrongExerciseLongPress(event,'${folderId}','${wt.taskId}',${qIdx})" ontouchend="cancelWrongExerciseLongPress()" ontouchmove="cancelWrongExerciseLongPress()">
                             <div class="exercise-task-title" style="font-size:13px;">第${q.questionIndex + 1}题</div>
                             <div style="display:flex;align-items:center;gap:6px;">
                                 <span class="wrong-exercise-score" style="background:${scoreColor};font-size:11px;">${q.score}/10</span>
@@ -20244,17 +20365,40 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
             openExerciseDoing(folderId, taskId, qIdx, true);
         }
 
+        function openWrongExerciseCard(e, folderId, taskId, qIdx) {
+            if (_wrongExerciseLongPressed) {
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+            }
+            openWrongExerciseDoing(folderId, taskId, qIdx);
+        }
+
+        function restoreWrongExercise(folderId, taskId, qIdx) {
+            const data = getExercisesData();
+            const ref = getWrongQuestionRef(data, folderId, taskId, qIdx);
+            if (!ref) return;
+            ref.question.archived = false;
+            delete ref.question.archivedAt;
+            saveData();
+            debouncedChatSync();
+            openExerciseArchive();
+            renderExercisesPage();
+            showToast(i18n('toast_restored'));
+        }
+
         // Exercise archive
         function openExerciseArchive() {
             const data = getExercisesData();
             const archived = data.folders.filter(f => f.archived);
+            const archivedWrongItems = getArchivedWrongItems(data);
             const view = document.getElementById('exerciseArchiveView');
             view.classList.add('show');
             const content = document.getElementById('exerciseArchiveContent');
-            if (archived.length === 0) {
+            if (archived.length === 0 && archivedWrongItems.length === 0) {
                 content.innerHTML = '<div class="empty-state"><p data-i18n="empty_archive">暂无归档</p></div>';
             } else {
-                content.innerHTML = archived.map(f => {
+                const folderHtml = archived.map(f => {
                     const taskCount = (f.tasks || []).length;
                     return `<div class="exercise-folder-card" style="margin-bottom:8px;">
                         <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -20266,6 +20410,19 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                         </div>
                     </div>`;
                 }).join('');
+                const wrongHtml = archivedWrongItems.map(item => {
+                    const scoreColor = item.question.score >= 8 ? '#22c55e' : item.question.score >= 6 ? '#eab308' : '#ef4444';
+                    return `<div class="exercise-folder-card" style="margin-bottom:8px;border-left:3px solid ${scoreColor};">
+                        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+                            <div style="min-width:0;">
+                                <div class="exercise-folder-card-name">${escapeHtml(item.folder.name)} · ${escapeHtml(item.wrongTask.taskName || '')}</div>
+                                <div class="exercise-folder-card-meta">第${item.question.questionIndex + 1}题 · ${item.question.score}/10</div>
+                            </div>
+                            <button onclick="restoreWrongExercise('${item.folder.id}','${item.wrongTask.taskId}',${item.qIdx})" style="border:none;background:var(--bg-tertiary);padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;flex-shrink:0;" data-i18n='exercise_restore'>恢复</button>
+                        </div>
+                    </div>`;
+                }).join('');
+                content.innerHTML = `${folderHtml}${wrongHtml ? `<div style="font-size:14px;font-weight:600;margin:16px 0 8px;">错题归档</div>${wrongHtml}` : ''}`;
             }
         }
 
