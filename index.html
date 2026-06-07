@@ -18195,12 +18195,14 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                     // 清理源文件
                     (task.sourceFiles || []).forEach(sf => {
                         try { deleteFileData('exercise_' + sf.id); } catch(e) {}
+                        triggerSyncOnFileChange(sf.id, 'exercise_delete');
                     });
                     // 清理每道题的IndexedDB缓存
                     (task.questions || []).forEach((q, i) => {
                         deleteFileData(`exercise_drawing_cache_${task.id}_${i}`).catch(e => {});
                         deleteFileData(`exercise_timer_${task.id}_${i}`).catch(e => {});
                         deleteFileData(`exercise_drawing_${task.id}_${i}`).catch(e => {});
+                        triggerSyncOnFileChange(`exercise_drawing_${task.id}_${i}`, 'exercise_drawing_delete');
                     });
                     // 清理内存缓存
                     (task.questions || []).forEach((q, i) => {
@@ -18310,10 +18312,12 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                 deleteFileData(`exercise_timer_${taskId}_${i}`).catch(e => {});
                 deleteFileData(`exercise_drawing_${taskId}_${i}`).catch(e => {});
                 delete exDrawingCache[`${taskId}_${i}`];
+                triggerSyncOnFileChange(`exercise_drawing_${taskId}_${i}`, 'exercise_drawing_delete');
             });
             // Clear existing questions
             task.questions = [];
             saveData();
+            debouncedChatSync();
             renderExerciseFolderContent(folder);
             // Re-extract from first source file
             const sf = task.sourceFiles[0];
@@ -18346,6 +18350,7 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                 deleteFileData(`exercise_drawing_cache_${taskId}_${i}`).catch(e => {});
                 deleteFileData(`exercise_timer_${taskId}_${i}`).catch(e => {});
                 deleteFileData(`exercise_drawing_${taskId}_${i}`).catch(e => {});
+                triggerSyncOnFileChange(`exercise_drawing_${taskId}_${i}`, 'exercise_drawing_delete');
             });
             // 清理内存缓存
             (task.questions || []).forEach((q, i) => {
@@ -20033,6 +20038,7 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
             const timerData = JSON.stringify({ remainingSeconds: q.remainingSeconds, timeUsedSeconds: q.timeUsedSeconds });
             saveFileData(timerKey, timerData).catch(e => console.warn('保存计时失败:', e));
             saveData();
+            debouncedChatSync();
         }
 
         // 从IndexedDB恢复计时数据
