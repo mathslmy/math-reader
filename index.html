@@ -5766,7 +5766,8 @@
             },
             exercises: {
                 folders: [],   // [{ id, name, createdAt, archived, tasks: [{ id, name, questions: [{latex, status, score, userDrawing, aiComment}], sourceFiles: [{id,name,type,mimeType}] }] }]
-                wrongByFolder: {}  // { folderId: [{ taskId, taskName, questions: [{questionIndex, latex, score, userDrawing, aiComment, redoDrawings:[]}] }] }
+                wrongByFolder: {},  // { folderId: [{ taskId, taskName, questions: [{questionIndex, latex, score, userDrawing, aiComment, redoDrawings:[]}] }] }
+                archivedWrong: {}  // { folderId: [{ taskId, taskName, questionIndex, latex, score, userDrawing, aiComment, redoDrawings:[], archivedAt }] }
             },
             settings: {
                 supabaseUrl: '',
@@ -5892,6 +5893,10 @@
                 recognition_failed:'识别失败',abstract_gen_failed:'摘要生成失败',
                 notification_abstract_done:'摘要生成完成',abstract_added:' 的摘要已添加',
                 exercise_task:'任务',exercise_click_redo:'点击重做',exercise_restore:'恢复',
+                wrong_archive:'归档此错题',wrong_delete:'删除此错题',wrong_restore:'恢复错题',
+                wrong_archived_title:'已归档错题',wrong_no_archived:'暂无归档错题',
+                confirm_delete_wrong:'确定删除此错题？删除后不可恢复。',
+                toast_wrong_archived:'错题已归档',toast_wrong_restored:'错题已恢复',toast_wrong_deleted:'错题已删除',
                 sync_uploaded:'同步完成! 上传了 {0} 个文件, {1} 篇讲义, {2} 篇摘要',
                 restore_downloaded:'恢复完成! 下载了 {0} 个文件, {1} 篇讲义, {2} 篇摘要',
 
@@ -6065,6 +6070,10 @@
                 recognition_failed:'Recognition failed',abstract_gen_failed:'Abstract generation failed',
                 notification_abstract_done:'Abstract generated',abstract_added:' abstract added',
                 exercise_task:'Tasks',exercise_click_redo:'Click to redo',exercise_restore:'Restore',
+                wrong_archive:'Archive this question',wrong_delete:'Delete this question',wrong_restore:'Restore',
+                wrong_archived_title:'Archived wrong answers',wrong_no_archived:'No archived items',
+                confirm_delete_wrong:'Delete this wrong answer? This cannot be undone.',
+                toast_wrong_archived:'Archived',toast_wrong_restored:'Restored',toast_wrong_deleted:'Deleted',
                 sync_uploaded:'Sync done! Uploaded {0} files, {1} lectures, {2} abstracts',
                 restore_downloaded:'Restore done! Downloaded {0} files, {1} lectures, {2} abstracts',
 
@@ -6238,6 +6247,10 @@
                 recognition_failed:'Échec reconnaissance',abstract_gen_failed:'Échec génération résumé',
                 notification_abstract_done:'Résumé généré',abstract_added:' résumé ajouté',
                 exercise_task:'Tâches',exercise_click_redo:'Refaire',exercise_restore:'Restaurer',
+                wrong_archive:'Archiver cette erreur',wrong_delete:'Supprimer cette erreur',wrong_restore:'Restaurer',
+                wrong_archived_title:'Erreurs archivées',wrong_no_archived:'Aucune erreur archivée',
+                confirm_delete_wrong:'Supprimer cette erreur ? Irréversible.',
+                toast_wrong_archived:'Archivé',toast_wrong_restored:'Restauré',toast_wrong_deleted:'Supprimé',
                 sync_uploaded:'Sync ! {0} fichiers, {1} cours, {2} résumés',
                 restore_downloaded:'Restauré ! {0} fichiers, {1} cours, {2} résumés',
 
@@ -6951,7 +6964,7 @@
                     if (!appData.notes) appData.notes = {};
                     if (!appData.archived) appData.archived = [];
                     if (!appData.classroom) appData.classroom = { courses: [], seminars: [] };
-                    if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {} };
+                    if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {}, archivedWrong: {} };
                     if (!appData.settings) appData.settings = {};
                     if (appData.settings.photoRetentionDays === undefined) appData.settings.photoRetentionDays = 0;
                 } catch(e) {
@@ -6971,6 +6984,7 @@
                     appData.exercises = exData;
                     if (!appData.exercises.folders) appData.exercises.folders = [];
                     if (!appData.exercises.wrongByFolder) appData.exercises.wrongByFolder = {};
+                    if (!appData.exercises.archivedWrong) appData.exercises.archivedWrong = {};
                     console.log('[loadExercisesFromIDB] 习题数据已从 IndexedDB 加载');
                 }
             } catch(e) {
@@ -6997,7 +7011,7 @@
             } catch(e) {
                 console.warn('[migrate] 习题迁移失败:', e);
             }
-            if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {} };
+            if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {}, archivedWrong: {} };
         }
 
         // 从 IndexedDB 备份恢复 appData
@@ -7014,7 +7028,7 @@
                         if (!appData.archived) appData.archived = [];
                         if (!appData.classroom) appData.classroom = { courses: [], seminars: [] };
                         if (!appData.settings) appData.settings = {};
-                        if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {} };
+                        if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {}, archivedWrong: {} };
                         // 写回 localStorage（不含 exercises）
                         try { localStorage.setItem('mathReader', JSON.stringify(appData)); } catch(e2) {}
                         console.log('[loadData] 已从 IndexedDB 备份恢复数据');
@@ -7114,6 +7128,12 @@
                             delete q.userDrawing;
                             (q.redoDrawings || []).forEach(rd => { delete rd.drawing; });
                         });
+                    });
+                });
+                Object.values(exercisesToIDB.archivedWrong || {}).forEach(items => {
+                    (items || []).forEach(item => {
+                        delete item.userDrawing;
+                        (item.redoDrawings || []).forEach(rd => { delete rd.drawing; });
                     });
                 });
                 saveFileData('__exercises_data__', JSON.stringify(exercisesToIDB)).catch(e => {
@@ -11301,8 +11321,9 @@
                         appData.exercises = cloudExercises;
                         if (!appData.exercises.folders) appData.exercises.folders = [];
                         if (!appData.exercises.wrongByFolder) appData.exercises.wrongByFolder = {};
+                        if (!appData.exercises.archivedWrong) appData.exercises.archivedWrong = {};
 
-                        // 把本地有但云端没有的 folder 和 task 合并进来
+                        // 合并本地有但云端没有的 folder / task
                         for (const localFolder of (localExercises.folders || [])) {
                             if (!cloudFolderIds.has(localFolder.id)) {
                                 appData.exercises.folders.push(localFolder);
@@ -11314,6 +11335,39 @@
                                             mergedFolder.tasks.push(localTask);
                                         }
                                     }
+                                }
+                            }
+                        }
+
+                        // 合并本地有但云端没有的 wrongByFolder 错题
+                        for (const fId of Object.keys(localExercises.wrongByFolder || {})) {
+                            if (!appData.exercises.wrongByFolder[fId]) {
+                                appData.exercises.wrongByFolder[fId] = localExercises.wrongByFolder[fId];
+                            } else {
+                                const cloudWrong = appData.exercises.wrongByFolder[fId];
+                                for (const localWt of (localExercises.wrongByFolder[fId] || [])) {
+                                    let cWt = cloudWrong.find(t => t.taskId === localWt.taskId);
+                                    if (!cWt) {
+                                        cloudWrong.push(localWt);
+                                    } else {
+                                        for (const lq of (localWt.questions || [])) {
+                                            const exists = (cWt.questions || []).some(cq => cq.questionIndex === lq.questionIndex);
+                                            if (!exists) { if (!cWt.questions) cWt.questions = []; cWt.questions.push(lq); }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // 合并本地有但云端没有的归档错题
+                        for (const fId of Object.keys(localExercises.archivedWrong || {})) {
+                            if (!appData.exercises.archivedWrong[fId]) {
+                                appData.exercises.archivedWrong[fId] = localExercises.archivedWrong[fId];
+                            } else {
+                                const cloudArchived = appData.exercises.archivedWrong[fId];
+                                for (const localItem of (localExercises.archivedWrong[fId] || [])) {
+                                    const exists = cloudArchived.some(ci => ci.taskId === localItem.taskId && ci.questionIndex === localItem.questionIndex && ci.archivedAt === localItem.archivedAt);
+                                    if (!exists) cloudArchived.push(localItem);
                                 }
                             }
                         }
@@ -11380,9 +11434,53 @@
                                 }
                             }
                         }
+                        // 同步用户作答drawings（本地有云端没有 → 上传，本地没有云端有 → 拉取）
+                        for (const q of (task.questions || [])) {
+                            if (q.status === 'done') {
+                                const drawKey = `exercise_drawing_${task.id}_${q.index}`;
+                                const localDraw = await getFileData(drawKey).catch(() => null);
+                                if (localDraw) {
+                                    try { await r2PutObject('exercises/drawings/' + drawKey, localDraw, 'image/png'); } catch(e) {}
+                                } else {
+                                    try {
+                                        const cd = await r2GetObject('exercises/drawings/' + drawKey);
+                                        if (cd) await saveFileData(drawKey, cd);
+                                    } catch(e) {}
+                                }
+                            }
+                        }
                     }
                 }
-                
+                // 同步错题和重做drawings
+                for (const fId of Object.keys(appData.exercises?.wrongByFolder || {})) {
+                    for (const wt of (appData.exercises.wrongByFolder[fId] || [])) {
+                        for (const q of (wt.questions || [])) {
+                            const wrongDrawKey = `exercise_drawing_${wt.taskId}_${q.questionIndex}`;
+                            const localWD = await getFileData(wrongDrawKey).catch(() => null);
+                            if (localWD) {
+                                try { await r2PutObject('exercises/drawings/' + wrongDrawKey, localWD, 'image/png'); } catch(e) {}
+                            } else {
+                                try { const cd = await r2GetObject('exercises/drawings/' + wrongDrawKey); if (cd) await saveFileData(wrongDrawKey, cd); } catch(e) {}
+                            }
+                            for (let ri = 0; ri < (q.redoDrawings || []).length; ri++) {
+                                const rd = q.redoDrawings[ri];
+                                const redoKey = `exercise_redo_drawing_${wt.taskId}_${q.questionIndex}_${ri}`;
+                                if (rd && rd.drawing) {
+                                    await saveFileData(redoKey, rd.drawing);
+                                    try { await r2PutObject('exercises/drawings/' + redoKey, rd.drawing, 'image/png'); } catch(e) {}
+                                } else {
+                                    const localRD = await getFileData(redoKey).catch(() => null);
+                                    if (localRD) {
+                                        try { await r2PutObject('exercises/drawings/' + redoKey, localRD, 'image/png'); } catch(e) {}
+                                    } else {
+                                        try { const cd = await r2GetObject('exercises/drawings/' + redoKey); if (cd) await saveFileData(redoKey, cd); } catch(e) {}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // 更新上次同步时间
                 config.lastSyncTime = new Date().toISOString();
                 r2LastSyncTime = config.lastSyncTime;
@@ -11477,6 +11575,13 @@
                     });
                 });
             });
+            // 剔除归档错题中的 base64 数据
+            Object.values(e.archivedWrong || {}).forEach(items => {
+                (items || []).forEach(item => {
+                    delete item.userDrawing;
+                    (item.redoDrawings || []).forEach(rd => { delete rd.drawing; });
+                });
+            });
             return e;
         }
 
@@ -11565,6 +11670,21 @@
                         await r2DeleteObject('exercises/' + fileId);
                     } catch (e) {}
                 }
+
+                // 如果是上传习题作答drawing，同步到云端
+                if (action === 'exercise_drawing_upload' && fileId) {
+                    const drawData = await getFileData(fileId).catch(() => null);
+                    if (drawData) {
+                        await r2PutObject('exercises/drawings/' + fileId, drawData, 'image/png');
+                    }
+                }
+
+                // 如果是删除习题drawing，删除云端
+                if (action === 'exercise_drawing_delete' && fileId) {
+                    try {
+                        await r2DeleteObject('exercises/drawings/' + fileId);
+                    } catch (e) {}
+                }
                 
                 // 更新上次同步时间
                 config.lastSyncTime = new Date().toISOString();
@@ -11582,6 +11702,8 @@
                     showToast(i18n('toast_exercise_synced'));
                 } else if (action === 'exercise_delete') {
                     showToast(i18n('toast_exercise_deleted_cloud'));
+                } else if (action === 'exercise_drawing_upload' || action === 'exercise_drawing_delete') {
+                    // 静默同步，不显示toast（频率高）
                 } else {
                     showToast(i18n('toast_auto_synced'));
                 }
@@ -12147,6 +12269,48 @@
                     }
                 }
 
+                // 7. 上传错题重做drawings和错题作答drawings (从IndexedDB获取)
+                const exData = getExercisesData();
+                for (const fId of Object.keys(exData.wrongByFolder || {})) {
+                    for (const wt of (exData.wrongByFolder[fId] || [])) {
+                        for (const q of (wt.questions || [])) {
+                            // 上传错题的原始作答drawing
+                            const wrongDrawKey = `exercise_drawing_${wt.taskId}_${q.questionIndex}`;
+                            const wrongDrawData = await getFileData(wrongDrawKey).catch(() => null);
+                            if (wrongDrawData) {
+                                await r2PutObject('exercises/drawings/' + wrongDrawKey, wrongDrawData, 'image/png');
+                            }
+                            // 上传重做drawings
+                            for (let ri = 0; ri < (q.redoDrawings || []).length; ri++) {
+                                const rd = q.redoDrawings[ri];
+                                if (rd.drawing) {
+                                    const redoKey = `exercise_redo_drawing_${wt.taskId}_${q.questionIndex}_${ri}`;
+                                    await saveFileData(redoKey, rd.drawing);
+                                    await r2PutObject('exercises/drawings/' + redoKey, rd.drawing, 'image/png');
+                                }
+                            }
+                        }
+                    }
+                }
+                // 上传归档错题的drawings
+                for (const fId of Object.keys(exData.archivedWrong || {})) {
+                    for (const item of (exData.archivedWrong[fId] || [])) {
+                        const archDrawKey = `exercise_drawing_${item.taskId}_${item.questionIndex}`;
+                        const archDrawData = await getFileData(archDrawKey).catch(() => null);
+                        if (archDrawData) {
+                            await r2PutObject('exercises/drawings/' + archDrawKey, archDrawData, 'image/png');
+                        }
+                        for (let ri = 0; ri < (item.redoDrawings || []).length; ri++) {
+                            const rd = item.redoDrawings[ri];
+                            if (rd.drawing) {
+                                const redoKey = `exercise_redo_drawing_${item.taskId}_${item.questionIndex}_${ri}`;
+                                await saveFileData(redoKey, rd.drawing);
+                                await r2PutObject('exercises/drawings/' + redoKey, rd.drawing, 'image/png');
+                            }
+                        }
+                    }
+                }
+
                 showToast(i18n('sync_done_detail', uploadedFiles, uploadedLectures, uploadedAbstracts));
             } catch (err) {
                 console.error('Sync to R2 failed:', err);
@@ -12393,11 +12557,69 @@
                     cloudSyncedAtMs
                 );
                 appData.lectureDrafts = metadata.lectureDrafts || appData.lectureDrafts || {};
-                // 合并习题数据：云端覆盖本地（简单策略）
+                // 合并习题数据：与 performAutoSync 一致的智能合并策略
                 if (metadata.exercises) {
-                    appData.exercises = metadata.exercises;
+                    const cloudEx = metadata.exercises;
+                    const localEx = appData.exercises || { folders: [], wrongByFolder: {}, archivedWrong: {} };
+                    const cloudFolderIds = new Set((cloudEx.folders || []).map(f => f.id));
+                    const cloudTaskIds = new Set();
+                    (cloudEx.folders || []).forEach(f => {
+                        (f.tasks || []).forEach(t => { if (t.id) cloudTaskIds.add(t.id); });
+                    });
+
+                    appData.exercises = cloudEx;
+                    if (!appData.exercises.folders) appData.exercises.folders = [];
+                    if (!appData.exercises.wrongByFolder) appData.exercises.wrongByFolder = {};
+                    if (!appData.exercises.archivedWrong) appData.exercises.archivedWrong = {};
+
+                    // 合并本地有但云端没有的 folder / task
+                    for (const localFolder of (localEx.folders || [])) {
+                        if (!cloudFolderIds.has(localFolder.id)) {
+                            appData.exercises.folders.push(localFolder);
+                        } else {
+                            const merged = appData.exercises.folders.find(f => f.id === localFolder.id);
+                            if (merged) {
+                                for (const lt of (localFolder.tasks || [])) {
+                                    if (!cloudTaskIds.has(lt.id)) merged.tasks.push(lt);
+                                }
+                            }
+                        }
+                    }
+
+                    // 合并本地有但云端没有的 wrongByFolder 错题
+                    for (const fId of Object.keys(localEx.wrongByFolder || {})) {
+                        if (!appData.exercises.wrongByFolder[fId]) {
+                            appData.exercises.wrongByFolder[fId] = localEx.wrongByFolder[fId];
+                        } else {
+                            const cloudWrong = appData.exercises.wrongByFolder[fId];
+                            for (const localWt of (localEx.wrongByFolder[fId] || [])) {
+                                let cWt = cloudWrong.find(t => t.taskId === localWt.taskId);
+                                if (!cWt) {
+                                    cloudWrong.push(localWt);
+                                } else {
+                                    for (const lq of (localWt.questions || [])) {
+                                        const exists = (cWt.questions || []).some(cq => cq.questionIndex === lq.questionIndex);
+                                        if (!exists) { if (!cWt.questions) cWt.questions = []; cWt.questions.push(lq); }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 合并本地有但云端没有的 archivedWrong
+                    for (const fId of Object.keys(localEx.archivedWrong || {})) {
+                        if (!appData.exercises.archivedWrong[fId]) {
+                            appData.exercises.archivedWrong[fId] = localEx.archivedWrong[fId];
+                        } else {
+                            const cloudArch = appData.exercises.archivedWrong[fId];
+                            for (const li of (localEx.archivedWrong[fId] || [])) {
+                                const exists = cloudArch.some(ci => ci.taskId === li.taskId && ci.questionIndex === li.questionIndex && ci.archivedAt === li.archivedAt);
+                                if (!exists) cloudArch.push(li);
+                            }
+                        }
+                    }
                 }
-                if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {} };
+                if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {}, archivedWrong: {} };
                 // API 设置仅保留本地值，不被云端覆盖
                 appData.settings = { ...metadata.settings, ...localApiSettings, r2Config: localR2Config };
                 saveData();
@@ -12495,6 +12717,67 @@
                                 }
                             }
                         }
+                        // 拉取用户作答drawings
+                        for (const q of (task.questions || [])) {
+                            if (q.status === 'done') {
+                                const drawKey = `exercise_drawing_${task.id}_${q.index}`;
+                                const localDraw = await getFileData(drawKey).catch(() => null);
+                                if (!localDraw) {
+                                    try {
+                                        const cloudDraw = await r2GetObject('exercises/drawings/' + drawKey);
+                                        if (cloudDraw) await saveFileData(drawKey, cloudDraw);
+                                    } catch(e) {}
+                                }
+                            }
+                        }
+                    }
+                }
+                // 拉取错题和重做drawings
+                for (const fId of Object.keys(appData.exercises?.wrongByFolder || {})) {
+                    for (const wt of (appData.exercises.wrongByFolder[fId] || [])) {
+                        for (const q of (wt.questions || [])) {
+                            const wrongDrawKey = `exercise_drawing_${wt.taskId}_${q.questionIndex}`;
+                            const localWD = await getFileData(wrongDrawKey).catch(() => null);
+                            if (!localWD) {
+                                try {
+                                    const cd = await r2GetObject('exercises/drawings/' + wrongDrawKey);
+                                    if (cd) await saveFileData(wrongDrawKey, cd);
+                                } catch(e) {}
+                            }
+                            for (let ri = 0; ri < (q.redoDrawings || []).length; ri++) {
+                                const redoKey = `exercise_redo_drawing_${wt.taskId}_${q.questionIndex}_${ri}`;
+                                const localRD = await getFileData(redoKey).catch(() => null);
+                                if (!localRD) {
+                                    try {
+                                        const cd = await r2GetObject('exercises/drawings/' + redoKey);
+                                        if (cd) await saveFileData(redoKey, cd);
+                                    } catch(e) {}
+                                }
+                            }
+                        }
+                    }
+                }
+                // 拉取归档错题的drawings
+                for (const fId of Object.keys(appData.exercises?.archivedWrong || {})) {
+                    for (const item of (appData.exercises.archivedWrong[fId] || [])) {
+                        const archDrawKey = `exercise_drawing_${item.taskId}_${item.questionIndex}`;
+                        const localAD = await getFileData(archDrawKey).catch(() => null);
+                        if (!localAD) {
+                            try {
+                                const cd = await r2GetObject('exercises/drawings/' + archDrawKey);
+                                if (cd) await saveFileData(archDrawKey, cd);
+                            } catch(e) {}
+                        }
+                        for (let ri = 0; ri < (item.redoDrawings || []).length; ri++) {
+                            const redoKey = `exercise_redo_drawing_${item.taskId}_${item.questionIndex}_${ri}`;
+                            const localRD = await getFileData(redoKey).catch(() => null);
+                            if (!localRD) {
+                                try {
+                                    const cd = await r2GetObject('exercises/drawings/' + redoKey);
+                                    if (cd) await saveFileData(redoKey, cd);
+                                } catch(e) {}
+                            }
+                        }
                     }
                 }
 
@@ -12570,7 +12853,8 @@
                 appData.lectures = metadata.lectures || {};
                 appData.drafts = metadata.drafts || {};
                 appData.classroom = metadata.classroom || { courses: [], seminars: [] };
-                appData.exercises = metadata.exercises || { folders: [], wrongByFolder: {} };
+                appData.exercises = metadata.exercises || { folders: [], wrongByFolder: {}, archivedWrong: {} };
+                if (!appData.exercises.archivedWrong) appData.exercises.archivedWrong = {};
                 appData.settings = { ...metadata.settings, ...localApiSettings, r2Config: localR2Config };
                 
                 saveData();
@@ -12670,6 +12954,53 @@
                                 console.warn('Failed to download exercise file:', sf.id, e);
                             }
                         }
+                        // 下载用户作答drawings
+                        for (const q of (task.questions || [])) {
+                            if (q.status === 'done') {
+                                const drawKey = `exercise_drawing_${task.id}_${q.index}`;
+                                try {
+                                    const drawData = await r2GetObject('exercises/drawings/' + drawKey);
+                                    if (drawData) await saveFileData(drawKey, drawData);
+                                } catch (e) {}
+                            }
+                        }
+                    }
+                }
+                // 下载错题和重做drawings
+                const restoredExData = getExercisesData();
+                for (const fId of Object.keys(restoredExData.wrongByFolder || {})) {
+                    for (const wt of (restoredExData.wrongByFolder[fId] || [])) {
+                        for (const q of (wt.questions || [])) {
+                            const wrongDrawKey = `exercise_drawing_${wt.taskId}_${q.questionIndex}`;
+                            try {
+                                const d = await r2GetObject('exercises/drawings/' + wrongDrawKey);
+                                if (d) await saveFileData(wrongDrawKey, d);
+                            } catch (e) {}
+                            for (let ri = 0; ri < (q.redoDrawings || []).length; ri++) {
+                                const redoKey = `exercise_redo_drawing_${wt.taskId}_${q.questionIndex}_${ri}`;
+                                try {
+                                    const rd = await r2GetObject('exercises/drawings/' + redoKey);
+                                    if (rd) await saveFileData(redoKey, rd);
+                                } catch (e) {}
+                            }
+                        }
+                    }
+                }
+                // 下载归档错题的drawings
+                for (const fId of Object.keys(restoredExData.archivedWrong || {})) {
+                    for (const item of (restoredExData.archivedWrong[fId] || [])) {
+                        const archDrawKey = `exercise_drawing_${item.taskId}_${item.questionIndex}`;
+                        try {
+                            const d = await r2GetObject('exercises/drawings/' + archDrawKey);
+                            if (d) await saveFileData(archDrawKey, d);
+                        } catch (e) {}
+                        for (let ri = 0; ri < (item.redoDrawings || []).length; ri++) {
+                            const redoKey = `exercise_redo_drawing_${item.taskId}_${item.questionIndex}_${ri}`;
+                            try {
+                                const rd = await r2GetObject('exercises/drawings/' + redoKey);
+                                if (rd) await saveFileData(redoKey, rd);
+                            } catch (e) {}
+                        }
                     }
                 }
 
@@ -12712,8 +13043,8 @@
             if (confirm(i18n('confirm_clear_all'))) {
                 localStorage.removeItem('mathReader');
                 // 清除 IndexedDB 中的习题数据
-                saveFileData('__exercises_data__', '{"folders":[],"wrongByFolder":{}}').catch(()=>{});
-                appData = { books: [], papers: [], notes: {}, archived: [], settings: appData.settings, exercises: { folders: [], wrongByFolder: {} } };
+                saveFileData('__exercises_data__', '{"folders":[],"wrongByFolder":{},"archivedWrong":{}}').catch(()=>{});
+                appData = { books: [], papers: [], notes: {}, archived: [], settings: appData.settings, exercises: { folders: [], wrongByFolder: {}, archivedWrong: {} } };
                 saveData();
                 renderLibrary();
                 renderNotesPage();
@@ -17777,9 +18108,10 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
         let exDrawingCache = {};
 
         function getExercisesData() {
-            if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {} };
+            if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {}, archivedWrong: {} };
             if (!appData.exercises.folders) appData.exercises.folders = [];
             if (!appData.exercises.wrongByFolder) appData.exercises.wrongByFolder = {};
+            if (!appData.exercises.archivedWrong) appData.exercises.archivedWrong = {};
             return appData.exercises;
         }
 
@@ -17831,9 +18163,13 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                 wrongList.innerHTML = folders.map(f => {
                     const wrong = data.wrongByFolder[f.id] || [];
                     const totalWrong = wrong.reduce((s, t) => s + (t.questions || []).length, 0);
-                    return `<div class="exercise-folder-card" onclick="event.stopPropagation();enterWrongFolder('${f.id}')" style="${totalWrong === 0 ? 'opacity:0.5;' : ''}">
+                    const archivedCount = (data.archivedWrong && data.archivedWrong[f.id]) ? data.archivedWrong[f.id].length : 0;
+                    const hasContent = totalWrong > 0 || archivedCount > 0;
+                    let metaText = totalWrong > 0 ? totalWrong + ' 道错题' : '暂无错题';
+                    if (archivedCount > 0) metaText += ` · ${archivedCount} 已归档`;
+                    return `<div class="exercise-folder-card" onclick="event.stopPropagation();enterWrongFolder('${f.id}')" style="${!hasContent ? 'opacity:0.5;' : ''}">
                         <div class="exercise-folder-card-name">${escapeHtml(f.name)}</div>
-                        <div class="exercise-folder-card-meta">${totalWrong > 0 ? totalWrong + ' 道错题' : '暂无错题'}</div>
+                        <div class="exercise-folder-card-meta">${metaText}</div>
                     </div>`;
                 }).join('');
             }
@@ -17938,12 +18274,14 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                     // 清理源文件
                     (task.sourceFiles || []).forEach(sf => {
                         try { deleteFileData('exercise_' + sf.id); } catch(e) {}
+                        triggerSyncOnFileChange(sf.id, 'exercise_delete');
                     });
                     // 清理每道题的IndexedDB缓存
                     (task.questions || []).forEach((q, i) => {
                         deleteFileData(`exercise_drawing_cache_${task.id}_${i}`).catch(e => {});
                         deleteFileData(`exercise_timer_${task.id}_${i}`).catch(e => {});
                         deleteFileData(`exercise_drawing_${task.id}_${i}`).catch(e => {});
+                        triggerSyncOnFileChange(`exercise_drawing_${task.id}_${i}`, 'exercise_drawing_delete');
                     });
                     // 清理内存缓存
                     (task.questions || []).forEach((q, i) => {
@@ -17952,6 +18290,7 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                 });
                 data.folders.splice(idx, 1);
                 delete data.wrongByFolder[folderId];
+                delete data.archivedWrong[folderId];
                 saveData();
                 debouncedChatSync();
                 renderExercisesPage();
@@ -18052,10 +18391,12 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                 deleteFileData(`exercise_timer_${taskId}_${i}`).catch(e => {});
                 deleteFileData(`exercise_drawing_${taskId}_${i}`).catch(e => {});
                 delete exDrawingCache[`${taskId}_${i}`];
+                triggerSyncOnFileChange(`exercise_drawing_${taskId}_${i}`, 'exercise_drawing_delete');
             });
             // Clear existing questions
             task.questions = [];
             saveData();
+            debouncedChatSync();
             renderExerciseFolderContent(folder);
             // Re-extract from first source file
             const sf = task.sourceFiles[0];
@@ -18088,6 +18429,7 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                 deleteFileData(`exercise_drawing_cache_${taskId}_${i}`).catch(e => {});
                 deleteFileData(`exercise_timer_${taskId}_${i}`).catch(e => {});
                 deleteFileData(`exercise_drawing_${taskId}_${i}`).catch(e => {});
+                triggerSyncOnFileChange(`exercise_drawing_${taskId}_${i}`, 'exercise_drawing_delete');
             });
             // 清理内存缓存
             (task.questions || []).forEach((q, i) => {
@@ -18205,6 +18547,7 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                     // Save drawing to IDB
                     const drawKey = `exercise_drawing_${taskId}_${qIdx}`;
                     await saveFileData(drawKey, drawing);
+                    triggerSyncOnFileChange(drawKey, 'exercise_drawing_upload');
 
                     // Add to wrong folder
                     if (!data.wrongByFolder[folderId]) data.wrongByFolder[folderId] = [];
@@ -19578,7 +19921,7 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
             openExerciseDoing(folderId, taskId, startIdx, false);
         }
 
-        function openExerciseDoing(folderId, taskId, questionIndex, isWrong) {
+        async function openExerciseDoing(folderId, taskId, questionIndex, isWrong) {
             const data = getExercisesData();
             let questions, title;
 
@@ -19622,6 +19965,12 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
 
             if (isWrong && !q._redoing) {
                 // 错题模式：未点重做前，只显示题目和之前的作答结果，隐藏画布
+                // 如果 userDrawing 被 strip 了（云同步后），从 IndexedDB 恢复
+                if (!q.userDrawing) {
+                    const drawKey = `exercise_drawing_${taskId}_${q.questionIndex}`;
+                    const idbDraw = await getFileData(drawKey).catch(() => null);
+                    if (idbDraw) q.userDrawing = idbDraw;
+                }
                 const scoreColor = q.score >= 8 ? '#22c55e' : q.score >= 6 ? '#eab308' : '#ef4444';
                 const timeUsedStr = q.timeUsedSeconds ? formatExTime(q.timeUsedSeconds) : '';
                 let html = `<div class="lecture-body" style="font-size:15px;line-height:1.8;padding:0;">${renderChatMarkdownLatex(q.latex || '')}</div>`;
@@ -19774,6 +20123,7 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
             const timerData = JSON.stringify({ remainingSeconds: q.remainingSeconds, timeUsedSeconds: q.timeUsedSeconds });
             saveFileData(timerKey, timerData).catch(e => console.warn('保存计时失败:', e));
             saveData();
+            debouncedChatSync();
         }
 
         // 从IndexedDB恢复计时数据
@@ -20020,6 +20370,11 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                     q._redoing = false;
                     if (!q.redoDrawings) q.redoDrawings = [];
                     q.redoDrawings.push({ drawing: userDrawing, score, comment, time: new Date().toISOString() });
+                    // Save redo drawing to IDB and trigger sync
+                    const redoIdx = q.redoDrawings.length - 1;
+                    const redoKey = `exercise_redo_drawing_${taskId}_${q.questionIndex}_${redoIdx}`;
+                    await saveFileData(redoKey, userDrawing);
+                    triggerSyncOnFileChange(redoKey, 'exercise_drawing_upload');
                 } else {
                     // Finalize timer: save elapsed time for this question
                     let finalTimeUsed = 0;
@@ -20052,6 +20407,7 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                     // Save user drawing to IDB
                     const drawKey = `exercise_drawing_${taskId}_${questionIndex}`;
                     await saveFileData(drawKey, userDrawing);
+                    triggerSyncOnFileChange(drawKey, 'exercise_drawing_upload');
 
                     // Add to wrong folder
                     if (!data.wrongByFolder[folderId]) data.wrongByFolder[folderId] = [];
@@ -20095,7 +20451,8 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
             const folder = data.folders.find(f => f.id === folderId);
             if (!folder) return;
             const wrongTasks = data.wrongByFolder[folderId] || [];
-            if (wrongTasks.length === 0) { showToast(i18n('empty_wrong')); return; }
+            const archivedCount = (data.archivedWrong && data.archivedWrong[folderId]) ? data.archivedWrong[folderId].length : 0;
+            if (wrongTasks.length === 0 && archivedCount === 0) { showToast(i18n('empty_wrong')); return; }
 
             wrongSelectMode = false;
             wrongSelectedItems = [];
@@ -20108,6 +20465,8 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
 
         function renderWrongFolderContent(folderId, folder, wrongTasks) {
             const container = document.getElementById('exerciseFolderContent');
+            const data = getExercisesData();
+            const archivedCount = (data.archivedWrong && data.archivedWrong[folderId]) ? data.archivedWrong[folderId].length : 0;
             let html = `<div class="classroom-folder" onclick="renderExercisesPage()">
                 <div class="classroom-folder-header">
                     <svg class="note-folder-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
@@ -20121,9 +20480,13 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                 html += `<button onclick="wrongAskAI('${folderId}')" style="border:none;background:var(--accent);color:#fff;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">问AI (${wrongSelectedItems.length})</button>`;
                 html += `<button onclick="toggleWrongSelectMode('${folderId}')" style="border:none;background:var(--bg-tertiary);padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;">取消</button>`;
             } else {
+                if (archivedCount > 0) {
+                    html += `<button onclick="openWrongArchive('${folderId}')" style="border:none;background:var(--bg-tertiary);padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;">${i18n('wrong_archived_title')} (${archivedCount})</button>`;
+                }
                 html += `<button onclick="toggleWrongSelectMode('${folderId}')" style="border:none;background:var(--bg-tertiary);padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;">选择</button>`;
             }
             html += `</div></div>`;
+            html += `<div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">长按错题可归档或删除</div>`;
 
             wrongTasks.forEach(wt => {
                 if (!wt.questions || wt.questions.length === 0) return;
@@ -20150,7 +20513,7 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                             </div>
                         </div>`;
                     } else {
-                        html += `<div class="exercise-task-card" style="border-left:3px solid ${scoreColor};" onclick="openWrongExerciseDoing('${folderId}','${wt.taskId}',${qIdx})">
+                        html += `<div class="exercise-task-card" style="border-left:3px solid ${scoreColor};" onclick="openWrongExerciseDoing('${folderId}','${wt.taskId}',${qIdx})" ontouchstart="startWrongQLongPress(event,'${folderId}','${wt.taskId}',${qIdx})" ontouchend="cancelWrongQLongPress()" ontouchmove="cancelWrongQLongPress()" oncontextmenu="event.preventDefault();showWrongQMenu(event,'${folderId}','${wt.taskId}',${qIdx})">
                             <div class="exercise-task-title" style="font-size:13px;">第${q.questionIndex + 1}题</div>
                             <div style="display:flex;align-items:center;gap:6px;">
                                 <span class="wrong-exercise-score" style="background:${scoreColor};font-size:11px;">${q.score}/10</span>
@@ -20225,14 +20588,19 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
             window._wrongAIContext = questionsText;
             window._wrongAIChatOverride = true;
 
-            // 收集选中错题的手写图片用于发送
+            // 收集选中错题的手写图片用于发送（优先内存，fallback IDB）
             const wrongImages = [];
             for (const item of wrongSelectedItems) {
                 const wt = wrongTasks.find(t => t.taskId === item.taskId);
                 if (!wt) continue;
                 const q = wt.questions[item.qIdx];
-                if (q && q.userDrawing && !isCanvasBlank(q.userDrawing)) {
-                    wrongImages.push({ qIndex: q.questionIndex, drawing: q.userDrawing });
+                if (!q) continue;
+                let drawing = q.userDrawing;
+                if (!drawing) {
+                    drawing = await getFileData(`exercise_drawing_${item.taskId}_${q.questionIndex}`).catch(() => null);
+                }
+                if (drawing && !isCanvasBlank(drawing)) {
+                    wrongImages.push({ qIndex: q.questionIndex, drawing });
                 }
             }
             window._wrongAIImages = wrongImages;
@@ -20242,6 +20610,177 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
 
         function openWrongExerciseDoing(folderId, taskId, qIdx) {
             openExerciseDoing(folderId, taskId, qIdx, true);
+        }
+
+        // ---- Wrong question long-press ----
+        let _wrongQLPTimer = null;
+        function cancelWrongQLongPress() { if (_wrongQLPTimer) { clearTimeout(_wrongQLPTimer); _wrongQLPTimer = null; } }
+        function startWrongQLongPress(e, folderId, taskId, qIdx) {
+            cancelWrongQLongPress();
+            const t = e.touches ? e.touches[0] : e;
+            const cx = t.clientX, cy = t.clientY;
+            _wrongQLPTimer = setTimeout(() => {
+                _wrongQLPTimer = null;
+                showWrongQMenu({ clientX: cx, clientY: cy }, folderId, taskId, qIdx);
+            }, 500);
+        }
+
+        function showWrongQMenu(e, folderId, taskId, qIdx) {
+            closeLongPressMenu();
+            const overlay = document.createElement('div');
+            overlay.className = 'longpress-overlay';
+            overlay.onclick = closeLongPressMenu;
+            const menu = document.createElement('div');
+            menu.className = 'longpress-menu';
+            menu.id = 'longpressMenu';
+            menu.innerHTML = `
+                <button class="longpress-menu-item" onclick="archiveWrongQuestion('${folderId}','${taskId}',${qIdx})">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+                    ${i18n('wrong_archive')}
+                </button>
+                <button class="longpress-menu-item danger" onclick="deleteWrongQuestion('${folderId}','${taskId}',${qIdx})">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                    ${i18n('wrong_delete')}
+                </button>`;
+            document.body.appendChild(overlay);
+            document.body.appendChild(menu);
+            let x = e.clientX || 100, y = e.clientY || 100;
+            if (x + 140 > window.innerWidth) x = window.innerWidth - 150;
+            if (y + 120 > window.innerHeight) y = window.innerHeight - 130;
+            menu.style.left = x + 'px';
+            menu.style.top = y + 'px';
+        }
+
+        function archiveWrongQuestion(folderId, taskId, qIdx) {
+            closeLongPressMenu();
+            const data = getExercisesData();
+            const wrongTasks = data.wrongByFolder[folderId] || [];
+            const wt = wrongTasks.find(t => t.taskId === taskId);
+            if (!wt || !wt.questions || !wt.questions[qIdx]) return;
+            const q = wt.questions[qIdx];
+            if (!data.archivedWrong) data.archivedWrong = {};
+            if (!data.archivedWrong[folderId]) data.archivedWrong[folderId] = [];
+            data.archivedWrong[folderId].push({
+                taskId, taskName: wt.taskName,
+                questionIndex: q.questionIndex, latex: q.latex,
+                score: q.score, userDrawing: q.userDrawing,
+                aiComment: q.aiComment, timeUsedSeconds: q.timeUsedSeconds || 0,
+                redoDrawings: q.redoDrawings || [],
+                archivedAt: new Date().toISOString()
+            });
+            wt.questions.splice(qIdx, 1);
+            if (wt.questions.length === 0) {
+                const wtIdx = wrongTasks.findIndex(t => t.taskId === taskId);
+                if (wtIdx >= 0) wrongTasks.splice(wtIdx, 1);
+            }
+            saveData();
+            debouncedChatSync();
+            const folder = data.folders.find(f => f.id === folderId);
+            if (folder) {
+                const updatedWrong = data.wrongByFolder[folderId] || [];
+                if (updatedWrong.length === 0 || updatedWrong.every(t => !t.questions || t.questions.length === 0)) {
+                    renderExercisesPage();
+                } else {
+                    renderWrongFolderContent(folderId, folder, updatedWrong);
+                }
+            }
+            showToast(i18n('toast_wrong_archived'));
+        }
+
+        function deleteWrongQuestion(folderId, taskId, qIdx) {
+            closeLongPressMenu();
+            if (!confirm(i18n('confirm_delete_wrong'))) return;
+            const data = getExercisesData();
+            const wrongTasks = data.wrongByFolder[folderId] || [];
+            const wt = wrongTasks.find(t => t.taskId === taskId);
+            if (!wt || !wt.questions || !wt.questions[qIdx]) return;
+            const q = wt.questions[qIdx];
+            // Clean up IDB drawings for this wrong question
+            const drawKey = `exercise_drawing_${taskId}_${q.questionIndex}`;
+            deleteFileData(drawKey).catch(e => {});
+            (q.redoDrawings || []).forEach((rd, ri) => {
+                deleteFileData(`exercise_redo_drawing_${taskId}_${q.questionIndex}_${ri}`).catch(e => {});
+            });
+            wt.questions.splice(qIdx, 1);
+            if (wt.questions.length === 0) {
+                const wtIdx = wrongTasks.findIndex(t => t.taskId === taskId);
+                if (wtIdx >= 0) wrongTasks.splice(wtIdx, 1);
+            }
+            saveData();
+            debouncedChatSync();
+            triggerSyncOnFileChange(drawKey, 'exercise_drawing_delete');
+            const folder = data.folders.find(f => f.id === folderId);
+            if (folder) {
+                const updatedWrong = data.wrongByFolder[folderId] || [];
+                if (updatedWrong.length === 0 || updatedWrong.every(t => !t.questions || t.questions.length === 0)) {
+                    renderExercisesPage();
+                } else {
+                    renderWrongFolderContent(folderId, folder, updatedWrong);
+                }
+            }
+            showToast(i18n('toast_wrong_deleted'));
+        }
+
+        function restoreWrongQuestion(folderId, archivedIdx) {
+            const data = getExercisesData();
+            if (!data.archivedWrong || !data.archivedWrong[folderId]) return;
+            const archived = data.archivedWrong[folderId];
+            if (archivedIdx < 0 || archivedIdx >= archived.length) return;
+            const item = archived[archivedIdx];
+            if (!data.wrongByFolder[folderId]) data.wrongByFolder[folderId] = [];
+            let wt = data.wrongByFolder[folderId].find(t => t.taskId === item.taskId);
+            if (!wt) {
+                wt = { taskId: item.taskId, taskName: item.taskName, questions: [] };
+                data.wrongByFolder[folderId].push(wt);
+            }
+            wt.questions.push({
+                questionIndex: item.questionIndex, latex: item.latex,
+                score: item.score, userDrawing: item.userDrawing,
+                aiComment: item.aiComment, timeUsedSeconds: item.timeUsedSeconds || 0,
+                redoDrawings: item.redoDrawings || []
+            });
+            archived.splice(archivedIdx, 1);
+            if (archived.length === 0) delete data.archivedWrong[folderId];
+            saveData();
+            debouncedChatSync();
+            showToast(i18n('toast_wrong_restored'));
+            openWrongArchive(folderId);
+        }
+
+        function openWrongArchive(folderId) {
+            const data = getExercisesData();
+            const archived = (data.archivedWrong && data.archivedWrong[folderId]) || [];
+            const folder = data.folders.find(f => f.id === folderId);
+            const folderName = folder ? folder.name : '';
+            const container = document.getElementById('exerciseFolderContent');
+            let html = `<div class="classroom-folder" onclick="enterWrongFolder('${folderId}')">
+                <div class="classroom-folder-header">
+                    <svg class="note-folder-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                    <span class="classroom-folder-name">返回</span>
+                </div>
+            </div>`;
+            html += `<div style="font-size:16px;font-weight:600;margin:12px 0 8px;">${escapeHtml(folderName)} - ${i18n('wrong_archived_title')}</div>`;
+            if (archived.length === 0) {
+                html += `<div class="empty-state"><p>${i18n('wrong_no_archived')}</p></div>`;
+            } else {
+                archived.forEach((item, idx) => {
+                    const scoreColor = item.score >= 8 ? '#22c55e' : item.score >= 6 ? '#eab308' : '#ef4444';
+                    html += `<div class="exercise-task-card" style="border-left:3px solid ${scoreColor};">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <div>
+                                <div class="exercise-task-title" style="font-size:13px;">第${item.questionIndex + 1}题 (${escapeHtml(item.taskName)})</div>
+                                <div style="display:flex;align-items:center;gap:6px;">
+                                    <span class="wrong-exercise-score" style="background:${scoreColor};font-size:11px;">${item.score}/10</span>
+                                    <span style="font-size:11px;color:var(--text-muted);">${new Date(item.archivedAt).toLocaleDateString()}</span>
+                                </div>
+                            </div>
+                            <button onclick="restoreWrongQuestion('${folderId}',${idx})" style="border:none;background:var(--bg-tertiary);padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;">${i18n('wrong_restore')}</button>
+                        </div>
+                    </div>`;
+                });
+            }
+            html += '<div style="height:60px;"></div>';
+            container.innerHTML = html;
         }
 
         // Exercise archive
