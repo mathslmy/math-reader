@@ -4991,6 +4991,22 @@
             <div class="setting-item">
                 <div class="setting-item-left">
                     <div class="setting-item-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    </div>
+                    <div>
+                        <div class="setting-item-label" data-i18n="exercise_time">习题时间</div>
+                        <div class="setting-item-desc" data-i18n="exercise_time_desc">每题作答时间（1-120分钟）</div>
+                    </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:4px;">
+                    <input type="number" id="exerciseTimeMinutes" value="20" min="1" max="120" class="settings-input" style="width:80px;" onblur="saveExerciseTime()">
+                    <span style="font-size:13px;color:var(--text-muted);" data-i18n="exercise_time_unit">分钟</span>
+                </div>
+            </div>
+
+            <div class="setting-item">
+                <div class="setting-item-left">
+                    <div class="setting-item-icon">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
                     </div>
                     <div>
@@ -5775,7 +5791,7 @@
             zh: {
                 nav_classroom:'课堂',nav_bookshelf:'书架',nav_reader:'阅读',nav_notes:'笔记',nav_exercises:'习题',nav_settings:'设置',
                 settings_title:'设置',user_settings:'用户设置',api_setting:'API Setting',api_setting_desc:'配置 AI 和同步服务',
-                notification:'通知推送',notification_desc:'Web Push Notification',photo_retention:'照片储存天数',photo_retention_desc:'0 = 永不删除',
+                notification:'通知推送',notification_desc:'Web Push Notification',photo_retention:'照片储存天数',photo_retention_desc:'0 = 永不删除',exercise_time:'习题时间',exercise_time_desc:'每题作答时间（1-120分钟）',exercise_time_unit:'分钟',
                 apple_pencil:'Apple Pencil 模式',apple_pencil_desc:'仅 Pencil 书写，手指仅翻页缩放',
                 eink_mode:'墨水屏模式',eink_mode_desc:'点击屏幕翻页，适合墨水屏设备',
                 toast_eink_on:'墨水屏模式已开启',toast_eink_off:'墨水屏模式已关闭',
@@ -5948,7 +5964,7 @@
             en: {
                 nav_classroom:'Class',nav_bookshelf:'Library',nav_reader:'Reader',nav_notes:'Notes',nav_exercises:'Exercise',nav_settings:'Settings',
                 settings_title:'Settings',user_settings:'User Settings',api_setting:'API Setting',api_setting_desc:'Configure AI & sync services',
-                notification:'Push Notifications',notification_desc:'Web Push Notification',photo_retention:'Photo Retention Days',photo_retention_desc:'0 = Never delete',
+                notification:'Push Notifications',notification_desc:'Web Push Notification',photo_retention:'Photo Retention Days',photo_retention_desc:'0 = Never delete',exercise_time:'Exercise Time',exercise_time_desc:'Time per question (1-120 min)',exercise_time_unit:'min',
                 apple_pencil:'Apple Pencil Mode',apple_pencil_desc:'Only Pencil writes; finger scrolls/zooms',
                 eink_mode:'E-Ink Mode',eink_mode_desc:'Tap screen to turn pages, for e-ink devices',
                 toast_eink_on:'E-Ink mode enabled',toast_eink_off:'E-Ink mode disabled',
@@ -6121,7 +6137,7 @@
             fr: {
                 nav_classroom:'Cours',nav_bookshelf:'Biblio',nav_reader:'Lecture',nav_notes:'Notes',nav_exercises:'Exercices',nav_settings:'Réglages',
                 settings_title:'Réglages',user_settings:'Paramètres utilisateur',api_setting:'Paramètres API',api_setting_desc:'Configurer l\'IA et la synchronisation',
-                notification:'Notifications push',notification_desc:'Web Push Notification',photo_retention:'Rétention photos (jours)',photo_retention_desc:'0 = Ne jamais supprimer',
+                notification:'Notifications push',notification_desc:'Web Push Notification',photo_retention:'Rétention photos (jours)',photo_retention_desc:'0 = Ne jamais supprimer',exercise_time:'Temps d\'exercice',exercise_time_desc:'Temps par question (1-120 min)',exercise_time_unit:'min',
                 apple_pencil:'Mode Apple Pencil',apple_pencil_desc:'Seul le Pencil écrit ; le doigt fait défiler/zoom',
                 eink_mode:'Mode E-Ink',eink_mode_desc:'Touchez l\'écran pour tourner les pages',
                 toast_eink_on:'Mode E-Ink activé',toast_eink_off:'Mode E-Ink désactivé',
@@ -10391,6 +10407,13 @@
             // Photo retention days
             const prEl = document.getElementById('photoRetentionDays');
             if (prEl) prEl.value = s.photoRetentionDays || 0;
+
+            // 习题时间（仅本地存储，不参与云同步）
+            try {
+                const etVal = parseInt(localStorage.getItem('exerciseTimeMinutes'));
+                const etEl = document.getElementById('exerciseTimeMinutes');
+                if (etEl) etEl.value = (etVal >= 1 && etVal <= 120) ? etVal : 20;
+            } catch(e) {}
 
             // Apple Pencil 模式（仅本地存储，不参与云同步）
             try {
@@ -17649,6 +17672,22 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
             showToast(i18n('toast_saved'));
         }
 
+        function saveExerciseTime() {
+            let val = parseInt(document.getElementById('exerciseTimeMinutes').value) || 20;
+            val = Math.max(1, Math.min(120, val));
+            document.getElementById('exerciseTimeMinutes').value = val;
+            try { localStorage.setItem('exerciseTimeMinutes', val); } catch(e) {}
+            showToast(i18n('toast_saved'));
+        }
+
+        function getExerciseTimeSeconds() {
+            try {
+                const val = parseInt(localStorage.getItem('exerciseTimeMinutes'));
+                if (val >= 1 && val <= 120) return val * 60;
+            } catch(e) {}
+            return 1200;
+        }
+
         // Override the lecture viewer regen button to handle classroom notes
         const origConfirmRegenerateLecture = typeof confirmRegenerateLecture === 'function' ? confirmRegenerateLecture : null;
 
@@ -17657,7 +17696,7 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
         let currentExerciseTask = null;   // { folderId, taskId }
         let exDoingState = null;          // { folderId, taskId, questionIndex, isWrong, wrongFolderId }
         let exTimerInterval = null;
-        let exTimerSeconds = 1200; // 20 min
+        let exTimerSeconds = 0;
         let exTimerStartedAt = null; // Date.now() when timer started for current question
         let exPenColor = '#000000';
         let exDrawing = false;
@@ -19582,7 +19621,7 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                 // 先从IndexedDB恢复计时（异步，恢复后更新显示）
                 restoreExTimerFromDB(taskId, questionIndex, q).then(() => {
                     if (q.remainingSeconds === undefined || q.remainingSeconds === null) {
-                        q.remainingSeconds = 1200;
+                        q.remainingSeconds = getExerciseTimeSeconds();
                     }
                     if (!q.timeUsedSeconds) q.timeUsedSeconds = 0;
                     exTimerSeconds = q.remainingSeconds;
