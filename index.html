@@ -6948,11 +6948,13 @@
                         throw new Error('数据结构损坏: books/papers 不是数组');
                     }
                     appData = parsed;
+                    // 习题/错题只从 IndexedDB 恢复；localStorage 中的旧 exercises 字段由 loadExercisesFromIDB 迁移后清除。
+                    delete appData.exercises;
                     // Ensure all fields exist
                     if (!appData.notes) appData.notes = {};
                     if (!appData.archived) appData.archived = [];
                     if (!appData.classroom) appData.classroom = { courses: [], seminars: [] };
-                    if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {}, deletedWrongQuestions: [] };
+                    appData.exercises = { folders: [], wrongByFolder: {}, deletedWrongQuestions: [] };
                     if (!appData.settings) appData.settings = {};
                     if (appData.settings.photoRetentionDays === undefined) appData.settings.photoRetentionDays = 0;
                 } catch(e) {
@@ -6969,10 +6971,7 @@
                 const exStr = await getFileData('__exercises_data__');
                 if (exStr) {
                     const exData = JSON.parse(exStr);
-                    appData.exercises = exData;
-                    if (!appData.exercises.folders) appData.exercises.folders = [];
-                    if (!appData.exercises.wrongByFolder) appData.exercises.wrongByFolder = {};
-                    if (!appData.exercises.deletedWrongQuestions) appData.exercises.deletedWrongQuestions = [];
+                    appData.exercises = normalizeExercisesData(exData);
                     console.log('[loadExercisesFromIDB] 习题数据已从 IndexedDB 加载');
                 }
             } catch(e) {
