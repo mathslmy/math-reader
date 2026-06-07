@@ -5766,7 +5766,8 @@
             },
             exercises: {
                 folders: [],   // [{ id, name, createdAt, archived, tasks: [{ id, name, questions: [{latex, status, score, userDrawing, aiComment}], sourceFiles: [{id,name,type,mimeType}] }] }]
-                wrongByFolder: {}  // { folderId: [{ taskId, taskName, questions: [{questionIndex, latex, score, userDrawing, aiComment, redoDrawings:[]}] }] }
+                wrongByFolder: {},  // { folderId: [{ taskId, taskName, questions: [{questionIndex, latex, score, userDrawing, aiComment, redoDrawings:[]}] }] }
+                archivedWrongByFolder: {}  // same structure as wrongByFolder, for archived wrong questions
             },
             settings: {
                 supabaseUrl: '',
@@ -6951,7 +6952,7 @@
                     if (!appData.notes) appData.notes = {};
                     if (!appData.archived) appData.archived = [];
                     if (!appData.classroom) appData.classroom = { courses: [], seminars: [] };
-                    if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {} };
+                    if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {}, archivedWrongByFolder: {} };
                     if (!appData.settings) appData.settings = {};
                     if (appData.settings.photoRetentionDays === undefined) appData.settings.photoRetentionDays = 0;
                 } catch(e) {
@@ -6971,6 +6972,7 @@
                     appData.exercises = exData;
                     if (!appData.exercises.folders) appData.exercises.folders = [];
                     if (!appData.exercises.wrongByFolder) appData.exercises.wrongByFolder = {};
+                    if (!appData.exercises.archivedWrongByFolder) appData.exercises.archivedWrongByFolder = {};
                     console.log('[loadExercisesFromIDB] 习题数据已从 IndexedDB 加载');
                 }
             } catch(e) {
@@ -6997,7 +6999,9 @@
             } catch(e) {
                 console.warn('[migrate] 习题迁移失败:', e);
             }
-            if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {} };
+            if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {}, archivedWrongByFolder: {} };
+            // 标记习题已加载，此后才允许把本地习题写回云端
+            exercisesLoaded = true;
         }
 
         // 从 IndexedDB 备份恢复 appData
@@ -7014,7 +7018,7 @@
                         if (!appData.archived) appData.archived = [];
                         if (!appData.classroom) appData.classroom = { courses: [], seminars: [] };
                         if (!appData.settings) appData.settings = {};
-                        if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {} };
+                        if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {}, archivedWrongByFolder: {} };
                         // 写回 localStorage（不含 exercises）
                         try { localStorage.setItem('mathReader', JSON.stringify(appData)); } catch(e2) {}
                         console.log('[loadData] 已从 IndexedDB 备份恢复数据');
@@ -7109,6 +7113,14 @@
                     });
                 });
                 Object.values(exercisesToIDB.wrongByFolder || {}).forEach(wrongTasks => {
+                    (wrongTasks || []).forEach(wt => {
+                        (wt.questions || []).forEach(q => {
+                            delete q.userDrawing;
+                            (q.redoDrawings || []).forEach(rd => { delete rd.drawing; });
+                        });
+                    });
+                });
+                Object.values(exercisesToIDB.archivedWrongByFolder || {}).forEach(wrongTasks => {
                     (wrongTasks || []).forEach(wt => {
                         (wt.questions || []).forEach(q => {
                             delete q.userDrawing;
@@ -11116,6 +11128,9 @@
         let r2LastSyncTime = null;
         let r2SyncInProgress = false;
         let r2PendingSyncQueue = []; // 排队等待的文件变更同步任务队列
+        // 习题数据是否已从 IndexedDB 加载完成。未加载完前内存里的 appData.exercises 可能是空的，
+        // 此时绝不能用它去覆盖云端，否则会把云端习题清空（见 r2SyncMetadataOnly / syncToR2 的守卫）。
+        let exercisesLoaded = false;
 
         function loadR2Config() {
             const config = appData.settings.r2Config || {};
@@ -11278,11 +11293,12 @@
                             });
                         });
 
-                        // 合并习题数据：以云端为基础，保留本地新增的 folder/task
-                        const cloudExercises = metadata.exercises || { folders: [], wrongByFolder: {} };
-                        const localExercises = appData.exercises || { folders: [], wrongByFolder: {} };
+                        // 合并习题数据：按 folder/task 双向合并，同一 task 取更完整/更新的一份，
+                        // 避免空题目或旧数据把另一端覆盖清空。
+                        const cloudExercises = metadata.exercises || { folders: [], wrongByFolder: {}, archivedWrongByFolder: {} };
+                        const localExercises = appData.exercises || { folders: [], wrongByFolder: {}, archivedWrongByFolder: {} };
 
-                        // 收集云端已有的习题文件 id
+                        // 收集云端已有的习题文件 id（后面用于决定哪些文件需要上传/拉取）
                         cloudExFileIds = new Set();
                         (cloudExercises.folders || []).forEach(f => {
                             (f.tasks || []).forEach(t => {
@@ -11290,33 +11306,7 @@
                             });
                         });
 
-                        // 收集云端已有的 folder id 和 task id
-                        const cloudFolderIds = new Set((cloudExercises.folders || []).map(f => f.id));
-                        const cloudTaskIds = new Set();
-                        (cloudExercises.folders || []).forEach(f => {
-                            (f.tasks || []).forEach(t => { if (t.id) cloudTaskIds.add(t.id); });
-                        });
-
-                        // 以云端为基础
-                        appData.exercises = cloudExercises;
-                        if (!appData.exercises.folders) appData.exercises.folders = [];
-                        if (!appData.exercises.wrongByFolder) appData.exercises.wrongByFolder = {};
-
-                        // 把本地有但云端没有的 folder 和 task 合并进来
-                        for (const localFolder of (localExercises.folders || [])) {
-                            if (!cloudFolderIds.has(localFolder.id)) {
-                                appData.exercises.folders.push(localFolder);
-                            } else {
-                                const mergedFolder = appData.exercises.folders.find(f => f.id === localFolder.id);
-                                if (mergedFolder) {
-                                    for (const localTask of (localFolder.tasks || [])) {
-                                        if (!cloudTaskIds.has(localTask.id)) {
-                                            mergedFolder.tasks.push(localTask);
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        appData.exercises = mergeExercisesData(cloudExercises, localExercises, cloudSyncedAtMs);
 
                         saveData();
                         refreshAllUIFromAppData();
@@ -11406,7 +11396,7 @@
             if (!config || !config.accessKeyId) {
                 throw new Error('R2 未配置');
             }
-            
+
             // 只上传元数据，不上传文件数据
             // API 相关设置仅保存本地，不上传
             const settingsToSync = stripApiSettingsFrom(appData.settings);
@@ -11420,11 +11410,30 @@
                 lectures: stripLectureContent(appData.lectures),
                 drafts: appData.drafts,
                 classroom: stripClassroomData(appData.classroom),
-                exercises: stripExercisesData(appData.exercises),
+                exercises: await getExercisesForCloudSync(),
                 syncedAt: new Date().toISOString()
             };
-            
+
             await r2PutObject('metadata.json', JSON.stringify(metadata), 'application/json');
+        }
+
+        // 返回写入云端 metadata.json 的习题数据。
+        // 守卫：如果本地习题还没从 IndexedDB 加载完成，内存里的 appData.exercises 可能是空的，
+        // 此时绝不能用它覆盖云端——改为读回云端现有习题原样保留，避免把云端习题清空。
+        async function getExercisesForCloudSync() {
+            if (exercisesLoaded) {
+                return stripExercisesData(appData.exercises);
+            }
+            try {
+                const existingStr = await r2GetObject('metadata.json');
+                if (existingStr) {
+                    const existing = JSON.parse(existingStr);
+                    if (existing && existing.exercises) return existing.exercises;
+                }
+            } catch (e) {
+                console.warn('读取云端习题以避免覆盖失败:', e);
+            }
+            return stripExercisesData(appData.exercises);
         }
 
         // 清理doc对象用于同步：去掉data、chatHistory中去掉screenshot并限制30条
@@ -11470,6 +11479,14 @@
                 });
             });
             Object.values(e.wrongByFolder || {}).forEach(wrongTasks => {
+                (wrongTasks || []).forEach(wt => {
+                    (wt.questions || []).forEach(q => {
+                        delete q.userDrawing;
+                        (q.redoDrawings || []).forEach(rd => { delete rd.drawing; });
+                    });
+                });
+            });
+            Object.values(e.archivedWrongByFolder || {}).forEach(wrongTasks => {
                 (wrongTasks || []).forEach(wt => {
                     (wt.questions || []).forEach(q => {
                         delete q.userDrawing;
@@ -12055,12 +12072,12 @@
                     lectures: stripLectureContent(appData.lectures),
                     drafts: appData.drafts || {},
                     classroom: stripClassroomData(appData.classroom),
-                    exercises: stripExercisesData(appData.exercises),
+                    exercises: await getExercisesForCloudSync(),
                     syncedAt: new Date().toISOString()
                 };
-                
+
                 await r2PutObject('metadata.json', JSON.stringify(metadata), 'application/json');
-                
+
                 // 2. 上传PDF文件 (从IndexedDB获取)
                 let uploadedFiles = 0;
                 const allDocs = [...appData.books, ...appData.papers];
@@ -12347,6 +12364,157 @@
             return merged;
         }
 
+        // ==================== 习题数据合并 ====================
+        // 习题被"上传后过段时间清空"的根因：之前云端/本地哪一份后写就整体覆盖另一份。
+        // 习题集（批量）上传时，任务会先以"空题目"同步到云端，AI 识别完才填进题目；
+        // 若识别后那次同步没赶上，云端就停留在空题目版本，随后的定时/启动同步又以云端为准，
+        // 把本地已识别的题目反向清掉，最终云端本地都空。
+        // 这里改为按 folder/task id 双向合并，且同一个 task 取"更完整/更新"的一份，
+        // 任何一端都不会被对端的空白或旧数据覆盖。
+        // cloudSyncedAtMs：云端 metadata.syncedAt 的毫秒时间戳，用于区分"本地新增还没上传"
+        // 和"已在别处删除"——前者保留、后者丢弃，避免删掉的习题被复活（与书籍合并同一套规则）。
+        function mergeExercisesData(cloudExercises, localExercises, cloudSyncedAtMs) {
+            const cloud = (cloudExercises && typeof cloudExercises === 'object') ? cloudExercises : { folders: [], wrongByFolder: {}, archivedWrongByFolder: {} };
+            const local = (localExercises && typeof localExercises === 'object') ? localExercises : { folders: [], wrongByFolder: {}, archivedWrongByFolder: {} };
+            const cloudFolders = Array.isArray(cloud.folders) ? cloud.folders : [];
+            const localFolders = Array.isArray(local.folders) ? local.folders : [];
+            const baseline = Number(cloudSyncedAtMs) || 0;
+            // 某条目晚于云端 syncedAt → 视为本地新增（还没上传），保留
+            const newerThanBaseline = (...isoDates) => {
+                for (const d of isoDates) {
+                    const ms = d ? Date.parse(d) : NaN;
+                    if (!isNaN(ms) && ms > baseline) return true;
+                }
+                return false;
+            };
+
+            const merged = { folders: [], wrongByFolder: {}, archivedWrongByFolder: {} };
+            const folderById = new Map();
+
+            // 1) 先放入云端 folder（深拷贝，避免引用污染原对象）
+            for (const cf of cloudFolders) {
+                if (!cf || !cf.id) continue;
+                const copy = JSON.parse(JSON.stringify(cf));
+                if (!Array.isArray(copy.tasks)) copy.tasks = [];
+                merged.folders.push(copy);
+                folderById.set(copy.id, copy);
+            }
+
+            // 2) 合并本地 folder
+            for (const lf of localFolders) {
+                if (!lf || !lf.id) continue;
+                const existing = folderById.get(lf.id);
+                if (!existing) {
+                    // 云端没有这个 folder：本地新建（createdAt 晚于云端 syncedAt）或它含有新任务 → 保留；
+                    // 否则视为已在别处删除 → 丢弃，避免复活。
+                    const folderTasks = Array.isArray(lf.tasks) ? lf.tasks : [];
+                    const hasNewTask = folderTasks.some(t => t && newerThanBaseline(t.updatedAt, t.createdAt));
+                    if (newerThanBaseline(lf.createdAt) || hasNewTask) {
+                        const copy = JSON.parse(JSON.stringify(lf));
+                        if (!Array.isArray(copy.tasks)) copy.tasks = [];
+                        // 只保留本身较新的任务，丢弃已在别处删除的旧任务
+                        copy.tasks = copy.tasks.filter(t => t && newerThanBaseline(t.updatedAt, t.createdAt));
+                        merged.folders.push(copy);
+                        folderById.set(copy.id, copy);
+                    }
+                    continue;
+                }
+                // 两端都有的 folder：按 task id 合并 tasks
+                const taskIndexById = new Map();
+                existing.tasks.forEach((t, i) => { if (t && t.id) taskIndexById.set(t.id, i); });
+                for (const lt of (lf.tasks || [])) {
+                    if (!lt || !lt.id) continue;
+                    if (!taskIndexById.has(lt.id)) {
+                        // 云端这个 folder 里没有该 task：本地新加（晚于 syncedAt）才保留，
+                        // 否则视为已在别处删除 → 丢弃。
+                        if (newerThanBaseline(lt.updatedAt, lt.createdAt)) {
+                            existing.tasks.push(JSON.parse(JSON.stringify(lt)));
+                            taskIndexById.set(lt.id, existing.tasks.length - 1);
+                        }
+                    } else {
+                        // 两端都有的 task → 取更完整/更新的一份，绝不让空题目覆盖已识别题目
+                        const idx = taskIndexById.get(lt.id);
+                        const better = pickBetterExerciseTask(existing.tasks[idx], lt);
+                        existing.tasks[idx] = JSON.parse(JSON.stringify(better));
+                    }
+                }
+            }
+
+            // 3) 合并错题本（wrongByFolder）
+            merged.wrongByFolder = mergeExerciseWrongData(cloud.wrongByFolder, local.wrongByFolder);
+
+            // 4) 合并归档错题（archivedWrongByFolder）
+            merged.archivedWrongByFolder = mergeExerciseWrongData(cloud.archivedWrongByFolder, local.archivedWrongByFolder);
+
+            return merged;
+        }
+
+        // 在两端都存在的同一个 task 中挑出应保留的一份。
+        // 返回传入的 a 或 b（不复制），调用方负责拷贝。
+        function pickBetterExerciseTask(a, b) {
+            const qa = Array.isArray(a && a.questions) ? a.questions : [];
+            const qb = Array.isArray(b && b.questions) ? b.questions : [];
+            // 1) 有题目的一方优先：避免"空题目"覆盖已识别题目（这是清空的主因）
+            if (qa.length === 0 && qb.length > 0) return b;
+            if (qb.length === 0 && qa.length > 0) return a;
+            // 2) updatedAt 较新者优先（创建/识别/批改时都会刷新）
+            const ta = Date.parse((a && (a.updatedAt || a.createdAt)) || '') || 0;
+            const tb = Date.parse((b && (b.updatedAt || b.createdAt)) || '') || 0;
+            if (ta && tb && ta !== tb) return ta > tb ? a : b;
+            // 3) 题目更多者优先
+            if (qa.length !== qb.length) return qa.length > qb.length ? a : b;
+            // 4) 已批改题目更多者优先（保留答题进度）
+            const da = qa.filter(q => q && q.status === 'done').length;
+            const db = qb.filter(q => q && q.status === 'done').length;
+            if (da !== db) return da > db ? a : b;
+            // 5) 兜底：保留 b（合并时传入的本地一份），避免界面突变
+            return b;
+        }
+
+        // 合并错题本：folderId -> [{taskId, questions:[{questionIndex,...}]}]
+        // 按 taskId、questionIndex 取并集，重做次数多的一份优先。
+        function mergeExerciseWrongData(cloudWrong, localWrong) {
+            const cw = (cloudWrong && typeof cloudWrong === 'object') ? cloudWrong : {};
+            const lw = (localWrong && typeof localWrong === 'object') ? localWrong : {};
+            const out = {};
+            const folderIds = new Set([...Object.keys(cw), ...Object.keys(lw)]);
+            for (const fid of folderIds) {
+                const cloudTasks = Array.isArray(cw[fid]) ? cw[fid] : [];
+                const localTasks = Array.isArray(lw[fid]) ? lw[fid] : [];
+                const byKey = new Map();
+                const order = [];
+                const addTask = (wt) => {
+                    if (!wt) return;
+                    const key = wt.taskId || ('__noid_' + order.length);
+                    if (!byKey.has(key)) {
+                        const copy = JSON.parse(JSON.stringify(wt));
+                        if (!Array.isArray(copy.questions)) copy.questions = [];
+                        byKey.set(key, copy);
+                        order.push(key);
+                        return;
+                    }
+                    const existing = byKey.get(key);
+                    const qByIdx = new Map();
+                    existing.questions.forEach((q, i) => qByIdx.set(q.questionIndex, i));
+                    (wt.questions || []).forEach(q => {
+                        if (!qByIdx.has(q.questionIndex)) {
+                            existing.questions.push(JSON.parse(JSON.stringify(q)));
+                            qByIdx.set(q.questionIndex, existing.questions.length - 1);
+                        } else {
+                            const i = qByIdx.get(q.questionIndex);
+                            const exRedo = (existing.questions[i].redoDrawings || []).length;
+                            const newRedo = (q.redoDrawings || []).length;
+                            if (newRedo > exRedo) existing.questions[i] = JSON.parse(JSON.stringify(q));
+                        }
+                    });
+                };
+                cloudTasks.forEach(addTask);
+                localTasks.forEach(addTask);
+                out[fid] = order.map(k => byKey.get(k));
+            }
+            return out;
+        }
+
         async function autoSyncFromR2OnStartup() {
             const config = appData.settings && appData.settings.r2Config;
             if (!config || !config.accessKeyId || !config.autoSyncEnabled) return;
@@ -12393,11 +12561,9 @@
                     cloudSyncedAtMs
                 );
                 appData.lectureDrafts = metadata.lectureDrafts || appData.lectureDrafts || {};
-                // 合并习题数据：云端覆盖本地（简单策略）
-                if (metadata.exercises) {
-                    appData.exercises = metadata.exercises;
-                }
-                if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {} };
+                // 合并习题数据：按 folder/task 双向合并，绝不让云端的空白/旧数据覆盖本地已识别的题目
+                // （之前这里是"云端覆盖本地"，会在重开 app 时把还没来得及上传的本地习题清掉）
+                appData.exercises = mergeExercisesData(metadata.exercises, appData.exercises, cloudSyncedAtMs);
                 // API 设置仅保留本地值，不被云端覆盖
                 appData.settings = { ...metadata.settings, ...localApiSettings, r2Config: localR2Config };
                 saveData();
@@ -12570,7 +12736,7 @@
                 appData.lectures = metadata.lectures || {};
                 appData.drafts = metadata.drafts || {};
                 appData.classroom = metadata.classroom || { courses: [], seminars: [] };
-                appData.exercises = metadata.exercises || { folders: [], wrongByFolder: {} };
+                appData.exercises = metadata.exercises || { folders: [], wrongByFolder: {}, archivedWrongByFolder: {} };
                 appData.settings = { ...metadata.settings, ...localApiSettings, r2Config: localR2Config };
                 
                 saveData();
@@ -12712,8 +12878,8 @@
             if (confirm(i18n('confirm_clear_all'))) {
                 localStorage.removeItem('mathReader');
                 // 清除 IndexedDB 中的习题数据
-                saveFileData('__exercises_data__', '{"folders":[],"wrongByFolder":{}}').catch(()=>{});
-                appData = { books: [], papers: [], notes: {}, archived: [], settings: appData.settings, exercises: { folders: [], wrongByFolder: {} } };
+                saveFileData('__exercises_data__', '{"folders":[],"wrongByFolder":{},"archivedWrongByFolder":{}}').catch(()=>{});
+                appData = { books: [], papers: [], notes: {}, archived: [], settings: appData.settings, exercises: { folders: [], wrongByFolder: {}, archivedWrongByFolder: {} } };
                 saveData();
                 renderLibrary();
                 renderNotesPage();
@@ -17777,9 +17943,10 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
         let exDrawingCache = {};
 
         function getExercisesData() {
-            if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {} };
+            if (!appData.exercises) appData.exercises = { folders: [], wrongByFolder: {}, archivedWrongByFolder: {} };
             if (!appData.exercises.folders) appData.exercises.folders = [];
             if (!appData.exercises.wrongByFolder) appData.exercises.wrongByFolder = {};
+            if (!appData.exercises.archivedWrongByFolder) appData.exercises.archivedWrongByFolder = {};
             return appData.exercises;
         }
 
@@ -17952,6 +18119,7 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                 });
                 data.folders.splice(idx, 1);
                 delete data.wrongByFolder[folderId];
+                delete data.archivedWrongByFolder[folderId];
                 saveData();
                 debouncedChatSync();
                 renderExercisesPage();
@@ -18098,6 +18266,10 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
             const wrongTasks = data.wrongByFolder[folderId] || [];
             const wtIdx = wrongTasks.findIndex(wt => wt.taskId === taskId);
             if (wtIdx >= 0) wrongTasks.splice(wtIdx, 1);
+            // Clean archived wrong questions for this task
+            const archivedTasks = data.archivedWrongByFolder[folderId] || [];
+            const awtIdx = archivedTasks.findIndex(wt => wt.taskId === taskId);
+            if (awtIdx >= 0) archivedTasks.splice(awtIdx, 1);
             saveData();
             debouncedChatSync();
             renderExerciseFolderContent(folder);
@@ -18201,6 +18373,7 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                     q.score = score;
                     q.userDrawing = drawing;
                     q.aiComment = comment;
+                    task.updatedAt = new Date().toISOString();
 
                     // Save drawing to IDB
                     const drawKey = `exercise_drawing_${taskId}_${qIdx}`;
@@ -18734,7 +18907,8 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                             type: isImage ? 'image' : 'pdf',
                             mimeType: file.type
                         }],
-                        createdAt: new Date().toISOString()
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString()
                     };
 
                     folder.tasks.push(task);
@@ -18989,7 +19163,8 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                         name: label,
                         questions: [],
                         sourceFiles: [{ id: fileId, name: label + '.pdf', type: 'pdf', mimeType: 'application/pdf' }],
-                        createdAt: new Date().toISOString()
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString()
                     };
                     folder.tasks.push(task);
                     saveData();
@@ -19084,6 +19259,7 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                     userDrawing: null,
                     aiComment: null
                 }));
+                task.updatedAt = new Date().toISOString();
 
                 saveData();
                 debouncedChatSync();
@@ -19399,6 +19575,7 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                     userDrawing: null,
                     aiComment: null
                 }));
+                task.updatedAt = new Date().toISOString();
 
                 saveData();
                 debouncedChatSync();
@@ -20047,6 +20224,7 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                         origQ.userDrawing = userDrawing;
                         origQ.aiComment = comment;
                         origQ.timeUsedSeconds = finalTimeUsed;
+                        task.updatedAt = new Date().toISOString();
                     }
 
                     // Save user drawing to IDB
@@ -20121,6 +20299,7 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                 html += `<button onclick="wrongAskAI('${folderId}')" style="border:none;background:var(--accent);color:#fff;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">问AI (${wrongSelectedItems.length})</button>`;
                 html += `<button onclick="toggleWrongSelectMode('${folderId}')" style="border:none;background:var(--bg-tertiary);padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;">取消</button>`;
             } else {
+                html += `<button onclick="openWrongArchive('${folderId}')" style="border:none;background:var(--bg-secondary);padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;color:var(--text-secondary);">归档</button>`;
                 html += `<button onclick="toggleWrongSelectMode('${folderId}')" style="border:none;background:var(--bg-tertiary);padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;">选择</button>`;
             }
             html += `</div></div>`;
@@ -20150,7 +20329,9 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                             </div>
                         </div>`;
                     } else {
-                        html += `<div class="exercise-task-card" style="border-left:3px solid ${scoreColor};" onclick="openWrongExerciseDoing('${folderId}','${wt.taskId}',${qIdx})">
+                        html += `<div class="exercise-task-card" style="border-left:3px solid ${scoreColor};" onclick="openWrongExerciseDoing('${folderId}','${wt.taskId}',${qIdx})"
+                            oncontextmenu="event.preventDefault();event.stopPropagation();if(!('ontouchstart' in window))showWrongQuestionMenu(event,'${folderId}','${wt.taskId}',${q.questionIndex})"
+                            ontouchstart="startWrongQLongPress(event,'${folderId}','${wt.taskId}',${q.questionIndex})" ontouchend="cancelWrongQLongPress()" ontouchmove="cancelWrongQLongPress()">
                             <div class="exercise-task-title" style="font-size:13px;">第${q.questionIndex + 1}题</div>
                             <div style="display:flex;align-items:center;gap:6px;">
                                 <span class="wrong-exercise-score" style="background:${scoreColor};font-size:11px;">${q.score}/10</span>
@@ -20284,6 +20465,170 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                 renderExercisesPage();
                 showToast(i18n('toast_restored'));
             }
+        }
+
+        // ==================== 错题长按菜单（删除/归档） ====================
+        let _wrongQLPTimer = null;
+        function cancelWrongQLongPress() { if (_wrongQLPTimer) { clearTimeout(_wrongQLPTimer); _wrongQLPTimer = null; } }
+        function startWrongQLongPress(e, folderId, taskId, questionIndex) {
+            cancelWrongQLongPress();
+            const t = e.touches ? e.touches[0] : e;
+            const cx = t.clientX, cy = t.clientY;
+            _wrongQLPTimer = setTimeout(() => {
+                _wrongQLPTimer = null;
+                showWrongQuestionMenu({ clientX: cx, clientY: cy }, folderId, taskId, questionIndex);
+            }, 500);
+        }
+
+        function showWrongQuestionMenu(e, folderId, taskId, questionIndex) {
+            closeLongPressMenu();
+            const overlay = document.createElement('div');
+            overlay.className = 'longpress-overlay';
+            overlay.onclick = closeLongPressMenu;
+            const menu = document.createElement('div');
+            menu.className = 'longpress-menu';
+            menu.id = 'longpressMenu';
+            menu.innerHTML = `
+                <button class="longpress-menu-item" onclick="archiveWrongQuestion('${folderId}','${taskId}',${questionIndex})">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+                    归档
+                </button>
+                <button class="longpress-menu-item danger" onclick="deleteWrongQuestion('${folderId}','${taskId}',${questionIndex})">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                    删除
+                </button>`;
+            document.body.appendChild(overlay);
+            document.body.appendChild(menu);
+            let x = e.clientX || 100, y = e.clientY || 100;
+            if (x + 140 > window.innerWidth) x = window.innerWidth - 150;
+            if (y + 120 > window.innerHeight) y = window.innerHeight - 130;
+            menu.style.left = x + 'px';
+            menu.style.top = y + 'px';
+        }
+
+        function deleteWrongQuestion(folderId, taskId, questionIndex) {
+            closeLongPressMenu();
+            if (!confirm('确定删除此错题？')) return;
+            const data = getExercisesData();
+            const wrongTasks = data.wrongByFolder[folderId];
+            if (!wrongTasks) return;
+            const wt = wrongTasks.find(t => t.taskId === taskId);
+            if (!wt) return;
+            wt.questions = (wt.questions || []).filter(q => q.questionIndex !== questionIndex);
+            if (wt.questions.length === 0) {
+                data.wrongByFolder[folderId] = wrongTasks.filter(t => t.taskId !== taskId);
+            }
+            saveData();
+            debouncedChatSync();
+            const folder = data.folders.find(f => f.id === folderId);
+            const remaining = data.wrongByFolder[folderId] || [];
+            if (remaining.length === 0 || remaining.every(t => !t.questions || t.questions.length === 0)) {
+                renderExercisesPage();
+            } else {
+                renderWrongFolderContent(folderId, folder, remaining);
+            }
+            showToast('已删除');
+        }
+
+        function archiveWrongQuestion(folderId, taskId, questionIndex) {
+            closeLongPressMenu();
+            const data = getExercisesData();
+            const wrongTasks = data.wrongByFolder[folderId];
+            if (!wrongTasks) return;
+            const wt = wrongTasks.find(t => t.taskId === taskId);
+            if (!wt) return;
+            const qIdx = (wt.questions || []).findIndex(q => q.questionIndex === questionIndex);
+            if (qIdx < 0) return;
+            const question = wt.questions.splice(qIdx, 1)[0];
+
+            // Move to archivedWrongByFolder
+            if (!data.archivedWrongByFolder[folderId]) data.archivedWrongByFolder[folderId] = [];
+            let archivedTask = data.archivedWrongByFolder[folderId].find(t => t.taskId === taskId);
+            if (!archivedTask) {
+                archivedTask = { taskId, taskName: wt.taskName, questions: [] };
+                data.archivedWrongByFolder[folderId].push(archivedTask);
+            }
+            archivedTask.questions.push(question);
+
+            // Clean empty task from active list
+            if (wt.questions.length === 0) {
+                data.wrongByFolder[folderId] = wrongTasks.filter(t => t.taskId !== taskId);
+            }
+
+            saveData();
+            debouncedChatSync();
+            const folder = data.folders.find(f => f.id === folderId);
+            const remaining = data.wrongByFolder[folderId] || [];
+            if (remaining.length === 0 || remaining.every(t => !t.questions || t.questions.length === 0)) {
+                renderExercisesPage();
+            } else {
+                renderWrongFolderContent(folderId, folder, remaining);
+            }
+            showToast('已归档');
+        }
+
+        function openWrongArchive(folderId) {
+            const data = getExercisesData();
+            const archivedTasks = data.archivedWrongByFolder[folderId] || [];
+            const folder = data.folders.find(f => f.id === folderId);
+            const view = document.getElementById('exerciseArchiveView');
+            view.classList.add('show');
+            const content = document.getElementById('exerciseArchiveContent');
+            const totalArchived = archivedTasks.reduce((s, t) => s + (t.questions || []).length, 0);
+            if (totalArchived === 0) {
+                content.innerHTML = '<div class="empty-state"><p>暂无归档错题</p></div>';
+            } else {
+                let html = `<div style="font-size:15px;font-weight:600;margin-bottom:12px;">${escapeHtml(folder ? folder.name : '')} - 归档错题</div>`;
+                archivedTasks.forEach(wt => {
+                    if (!wt.questions || wt.questions.length === 0) return;
+                    html += `<div style="margin-bottom:12px;">
+                        <div style="font-size:14px;font-weight:500;margin-bottom:8px;">${escapeHtml(wt.taskName)}</div>`;
+                    wt.questions.forEach(q => {
+                        const scoreColor = q.score >= 8 ? '#22c55e' : q.score >= 6 ? '#eab308' : '#ef4444';
+                        html += `<div class="exercise-task-card" style="border-left:3px solid ${scoreColor};">
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <div>
+                                    <div class="exercise-task-title" style="font-size:13px;">第${q.questionIndex + 1}题</div>
+                                    <span class="wrong-exercise-score" style="background:${scoreColor};font-size:11px;">${q.score}/10</span>
+                                </div>
+                                <button onclick="unarchiveWrongQuestion('${folderId}','${wt.taskId}',${q.questionIndex})" style="border:none;background:var(--bg-tertiary);padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;">恢复</button>
+                            </div>
+                        </div>`;
+                    });
+                    html += `</div>`;
+                });
+                content.innerHTML = html;
+            }
+        }
+
+        function unarchiveWrongQuestion(folderId, taskId, questionIndex) {
+            const data = getExercisesData();
+            const archivedTasks = data.archivedWrongByFolder[folderId];
+            if (!archivedTasks) return;
+            const wt = archivedTasks.find(t => t.taskId === taskId);
+            if (!wt) return;
+            const qIdx = (wt.questions || []).findIndex(q => q.questionIndex === questionIndex);
+            if (qIdx < 0) return;
+            const question = wt.questions.splice(qIdx, 1)[0];
+
+            // Move back to wrongByFolder
+            if (!data.wrongByFolder[folderId]) data.wrongByFolder[folderId] = [];
+            let activeTask = data.wrongByFolder[folderId].find(t => t.taskId === taskId);
+            if (!activeTask) {
+                activeTask = { taskId, taskName: wt.taskName, questions: [] };
+                data.wrongByFolder[folderId].push(activeTask);
+            }
+            activeTask.questions.push(question);
+
+            // Clean empty task from archived list
+            if (wt.questions.length === 0) {
+                data.archivedWrongByFolder[folderId] = archivedTasks.filter(t => t.taskId !== taskId);
+            }
+
+            saveData();
+            debouncedChatSync();
+            openWrongArchive(folderId);
+            showToast('已恢复');
         }
 
         // ==================== Service Worker ====================
