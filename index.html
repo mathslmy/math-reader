@@ -16536,38 +16536,41 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
             const wrapper = document.getElementById('pdfCanvasWrapper');
             if (!container || !wrapper || !pdfDoc) { _pinchRebuildScheduled = false; return; }
 
-            // 去掉预览 transform
-            wrapper.style.transform = '';
-            wrapper.style.transformOrigin = '';
+            try {
+                // 去掉预览 transform
+                wrapper.style.transform = '';
+                wrapper.style.transformOrigin = '';
 
-            // 记住焦点页面在视口中的相对位置
-            const focusEl = pageElements[focusPageNum];
-            let focusOffsetRatio = 0;
-            if (focusEl) {
-                const containerRect = container.getBoundingClientRect();
-                const elRect = focusEl.getBoundingClientRect();
-                focusOffsetRatio = (containerRect.top - elRect.top) / elRect.height;
+                // 记住焦点页面在视口中的相对位置
+                const focusData = pageElements[focusPageNum];
+                const focusEl = focusData && focusData.placeholder;
+                let focusOffsetRatio = 0;
+                if (focusEl) {
+                    const containerRect = container.getBoundingClientRect();
+                    const elRect = focusEl.getBoundingClientRect();
+                    focusOffsetRatio = (containerRect.top - elRect.top) / elRect.height;
+                }
+
+                // 重新渲染（会重建所有 placeholder 尺寸）
+                suppressScrollWriteback = true;
+                const savedPage = currentPage;
+                renderedPages.clear();
+                for (let k in pageElements) { if (pageElements[k]) pageElements[k].rendered = false; }
+                isRenderingAllPages = false;
+                await renderAllPDFPages();
+
+                // 恢复滚动位置：把焦点页面放回视口中原来的相对位置
+                const newFocusData = pageElements[focusPageNum];
+                const newFocusEl = newFocusData && newFocusData.placeholder;
+                if (newFocusEl) {
+                    container.scrollTop = newFocusEl.offsetTop + focusOffsetRatio * newFocusEl.offsetHeight * -1;
+                }
+                currentPage = savedPage;
+                document.getElementById('pageInfo').textContent = `${currentPage} / ${totalPages}`;
+            } finally {
+                suppressScrollWriteback = false;
+                _pinchRebuildScheduled = false;
             }
-
-            // 重新渲染（会重建所有 placeholder 尺寸）
-            suppressScrollWriteback = true;
-            const savedPage = currentPage;
-            renderedPages.clear();
-            for (let k in pageElements) { if (pageElements[k]) pageElements[k].rendered = false; }
-            isRenderingAllPages = false;
-            await renderAllPDFPages();
-
-            // 恢复滚动位置：把焦点页面放回视口中原来的相对位置
-            const newFocusEl = pageElements[focusPageNum];
-            if (newFocusEl) {
-                const newElTop = newFocusEl.offsetTop;
-                const newElHeight = newFocusEl.offsetHeight;
-                container.scrollTop = newElTop + focusOffsetRatio * newElHeight * -1;
-            }
-            currentPage = savedPage;
-            document.getElementById('pageInfo').textContent = `${currentPage} / ${totalPages}`;
-            suppressScrollWriteback = false;
-            _pinchRebuildScheduled = false;
         }
 
         (function() {
@@ -16600,8 +16603,9 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
             function getPageAtPoint(container, clientY) {
                 const scrollY = container.scrollTop + (clientY - container.getBoundingClientRect().top);
                 for (let p = 1; p <= totalPages; p++) {
-                    const el = pageElements[p];
-                    if (!el) continue;
+                    const pd = pageElements[p];
+                    if (!pd || !pd.placeholder) continue;
+                    const el = pd.placeholder;
                     if (scrollY >= el.offsetTop && scrollY < el.offsetTop + el.offsetHeight) {
                         return p;
                     }
