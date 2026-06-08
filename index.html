@@ -16700,6 +16700,8 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                     pinchAllowed = false;
                     setTimeout(() => { isPinching = false; }, 150);
 
+                    if (_gestureActive) { liveScale = 1; return; }
+
                     if (wasPinchZoom && wrapper) {
                         wrapper.style.transform = '';
                         wrapper.style.transformOrigin = '';
@@ -16742,10 +16744,12 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
 
             // Safari gesture events (iOS Safari, Mac Safari)
             let gestureBaseZoom = 1;
+            let _gestureActive = false;
             document.addEventListener('gesturestart', (e) => {
                 const container = document.getElementById('readerContainer');
                 if (!container || !container.closest('.page.active')) return;
                 e.preventDefault();
+                _gestureActive = true;
                 gestureBaseZoom = userZoom;
             });
             document.addEventListener('gesturechange', (e) => {
@@ -16756,31 +16760,31 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                 if (!wrapper) return;
                 let targetZoom = gestureBaseZoom * e.scale;
                 targetZoom = Math.max(minZoom, Math.min(maxZoom, targetZoom));
-                const ls = targetZoom / userZoom;
+                const ls = targetZoom / gestureBaseZoom;
                 const rect = container.getBoundingClientRect();
                 const originX = rect.width / 2;
                 const originY = rect.height / 2 + container.scrollTop;
                 wrapper.style.transformOrigin = `${originX}px ${originY}px`;
                 wrapper.style.transform = `scale(${ls})`;
-                liveScale = ls;
             });
             document.addEventListener('gestureend', (e) => {
                 const container = document.getElementById('readerContainer');
                 if (!container || !container.closest('.page.active')) return;
                 e.preventDefault();
+                _gestureActive = false;
+                wrapper = document.getElementById('pdfCanvasWrapper');
+                if (wrapper) { wrapper.style.transform = ''; wrapper.style.transformOrigin = ''; }
                 if (einkMode) {
-                    wrapper = document.getElementById('pdfCanvasWrapper');
-                    if (wrapper) { wrapper.style.transform = ''; wrapper.style.transformOrigin = ''; }
                     if (Math.abs(e.scale - 1) > 0.02) einkApplyPinchZoom(e.scale);
-                    liveScale = 1;
                     return;
                 }
                 let newZoom = gestureBaseZoom * e.scale;
                 newZoom = Math.max(minZoom, Math.min(maxZoom, newZoom));
                 if (newZoom > 0.9 && newZoom < 1.1) newZoom = 1;
-                const focusPage = getPageAtPoint(container, container.getBoundingClientRect().top + container.clientHeight / 2);
-                rebuildPagesForZoom(newZoom, focusPage);
-                liveScale = 1;
+                if (Math.abs(newZoom - userZoom) >= 0.02) {
+                    const focusPage = getPageAtPoint(container, container.getBoundingClientRect().top + container.clientHeight / 2);
+                    rebuildPagesForZoom(newZoom, focusPage);
+                }
             });
         })();
 
@@ -20839,21 +20843,22 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
         // 需要重新计算 annotation canvas 和 lecture canvas 的尺寸和坐标。
         (function() {
             let resizeTimer = null;
+            let lastResizeWidth = window.innerWidth;
             function onViewportResize() {
                 if (resizeTimer) clearTimeout(resizeTimer);
                 resizeTimer = setTimeout(() => {
-                    // 重新调整讲义画布
                     if (typeof resizeLectureDrawCanvas === 'function') {
                         resizeLectureDrawCanvas();
                     }
-                    // 如果阅读器打开且有 PDF，重建页面以适应新宽度
+                    const curWidth = window.innerWidth;
+                    if (curWidth === lastResizeWidth) return;
+                    lastResizeWidth = curWidth;
                     if (pdfDoc && currentDoc && document.getElementById('page2')?.classList.contains('active')) {
                         const focusPage = currentPage || 1;
                         rebuildPagesForZoom(userZoom, focusPage);
                     }
                 }, 300);
             }
-            // 使用 visualViewport API（iPad 支持）
             if (window.visualViewport) {
                 window.visualViewport.addEventListener('resize', onViewportResize);
             }
