@@ -16697,9 +16697,9 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                     setTimeout(() => { isPinching = false; }, 150);
 
                     if (wasPinchZoom && wrapper) {
+                        wrapper.style.transform = '';
+                        wrapper.style.transformOrigin = '';
                         if (einkMode) {
-                            wrapper.style.transform = '';
-                            wrapper.style.transformOrigin = '';
                             if (Math.abs(finalLiveScale - 1) > 0.02) {
                                 einkApplyPinchZoom(finalLiveScale);
                             }
@@ -16707,10 +16707,7 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                             let newZoom = baseZoom * finalLiveScale;
                             newZoom = Math.max(minZoom, Math.min(maxZoom, newZoom));
                             if (newZoom > 0.9 && newZoom < 1.1) newZoom = 1;
-                            if (Math.abs(newZoom - userZoom) < 0.02) {
-                                wrapper.style.transform = '';
-                                wrapper.style.transformOrigin = '';
-                            } else {
+                            if (Math.abs(newZoom - userZoom) >= 0.02) {
                                 rebuildPagesForZoom(newZoom, pinchFocusPageNum);
                             }
                         }
