@@ -2543,6 +2543,27 @@
 
         .toggle.on .toggle-knob { transform: translateX(18px); }
 
+        /* 优化书写延迟：仅开关开启时启用，避免影响默认渲染/交互逻辑 */
+        body.writing-latency-optimized .annotation-canvas,
+        body.writing-latency-optimized #noteCanvas,
+        body.writing-latency-optimized #draftCanvas,
+        body.writing-latency-optimized #lectureDrawCanvas,
+        body.writing-latency-optimized #lectureDraftCanvas,
+        body.writing-latency-optimized #exerciseDoingCanvas {
+            will-change: contents;
+            transform: translateZ(0);
+            backface-visibility: hidden;
+        }
+
+        body.writing-latency-optimized .annotation-canvas,
+        body.writing-latency-optimized .note-canvas-container,
+        body.writing-latency-optimized .exercise-doing-canvas-wrap,
+        body.writing-latency-optimized #draftCanvasWrapper,
+        body.writing-latency-optimized #lectureDraftCanvasWrapper {
+            -webkit-tap-highlight-color: transparent;
+            overscroll-behavior: contain;
+        }
+
         /* ==================== Modal ==================== */
         /* Page1 AI Button (from original) */
         .ai-btn {
@@ -5075,6 +5096,23 @@
                 </div>
             </div>
 
+            <div class="setting-item">
+                <div class="setting-item-left">
+                    <div class="setting-item-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5"/><path d="M8 17V7"/><path d="M12 15V9"/><path d="M16 13v-2"/><path d="M20 12h-4"/></svg>
+                    </div>
+                    <div>
+                        <div class="setting-item-label" data-i18n="writing_latency_opt">优化书写延迟</div>
+                        <div class="setting-item-desc" data-i18n="writing_latency_opt_desc">墨水屏手写时减少输入到落笔的等待</div>
+                    </div>
+                </div>
+                <div class="setting-item-right">
+                    <div class="toggle" id="writingLatencyToggle" onclick="toggleWritingLatencyOptimization()">
+                        <div class="toggle-knob"></div>
+                    </div>
+                </div>
+            </div>
+
             <div class="setting-item" onclick="manualRequestPersist()">
                 <div class="setting-item-left">
                     <div class="setting-item-icon">
@@ -5833,6 +5871,7 @@
                 apple_pencil:'Apple Pencil 模式',apple_pencil_desc:'仅 Pencil 书写，手指仅翻页缩放',
                 eink_mode:'墨水屏模式',eink_mode_desc:'点击屏幕翻页，适合墨水屏设备',
                 toast_eink_on:'墨水屏模式已开启',toast_eink_off:'墨水屏模式已关闭',
+                writing_latency_opt:'优化书写延迟',writing_latency_opt_desc:'墨水屏手写时减少输入到落笔的等待',toast_writing_latency_on:'书写延迟优化已开启',toast_writing_latency_off:'书写延迟优化已关闭',
                 eink_prev_page:'上一页',eink_next_page:'下一页',eink_page_indicator:'第 {0} 页 / 共 {1} 页',
                 storage_persist:'存储持久化',storage_persist_checking:'检测中…',storage_persist_btn:'请求授权',
                 ai_settings:'AI 设置',ai_avatar:'AI 头像',ai_name_label:'AI 名称',
@@ -6010,6 +6049,7 @@
                 apple_pencil:'Apple Pencil Mode',apple_pencil_desc:'Only Pencil writes; finger scrolls/zooms',
                 eink_mode:'E-Ink Mode',eink_mode_desc:'Tap screen to turn pages, for e-ink devices',
                 toast_eink_on:'E-Ink mode enabled',toast_eink_off:'E-Ink mode disabled',
+                writing_latency_opt:'Optimize writing latency',writing_latency_opt_desc:'Reduce pen-to-ink delay when handwriting on e-ink devices',toast_writing_latency_on:'Writing latency optimization enabled',toast_writing_latency_off:'Writing latency optimization disabled',
                 eink_prev_page:'Previous',eink_next_page:'Next',eink_page_indicator:'Page {0} / {1}',
                 storage_persist:'Storage Persistence',storage_persist_checking:'Checking…',storage_persist_btn:'Request Permission',
                 ai_settings:'AI Settings',ai_avatar:'AI Avatar',ai_name_label:'AI Name',
@@ -6187,6 +6227,7 @@
                 apple_pencil:'Mode Apple Pencil',apple_pencil_desc:'Seul le Pencil écrit ; le doigt fait défiler/zoom',
                 eink_mode:'Mode E-Ink',eink_mode_desc:'Touchez l\'écran pour tourner les pages',
                 toast_eink_on:'Mode E-Ink activé',toast_eink_off:'Mode E-Ink désactivé',
+                writing_latency_opt:'Optimiser la latence d’écriture',writing_latency_opt_desc:'Réduit le délai stylet-encre sur les appareils e-ink',toast_writing_latency_on:'Optimisation de l’écriture activée',toast_writing_latency_off:'Optimisation de l’écriture désactivée',
                 eink_prev_page:'Précédent',eink_next_page:'Suivant',eink_page_indicator:'Page {0} / {1}',
                 storage_persist:'Persistance du stockage',storage_persist_checking:'Vérification…',storage_persist_btn:'Demander l\'autorisation',
                 ai_settings:'Paramètres IA',ai_avatar:'Avatar IA',ai_name_label:'Nom de l\'IA',
@@ -6398,6 +6439,41 @@
         let noteLastX = 0;
         let noteLastY = 0;
         let currentNotePosition = { page: 1, x: 0.5, y: 0.5 };
+        let writingLatencyOptimized = false;
+
+        function isWritingLatencyOptimizationEnabled() {
+            return writingLatencyOptimized === true;
+        }
+
+        function getPointerSamples(e) {
+            if (isWritingLatencyOptimizationEnabled() && typeof e.getCoalescedEvents === 'function') {
+                const samples = e.getCoalescedEvents();
+                if (samples && samples.length) return samples;
+            }
+            return [e];
+        }
+
+        function drawCanvasSegment(ctx, x1, y1, x2, y2) {
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+        }
+
+        function drawCanvasDot(ctx, x, y, radius) {
+            ctx.beginPath();
+            ctx.arc(x, y, Math.max(radius || 1, 0.5), 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function applyWritingLatencyOptimizationState() {
+            try {
+                writingLatencyOptimized = localStorage.getItem('writingLatencyOptimized') === 'true';
+            } catch(e) { writingLatencyOptimized = false; }
+            const toggle = document.getElementById('writingLatencyToggle');
+            if (toggle) toggle.classList.toggle('on', writingLatencyOptimized);
+            document.body.classList.toggle('writing-latency-optimized', writingLatencyOptimized);
+        }
 
         // ==================== Init ====================
         async function init() {
@@ -7708,6 +7784,11 @@
             draftDrawing = true;
             draftLastX = touch.clientX - rect.left;
             draftLastY = touch.clientY - rect.top;
+            if (isWritingLatencyOptimizationEnabled() && draftPenEnabled && !draftEraserEnabled) {
+                draftCtx.globalCompositeOperation = 'source-over';
+                draftCtx.fillStyle = draftPenColor;
+                drawCanvasDot(draftCtx, draftLastX, draftLastY, draftPenSize);
+            }
         }
         
         function handleDraftTouchMove(e) {
@@ -7735,10 +7816,6 @@
             const x = touch.clientX - rect.left;
             const y = touch.clientY - rect.top;
             
-            draftCtx.beginPath();
-            draftCtx.moveTo(draftLastX, draftLastY);
-            draftCtx.lineTo(x, y);
-            
             if (draftEraserEnabled) {
                 draftCtx.globalCompositeOperation = 'destination-out';
                 draftCtx.strokeStyle = 'rgba(0,0,0,1)';
@@ -7750,7 +7827,7 @@
             }
             draftCtx.lineCap = 'round';
             draftCtx.lineJoin = 'round';
-            draftCtx.stroke();
+            drawCanvasSegment(draftCtx, draftLastX, draftLastY, x, y);
             
             draftLastX = x;
             draftLastY = y;
@@ -7775,6 +7852,11 @@
             const rect = draftCanvas.getBoundingClientRect();
             draftLastX = e.clientX - rect.left;
             draftLastY = e.clientY - rect.top;
+            if (isWritingLatencyOptimizationEnabled() && draftPenEnabled && !draftEraserEnabled) {
+                draftCtx.globalCompositeOperation = 'source-over';
+                draftCtx.fillStyle = draftPenColor;
+                drawCanvasDot(draftCtx, draftLastX, draftLastY, draftPenSize);
+            }
         }
 
         function doDraftDraw(e) {
@@ -7783,10 +7865,6 @@
             const rect = draftCanvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
-            
-            draftCtx.beginPath();
-            draftCtx.moveTo(draftLastX, draftLastY);
-            draftCtx.lineTo(x, y);
             
             if (draftEraserEnabled) {
                 draftCtx.globalCompositeOperation = 'destination-out';
@@ -7799,7 +7877,7 @@
             }
             draftCtx.lineCap = 'round';
             draftCtx.lineJoin = 'round';
-            draftCtx.stroke();
+            drawCanvasSegment(draftCtx, draftLastX, draftLastY, x, y);
             
             draftLastX = x;
             draftLastY = y;
@@ -8668,7 +8746,7 @@
                 const top = strokeHistory[strokeHistory.length - 1];
                 if (top && top.annoCanvas === annoCanvas) {
                     strokeHistory.pop();
-                    annoCtx.putImageData(top.imageData, 0, 0);
+                    restoreStrokeEntry(annoCtx, top);
                     updateUndoRedoButtons();
                 }
             }
@@ -8702,6 +8780,10 @@
                     annoCtx.globalCompositeOperation = 'source-over';
                     annoCtx.strokeStyle = penColor;
                     annoCtx.lineWidth = penSize;
+                    if (isWritingLatencyOptimizationEnabled()) {
+                        annoCtx.fillStyle = penColor;
+                        drawCanvasDot(annoCtx, lastX, lastY, penSize / 2);
+                    }
                 }
                 annoCtx.lineCap = 'round';
                 annoCtx.lineJoin = 'round';
@@ -8718,12 +8800,13 @@
                 if (e.pointerId !== activePointerId) return;
                 // Apple Pencil 模式：忽略手指
                 if (applePencilMode && e.pointerType === 'touch') return;
-                const p = pointerToCanvasXY(e);
-                annoCtx.beginPath();
-                annoCtx.moveTo(lastX, lastY);
-                annoCtx.lineTo(p.x, p.y);
-                annoCtx.stroke();
-                lastX = p.x; lastY = p.y;
+                const samples = getPointerSamples(e);
+                for (const sample of samples) {
+                    const p = pointerToCanvasXY(sample);
+                    if (p.x === lastX && p.y === lastY) continue;
+                    drawCanvasSegment(annoCtx, lastX, lastY, p.x, p.y);
+                    lastX = p.x; lastY = p.y;
+                }
                 e.preventDefault();
             });
 
@@ -9237,19 +9320,47 @@
         }
 
         // ---- Undo / Redo ----
-        // strokeHistory / redoHistory 是全局栈，每个条目是 { pageNum, annoCanvas, imageData }
+        // strokeHistory / redoHistory 是全局栈，每个条目是 { pageNum, annoCanvas, imageData|snapshotCanvas }
         // 按操作发生的时间顺序撤销，跨页
+        function makeCanvasSnapshot(canvas) {
+            if (!canvas) return null;
+            const snap = document.createElement('canvas');
+            snap.width = canvas.width;
+            snap.height = canvas.height;
+            const snapCtx = snap.getContext('2d');
+            snapCtx.drawImage(canvas, 0, 0);
+            return snap;
+        }
+
+        function restoreStrokeEntry(ctx, entry) {
+            if (entry.imageData) {
+                ctx.putImageData(entry.imageData, 0, 0);
+            } else if (entry.snapshotCanvas) {
+                ctx.clearRect(0, 0, entry.snapshotCanvas.width, entry.snapshotCanvas.height);
+                ctx.drawImage(entry.snapshotCanvas, 0, 0);
+            }
+        }
+
+        function buildStrokeHistoryEntry(pageNum, annoCanvas, ctx, w, h) {
+            const entry = {
+                pageNum: pageNum || parseInt(annoCanvas.dataset.pageNum) || currentPage,
+                annoCanvas: annoCanvas
+            };
+            if (isWritingLatencyOptimizationEnabled()) {
+                entry.snapshotCanvas = makeCanvasSnapshot(annoCanvas);
+            } else {
+                entry.imageData = ctx.getImageData(0, 0, w, h);
+            }
+            return entry;
+        }
+
         function saveStrokeState(pageNum, annoCanvas) {
             annoCanvas = annoCanvas || currentAnnoCanvas;
             if (!annoCanvas) return;
             const ctx = annoCanvas.getContext('2d');
             const w = annoCanvas.width;
             const h = annoCanvas.height;
-            strokeHistory.push({
-                pageNum: pageNum || parseInt(annoCanvas.dataset.pageNum) || currentPage,
-                annoCanvas: annoCanvas,
-                imageData: ctx.getImageData(0, 0, w, h)
-            });
+            strokeHistory.push(buildStrokeHistoryEntry(pageNum, annoCanvas, ctx, w, h));
             // 限制历史步数 30
             if (strokeHistory.length > 30) strokeHistory.shift();
         }
@@ -9266,12 +9377,8 @@
             const ctx = canvas.getContext('2d');
             const w = canvas.width, h = canvas.height;
             // 当前状态入 redo
-            redoHistory.push({
-                pageNum: entry.pageNum,
-                annoCanvas: canvas,
-                imageData: ctx.getImageData(0, 0, w, h)
-            });
-            ctx.putImageData(entry.imageData, 0, 0);
+            redoHistory.push(buildStrokeHistoryEntry(entry.pageNum, canvas, ctx, w, h));
+            restoreStrokeEntry(ctx, entry);
             // 如果这个页面不在当前视窗，滚动到那页以让用户看到效果
             if (entry.pageNum !== currentPage) {
                 scrollToPage(entry.pageNum);
@@ -9290,12 +9397,8 @@
             }
             const ctx = canvas.getContext('2d');
             const w = canvas.width, h = canvas.height;
-            strokeHistory.push({
-                pageNum: entry.pageNum,
-                annoCanvas: canvas,
-                imageData: ctx.getImageData(0, 0, w, h)
-            });
-            ctx.putImageData(entry.imageData, 0, 0);
+            strokeHistory.push(buildStrokeHistoryEntry(entry.pageNum, canvas, ctx, w, h));
+            restoreStrokeEntry(ctx, entry);
             if (entry.pageNum !== currentPage) {
                 scrollToPage(entry.pageNum);
             }
@@ -10033,6 +10136,11 @@
                 const rect = canvas.getBoundingClientRect();
                 lx = e.clientX - rect.left;
                 ly = e.clientY - rect.top;
+                if (isWritingLatencyOptimizationEnabled() && !noteEraserEnabled) {
+                    ctx.globalCompositeOperation = 'source-over';
+                    ctx.fillStyle = noteColor;
+                    drawCanvasDot(ctx, lx, ly, 1);
+                }
                 e.preventDefault();
             };
             canvas.ontouchstart = (e) => { e.preventDefault(); };
@@ -10040,8 +10148,6 @@
             canvas.onpointermove = (e) => {
                 if (!drawing) return;
                 const rect = canvas.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
                 if (noteEraserEnabled) {
                     // 橡皮擦模式
                     ctx.globalCompositeOperation = 'destination-out';
@@ -10051,11 +10157,14 @@
                     ctx.strokeStyle = noteColor;
                     ctx.lineWidth = 2;
                 }
-                ctx.beginPath();
-                ctx.moveTo(lx, ly);
-                ctx.lineTo(x, y);
-                ctx.stroke();
-                lx = x; ly = y;
+                const samples = getPointerSamples(e);
+                for (const sample of samples) {
+                    const x = sample.clientX - rect.left;
+                    const y = sample.clientY - rect.top;
+                    if (x === lx && y === ly) continue;
+                    drawCanvasSegment(ctx, lx, ly, x, y);
+                    lx = x; ly = y;
+                }
                 e.preventDefault();
             };
             canvas.onpointerup = () => {
@@ -10489,6 +10598,7 @@
             document.body.classList.toggle('eink-mode', einkMode);
             setupEinkReaderTapZones();
             setupEinkLectureTapZones();
+            applyWritingLatencyOptimizationState();
         }
 
         function saveSettings() {
@@ -10956,6 +11066,17 @@
             setupEinkReaderTapZones();
             setupEinkLectureTapZones();
             showToast(einkMode ? i18n('toast_eink_on') : i18n('toast_eink_off'));
+        }
+
+        function toggleWritingLatencyOptimization() {
+            writingLatencyOptimized = !writingLatencyOptimized;
+            const toggle = document.getElementById('writingLatencyToggle');
+            if (toggle) toggle.classList.toggle('on', writingLatencyOptimized);
+            document.body.classList.toggle('writing-latency-optimized', writingLatencyOptimized);
+            try {
+                localStorage.setItem('writingLatencyOptimized', writingLatencyOptimized ? 'true' : 'false');
+            } catch(e) {}
+            showToast(writingLatencyOptimized ? i18n('toast_writing_latency_on') : i18n('toast_writing_latency_off'));
         }
 
         function setupEinkReaderTapZones() {
@@ -15248,6 +15369,12 @@ ${i18n('prompt_lecture_gen')}`;
             lecturePenLastY = (e.clientY - rect.top) * scaleY;
             lecturePenDrawing = true;
 
+            if (isWritingLatencyOptimizationEnabled() && !lecturePenEraser) {
+                lecturePenCtx.globalCompositeOperation = 'source-over';
+                lecturePenCtx.fillStyle = lecturePenColor;
+                drawCanvasDot(lecturePenCtx, lecturePenLastX, lecturePenLastY, lecturePenSize / 2);
+            }
+
             if (lecturePenEraser) {
                 // 橡皮擦模式：保存状态用于撤销，检测并删除笔画
                 saveLectureStrokeState();
@@ -15319,21 +15446,24 @@ ${i18n('prompt_lecture_gen')}`;
             const rect = canvas.getBoundingClientRect();
             const scaleX = canvas.width / rect.width;
             const scaleY = canvas.height / rect.height;
-            const x = (e.clientX - rect.left) * scaleX;
-            const y = (e.clientY - rect.top) * scaleY;
+            const samples = getPointerSamples(e);
+            for (const sample of samples) {
+                const x = (sample.clientX - rect.left) * scaleX;
+                const y = (sample.clientY - rect.top) * scaleY;
 
-            if (lecturePenEraser) {
-                // 橡皮擦模式：沿路径检测并删除笔画
-                eraseLectureStrokeAt(x, y);
-            } else {
-                // 画笔模式：画线并记录点
-                drawLecturePenLine(lecturePenLastX, lecturePenLastY, x, y);
-                if (lectureCurrentStroke) {
-                    lectureCurrentStroke.points.push({x, y});
+                if (lecturePenEraser) {
+                    // 橡皮擦模式：沿路径检测并删除笔画
+                    eraseLectureStrokeAt(x, y);
+                } else {
+                    // 画笔模式：画线并记录点
+                    drawLecturePenLine(lecturePenLastX, lecturePenLastY, x, y);
+                    if (lectureCurrentStroke) {
+                        lectureCurrentStroke.points.push({x, y});
+                    }
                 }
+                lecturePenLastX = x;
+                lecturePenLastY = y;
             }
-            lecturePenLastX = x;
-            lecturePenLastY = y;
         }
 
         function handleLecturePenPointerUp(e) {
@@ -15798,6 +15928,11 @@ ${i18n('prompt_lecture_gen')}`;
             const rect = lectureDraftCanvas.getBoundingClientRect();
             lectureDraftLastX = touch.clientX - rect.left;
             lectureDraftLastY = touch.clientY - rect.top;
+            if (isWritingLatencyOptimizationEnabled() && lectureDraftPenEnabled && !lectureDraftEraserEnabled) {
+                lectureDraftCtx.globalCompositeOperation = 'source-over';
+                lectureDraftCtx.fillStyle = lectureDraftPenColor;
+                drawCanvasDot(lectureDraftCtx, lectureDraftLastX, lectureDraftLastY, lectureDraftPenSize);
+            }
         }
 
         function handleLectureDraftTouchMove(e) {
@@ -15824,10 +15959,6 @@ ${i18n('prompt_lecture_gen')}`;
             const x = touch.clientX - rect.left;
             const y = touch.clientY - rect.top;
             
-            lectureDraftCtx.beginPath();
-            lectureDraftCtx.moveTo(lectureDraftLastX, lectureDraftLastY);
-            lectureDraftCtx.lineTo(x, y);
-            
             if (lectureDraftEraserEnabled) {
                 lectureDraftCtx.globalCompositeOperation = 'destination-out';
                 lectureDraftCtx.strokeStyle = 'rgba(0,0,0,1)';
@@ -15839,7 +15970,7 @@ ${i18n('prompt_lecture_gen')}`;
             }
             lectureDraftCtx.lineCap = 'round';
             lectureDraftCtx.lineJoin = 'round';
-            lectureDraftCtx.stroke();
+            drawCanvasSegment(lectureDraftCtx, lectureDraftLastX, lectureDraftLastY, x, y);
             
             lectureDraftLastX = x;
             lectureDraftLastY = y;
@@ -15863,6 +15994,11 @@ ${i18n('prompt_lecture_gen')}`;
             const rect = lectureDraftCanvas.getBoundingClientRect();
             lectureDraftLastX = e.clientX - rect.left;
             lectureDraftLastY = e.clientY - rect.top;
+            if (isWritingLatencyOptimizationEnabled() && lectureDraftPenEnabled && !lectureDraftEraserEnabled) {
+                lectureDraftCtx.globalCompositeOperation = 'source-over';
+                lectureDraftCtx.fillStyle = lectureDraftPenColor;
+                drawCanvasDot(lectureDraftCtx, lectureDraftLastX, lectureDraftLastY, lectureDraftPenSize);
+            }
         }
 
         function doLectureDraftDraw(e) {
@@ -15870,10 +16006,6 @@ ${i18n('prompt_lecture_gen')}`;
             const rect = lectureDraftCanvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
-            
-            lectureDraftCtx.beginPath();
-            lectureDraftCtx.moveTo(lectureDraftLastX, lectureDraftLastY);
-            lectureDraftCtx.lineTo(x, y);
             
             if (lectureDraftEraserEnabled) {
                 lectureDraftCtx.globalCompositeOperation = 'destination-out';
@@ -15886,7 +16018,7 @@ ${i18n('prompt_lecture_gen')}`;
             }
             lectureDraftCtx.lineCap = 'round';
             lectureDraftCtx.lineJoin = 'round';
-            lectureDraftCtx.stroke();
+            drawCanvasSegment(lectureDraftCtx, lectureDraftLastX, lectureDraftLastY, x, y);
             
             lectureDraftLastX = x;
             lectureDraftLastY = y;
@@ -20329,33 +20461,43 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                 exLastY = e.clientY - rect.top;
                 exCanvasCtx.beginPath();
                 exCanvasCtx.moveTo(exLastX, exLastY);
+                if (isWritingLatencyOptimizationEnabled() && !exEraserMode) {
+                    exCanvasCtx.globalCompositeOperation = 'source-over';
+                    exCanvasCtx.fillStyle = exPenColor;
+                    drawCanvasDot(exCanvasCtx, exLastX, exLastY, 1);
+                    exCanvasCtx.beginPath();
+                    exCanvasCtx.moveTo(exLastX, exLastY);
+                }
             };
 
             canvas.onpointermove = (e) => {
                 if (!exDrawing) return;
                 e.preventDefault();
                 const rect = canvas.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
-                if (exEraserMode) {
-                    exCanvasCtx.save();
-                    exCanvasCtx.globalCompositeOperation = 'destination-out';
-                    exCanvasCtx.lineWidth = 20;
-                    exCanvasCtx.strokeStyle = 'rgba(0,0,0,1)';
-                    exCanvasCtx.lineTo(x, y);
-                    exCanvasCtx.stroke();
-                    exCanvasCtx.restore();
-                } else {
-                    exCanvasCtx.strokeStyle = exPenColor;
-                    exCanvasCtx.lineWidth = 2;
-                    exCanvasCtx.globalCompositeOperation = 'source-over';
-                    exCanvasCtx.lineTo(x, y);
-                    exCanvasCtx.stroke();
+                const samples = getPointerSamples(e);
+                for (const sample of samples) {
+                    const x = sample.clientX - rect.left;
+                    const y = sample.clientY - rect.top;
+                    if (exEraserMode) {
+                        exCanvasCtx.save();
+                        exCanvasCtx.globalCompositeOperation = 'destination-out';
+                        exCanvasCtx.lineWidth = 20;
+                        exCanvasCtx.strokeStyle = 'rgba(0,0,0,1)';
+                        exCanvasCtx.lineTo(x, y);
+                        exCanvasCtx.stroke();
+                        exCanvasCtx.restore();
+                    } else {
+                        exCanvasCtx.strokeStyle = exPenColor;
+                        exCanvasCtx.lineWidth = 2;
+                        exCanvasCtx.globalCompositeOperation = 'source-over';
+                        exCanvasCtx.lineTo(x, y);
+                        exCanvasCtx.stroke();
+                    }
+                    exCanvasCtx.beginPath();
+                    exCanvasCtx.moveTo(x, y);
+                    exLastX = x;
+                    exLastY = y;
                 }
-                exCanvasCtx.beginPath();
-                exCanvasCtx.moveTo(x, y);
-                exLastX = x;
-                exLastY = y;
             };
 
             canvas.onpointerup = (e) => {
