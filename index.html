@@ -5075,6 +5075,23 @@
                 </div>
             </div>
 
+            <div class="setting-item">
+                <div class="setting-item-left">
+                    <div class="setting-item-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h8l-1 8 10-12h-8l1-8z"/></svg>
+                    </div>
+                    <div>
+                        <div class="setting-item-label" data-i18n="optimize_writing_latency">优化书写延迟</div>
+                        <div class="setting-item-desc" data-i18n="optimize_writing_latency_desc">习题页手写直渲染，降低墨水屏书写延迟</div>
+                    </div>
+                </div>
+                <div class="setting-item-right">
+                    <div class="toggle" id="writingLatencyToggle" onclick="toggleWritingLatencyOptimization()">
+                        <div class="toggle-knob"></div>
+                    </div>
+                </div>
+            </div>
+
             <div class="setting-item" onclick="manualRequestPersist()">
                 <div class="setting-item-left">
                     <div class="setting-item-icon">
@@ -5833,6 +5850,8 @@
                 apple_pencil:'Apple Pencil 模式',apple_pencil_desc:'仅 Pencil 书写，手指仅翻页缩放',
                 eink_mode:'墨水屏模式',eink_mode_desc:'点击屏幕翻页，适合墨水屏设备',
                 toast_eink_on:'墨水屏模式已开启',toast_eink_off:'墨水屏模式已关闭',
+                optimize_writing_latency:'优化书写延迟',optimize_writing_latency_desc:'习题页手写直渲染，降低墨水屏书写延迟',
+                toast_writing_latency_on:'书写延迟优化已开启（习题页生效）',toast_writing_latency_off:'书写延迟优化已关闭',
                 eink_prev_page:'上一页',eink_next_page:'下一页',eink_page_indicator:'第 {0} 页 / 共 {1} 页',
                 storage_persist:'存储持久化',storage_persist_checking:'检测中…',storage_persist_btn:'请求授权',
                 ai_settings:'AI 设置',ai_avatar:'AI 头像',ai_name_label:'AI 名称',
@@ -6010,6 +6029,8 @@
                 apple_pencil:'Apple Pencil Mode',apple_pencil_desc:'Only Pencil writes; finger scrolls/zooms',
                 eink_mode:'E-Ink Mode',eink_mode_desc:'Tap screen to turn pages, for e-ink devices',
                 toast_eink_on:'E-Ink mode enabled',toast_eink_off:'E-Ink mode disabled',
+                optimize_writing_latency:'Optimize Writing Latency',optimize_writing_latency_desc:'Low-latency handwriting on exercise pages, for e-ink devices',
+                toast_writing_latency_on:'Writing latency optimization enabled (exercise pages)',toast_writing_latency_off:'Writing latency optimization disabled',
                 eink_prev_page:'Previous',eink_next_page:'Next',eink_page_indicator:'Page {0} / {1}',
                 storage_persist:'Storage Persistence',storage_persist_checking:'Checking…',storage_persist_btn:'Request Permission',
                 ai_settings:'AI Settings',ai_avatar:'AI Avatar',ai_name_label:'AI Name',
@@ -6187,6 +6208,8 @@
                 apple_pencil:'Mode Apple Pencil',apple_pencil_desc:'Seul le Pencil écrit ; le doigt fait défiler/zoom',
                 eink_mode:'Mode E-Ink',eink_mode_desc:'Touchez l\'écran pour tourner les pages',
                 toast_eink_on:'Mode E-Ink activé',toast_eink_off:'Mode E-Ink désactivé',
+                optimize_writing_latency:'Optimiser la latence d’écriture',optimize_writing_latency_desc:'Tracé manuscrit basse latence dans les exercices (e-ink)',
+                toast_writing_latency_on:'Optimisation de la latence d’écriture activée (exercices)',toast_writing_latency_off:'Optimisation de la latence d’écriture désactivée',
                 eink_prev_page:'Précédent',eink_next_page:'Suivant',eink_page_indicator:'Page {0} / {1}',
                 storage_persist:'Persistance du stockage',storage_persist_checking:'Vérification…',storage_persist_btn:'Demander l\'autorisation',
                 ai_settings:'Paramètres IA',ai_avatar:'Avatar IA',ai_name_label:'Nom de l\'IA',
@@ -10489,6 +10512,13 @@
             document.body.classList.toggle('eink-mode', einkMode);
             setupEinkReaderTapZones();
             setupEinkLectureTapZones();
+
+            // 优化书写延迟（仅本地存储，不参与云同步）
+            try {
+                optimizeWritingLatency = localStorage.getItem('optimizeWritingLatency') === 'true';
+            } catch(e) { optimizeWritingLatency = false; }
+            const wlToggle = document.getElementById('writingLatencyToggle');
+            if (wlToggle) wlToggle.classList.toggle('on', optimizeWritingLatency);
         }
 
         function saveSettings() {
@@ -10956,6 +10986,27 @@
             setupEinkReaderTapZones();
             setupEinkLectureTapZones();
             showToast(einkMode ? i18n('toast_eink_on') : i18n('toast_eink_off'));
+        }
+
+        // ==================== 优化书写延迟 ====================
+        function toggleWritingLatencyOptimization() {
+            optimizeWritingLatency = !optimizeWritingLatency;
+            const toggle = document.getElementById('writingLatencyToggle');
+            if (toggle) toggle.classList.toggle('on', optimizeWritingLatency);
+            // 仅存储在 localStorage，不参与云同步
+            try {
+                localStorage.setItem('optimizeWritingLatency', optimizeWritingLatency ? 'true' : 'false');
+            } catch(e) {}
+            // 习题书写画布若已打开，先保存笔迹再按新模式重建，开关即时生效
+            if (exDoingState && exDoingState.questions && exCanvasCtx) {
+                const q = exDoingState.questions[exDoingState.questionIndex];
+                if (q && (!exDoingState.isWrong || q._redoing)) {
+                    saveCurrentDrawingToCache();
+                    initExCanvas();
+                    restoreDrawingFromCache();
+                }
+            }
+            showToast(optimizeWritingLatency ? i18n('toast_writing_latency_on') : i18n('toast_writing_latency_off'));
         }
 
         function setupEinkReaderTapZones() {
@@ -14948,6 +14999,8 @@ ${i18n('prompt_lecture_gen')}`;
         let applePencilMode = false;
         // 墨水屏模式（仅本地存储，不云同步）
         let einkMode = false;
+        // 优化书写延迟（仅本地存储，不云同步；当前仅习题页书写画布生效）
+        let optimizeWritingLatency = false;
         let einkLectureCurrentPage = 0;
         let einkLectureTotalPages = 1;
         // 讲义双指滑动支持
@@ -20297,14 +20350,204 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
             }
         }
 
+        // ==================== 优化书写延迟（仅开关开启时启用，不影响默认书写路径） ====================
+        function exLowLatencyEnabled() {
+            return optimizeWritingLatency === true;
+        }
+
+        // 低延迟模式撤销历史上限（canvas 快照驻留显存，需要限制深度）
+        const EX_LOWLAT_HISTORY_MAX = 10;
+
+        // desynchronized 读回自检结果缓存：true 表示该设备读回异常，永久回退标准上下文
+        let exDesyncReadbackBroken = false;
+
+        // 同一 canvas 元素的 getContext 属性在首次调用后固定，
+        // 切换 desynchronized 模式时必须替换节点才能拿到新属性的上下文
+        function exReplaceCanvasNode(oldCanvas) {
+            const fresh = oldCanvas.cloneNode(false);
+            oldCanvas.parentNode.replaceChild(fresh, oldCanvas);
+            return fresh;
+        }
+
+        // 自检：desynchronized 上下文在个别 GPU 路径上 getImageData/toDataURL 读回为空，
+        // 会导致撤销与答案图片丢失，检测到则放弃 desynchronized（事件层优化仍保留）
+        function exVerifyCtxReadback(ctx) {
+            try {
+                ctx.save();
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0, 0, 1, 1);
+                const ok = ctx.getImageData(0, 0, 1, 1).data[3] > 0;
+                ctx.clearRect(0, 0, 1, 1);
+                ctx.restore();
+                return ok;
+            } catch(err) {
+                try { ctx.restore(); } catch(e2) {}
+                return false;
+            }
+        }
+
+        // 画一段到 (x, y)：笔/橡皮参数与默认路径完全一致
+        function exDrawSegmentTo(x, y) {
+            if (!exCanvasCtx) return;
+            if (exEraserMode) {
+                exCanvasCtx.save();
+                exCanvasCtx.globalCompositeOperation = 'destination-out';
+                exCanvasCtx.lineWidth = 20;
+                exCanvasCtx.strokeStyle = 'rgba(0,0,0,1)';
+                exCanvasCtx.lineTo(x, y);
+                exCanvasCtx.stroke();
+                exCanvasCtx.restore();
+            } else {
+                exCanvasCtx.strokeStyle = exPenColor;
+                exCanvasCtx.lineWidth = 2;
+                exCanvasCtx.globalCompositeOperation = 'source-over';
+                exCanvasCtx.lineTo(x, y);
+                exCanvasCtx.stroke();
+            }
+            exCanvasCtx.beginPath();
+            exCanvasCtx.moveTo(x, y);
+            exLastX = x;
+            exLastY = y;
+        }
+
+        // 撤销快照：低延迟模式用离屏 canvas（GPU 内拷贝，避免每笔抬笔时
+        // getImageData 整幅 GPU→CPU 同步读回阻塞主线程），默认模式仍用 ImageData
+        function exCaptureState(canvas) {
+            if (exLowLatencyEnabled()) {
+                const snap = document.createElement('canvas');
+                snap.width = canvas.width;
+                snap.height = canvas.height;
+                snap.getContext('2d').drawImage(canvas, 0, 0);
+                return snap;
+            }
+            return exCanvasCtx.getImageData(0, 0, canvas.width, canvas.height);
+        }
+
+        function exRestoreState(canvas, state) {
+            if (state instanceof ImageData) {
+                exCanvasCtx.putImageData(state, 0, 0);
+            } else {
+                exCanvasCtx.save();
+                exCanvasCtx.setTransform(1, 0, 0, 1, 0, 0);
+                exCanvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+                exCanvasCtx.drawImage(state, 0, 0);
+                exCanvasCtx.restore();
+            }
+        }
+
+        // 低延迟事件绑定：
+        // - pointerrawupdate（若支持）以输入原始频率立即落墨，不等渲染帧对齐
+        // - pointermove 兜底：rawupdate 未生效时照常绘制，保证任何设备都能书写
+        // - getCoalescedEvents 补全两次事件间的全部采样点，快写不断线
+        // - rect 按笔画缓存，避免每个移动事件强制同步布局
+        // - setPointerCapture + 单指针跟踪：出边界不断笔，并忽略书写中的第二触点
+        function setupLowLatencyExCanvas(canvas) {
+            if (canvas._exLowLatCleanup) { canvas._exLowLatCleanup(); canvas._exLowLatCleanup = null; }
+            let activeId = null;
+            let rawSeen = false;
+            let rect = null;
+
+            const drawFromEvent = (ev) => {
+                const x = ev.clientX - rect.left;
+                const y = ev.clientY - rect.top;
+                if (!isFinite(x) || !isFinite(y)) return;
+                exDrawSegmentTo(x, y);
+            };
+
+            const drawMove = (e) => {
+                let events = null;
+                try {
+                    events = typeof e.getCoalescedEvents === 'function' ? e.getCoalescedEvents() : null;
+                } catch(err) {}
+                if (events && events.length) {
+                    for (const ev of events) drawFromEvent(ev);
+                } else {
+                    drawFromEvent(e);
+                }
+            };
+
+            const onDown = (e) => {
+                if (activeId !== null) return;
+                e.preventDefault();
+                activeId = e.pointerId;
+                rawSeen = false;
+                rect = canvas.getBoundingClientRect();
+                try { canvas.setPointerCapture(e.pointerId); } catch(err) {}
+                exDrawing = true;
+                exLastX = e.clientX - rect.left;
+                exLastY = e.clientY - rect.top;
+                exCanvasCtx.beginPath();
+                exCanvasCtx.moveTo(exLastX, exLastY);
+            };
+
+            const onRaw = (e) => {
+                if (!exDrawing || e.pointerId !== activeId) return;
+                rawSeen = true;
+                drawMove(e);
+            };
+
+            const onMove = (e) => {
+                if (!exDrawing || e.pointerId !== activeId) return;
+                if (rawSeen) return; // rawupdate 已实时绘制，避免重复落墨
+                e.preventDefault();
+                drawMove(e);
+            };
+
+            const onEnd = (e) => {
+                if (activeId === null || e.pointerId !== activeId) return;
+                activeId = null;
+                if (exDrawing) {
+                    exDrawing = false;
+                    exSaveSnapshot();
+                }
+            };
+
+            const hasRaw = typeof window !== 'undefined' && 'onpointerrawupdate' in window;
+            canvas.addEventListener('pointerdown', onDown);
+            if (hasRaw) canvas.addEventListener('pointerrawupdate', onRaw);
+            canvas.addEventListener('pointermove', onMove);
+            canvas.addEventListener('pointerup', onEnd);
+            canvas.addEventListener('pointercancel', onEnd);
+            canvas.addEventListener('lostpointercapture', onEnd);
+            canvas._exLowLatCleanup = () => {
+                canvas.removeEventListener('pointerdown', onDown);
+                if (hasRaw) canvas.removeEventListener('pointerrawupdate', onRaw);
+                canvas.removeEventListener('pointermove', onMove);
+                canvas.removeEventListener('pointerup', onEnd);
+                canvas.removeEventListener('pointercancel', onEnd);
+                canvas.removeEventListener('lostpointercapture', onEnd);
+            };
+        }
+
         function initExCanvas() {
-            const canvas = document.getElementById('exerciseDoingCanvas');
+            let canvas = document.getElementById('exerciseDoingCanvas');
             const wrap = canvas.parentElement;
+            const lowLatency = exLowLatencyEnabled();
+            const ctxMode = lowLatency ? 'lowlat' : 'std';
+            if (canvas._exCtxMode && canvas._exCtxMode !== ctxMode) {
+                canvas = exReplaceCanvasNode(canvas);
+            }
             canvas.width = wrap.clientWidth * 2;
             canvas.height = wrap.clientHeight * 2;
             canvas.style.width = wrap.clientWidth + 'px';
             canvas.style.height = wrap.clientHeight + 'px';
-            exCanvasCtx = canvas.getContext('2d');
+            if (lowLatency && !exDesyncReadbackBroken) {
+                // desynchronized：绘制结果绕过合成器队列直接上屏，是降低落墨延迟的关键
+                exCanvasCtx = canvas.getContext('2d', { desynchronized: true });
+                if (!exVerifyCtxReadback(exCanvasCtx)) {
+                    exDesyncReadbackBroken = true;
+                    canvas = exReplaceCanvasNode(canvas);
+                    canvas.width = wrap.clientWidth * 2;
+                    canvas.height = wrap.clientHeight * 2;
+                    canvas.style.width = wrap.clientWidth + 'px';
+                    canvas.style.height = wrap.clientHeight + 'px';
+                    exCanvasCtx = canvas.getContext('2d');
+                }
+            } else {
+                exCanvasCtx = canvas.getContext('2d');
+            }
+            canvas._exCtxMode = ctxMode;
             exCanvasCtx.scale(2, 2);
             exCanvasCtx.lineCap = 'round';
             exCanvasCtx.lineJoin = 'round';
@@ -20320,6 +20563,15 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
             canvas.onpointerdown = null;
             canvas.onpointermove = null;
             canvas.onpointerup = null;
+
+            if (lowLatency) {
+                setupLowLatencyExCanvas(canvas);
+                if (!canvas._exTouchGuardAdded) {
+                    canvas.addEventListener('touchstart', (e) => { e.preventDefault(); }, { passive: false });
+                    canvas._exTouchGuardAdded = true;
+                }
+                return;
+            }
 
             canvas.onpointerdown = (e) => {
                 e.preventDefault();
@@ -20378,8 +20630,11 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
         function exSaveSnapshot() {
             const canvas = document.getElementById('exerciseDoingCanvas');
             if (!canvas || !exCanvasCtx) return;
-            const snapshot = exCanvasCtx.getImageData(0, 0, canvas.width, canvas.height);
+            const snapshot = exCaptureState(canvas);
             exStrokeHistory.push(snapshot);
+            if (exLowLatencyEnabled() && exStrokeHistory.length > EX_LOWLAT_HISTORY_MAX) {
+                exStrokeHistory.shift();
+            }
             exRedoStack = [];
             updateExUndoRedoButtons();
         }
@@ -20388,10 +20643,10 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
             if (exStrokeHistory.length === 0) return;
             const canvas = document.getElementById('exerciseDoingCanvas');
             if (!canvas || !exCanvasCtx) return;
-            const current = exCanvasCtx.getImageData(0, 0, canvas.width, canvas.height);
+            const current = exCaptureState(canvas);
             exRedoStack.push(current);
             const prev = exStrokeHistory.pop();
-            exCanvasCtx.putImageData(prev, 0, 0);
+            exRestoreState(canvas, prev);
             updateExUndoRedoButtons();
         }
 
@@ -20399,10 +20654,10 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
             if (exRedoStack.length === 0) return;
             const canvas = document.getElementById('exerciseDoingCanvas');
             if (!canvas || !exCanvasCtx) return;
-            const current = exCanvasCtx.getImageData(0, 0, canvas.width, canvas.height);
+            const current = exCaptureState(canvas);
             exStrokeHistory.push(current);
             const next = exRedoStack.pop();
-            exCanvasCtx.putImageData(next, 0, 0);
+            exRestoreState(canvas, next);
             updateExUndoRedoButtons();
         }
 
