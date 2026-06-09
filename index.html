@@ -8724,14 +8724,12 @@
                     strokeHistory.pop();
                     // 优化：延迟快照可能还未完成，强制解析
                     if (optimizePenLatency && top._snapshotPending) {
-                        try {
-                            if (top._idleHandle) {
-                                if (typeof cancelIdleCallback === 'function') cancelIdleCallback(top._idleHandle);
-                                else clearTimeout(top._idleHandle);
-                            }
-                            top.imageData = annoCtx.getImageData(0, 0, annoCanvas.width, annoCanvas.height);
-                            top._snapshotPending = false;
-                        } catch(err) { top._snapshotPending = false; }
+                        if (top._idleHandle) {
+                            if (typeof cancelIdleCallback === 'function') cancelIdleCallback(top._idleHandle);
+                            else clearTimeout(top._idleHandle);
+                        }
+                        top.imageData = annoCtx.getImageData(0, 0, annoCanvas.width, annoCanvas.height);
+                        top._snapshotPending = false;
                     }
                     if (top.imageData) {
                         annoCtx.putImageData(top.imageData, 0, 0);
@@ -8790,38 +8788,32 @@
 
                 // 优化：在第一次 pointermove 时解析延迟的 undo 快照（此时 canvas 还未被绘制）
                 if (optimizePenLatency) {
-                    try {
-                        const top = strokeHistory[strokeHistory.length - 1];
-                        if (top && top._snapshotPending && top.annoCanvas === annoCanvas) {
-                            if (top._idleHandle) {
-                                if (typeof cancelIdleCallback === 'function') cancelIdleCallback(top._idleHandle);
-                                else clearTimeout(top._idleHandle);
-                            }
-                            top.imageData = annoCtx.getImageData(0, 0, annoCanvas.width, annoCanvas.height);
-                            top._snapshotPending = false;
+                    const top = strokeHistory[strokeHistory.length - 1];
+                    if (top && top._snapshotPending && top.annoCanvas === annoCanvas) {
+                        if (top._idleHandle) {
+                            if (typeof cancelIdleCallback === 'function') cancelIdleCallback(top._idleHandle);
+                            else clearTimeout(top._idleHandle);
                         }
-                    } catch(err) {}
+                        top.imageData = annoCtx.getImageData(0, 0, annoCanvas.width, annoCanvas.height);
+                        top._snapshotPending = false;
+                    }
                 }
 
                 // 优化：使用 getCoalescedEvents 获取所有中间点，绘制更平滑的笔画
-                if (optimizePenLatency) {
-                    try {
-                        const events = (typeof e.getCoalescedEvents === 'function') ? e.getCoalescedEvents() : null;
-                        if (events && events.length > 0) {
-                            annoCtx.beginPath();
-                            annoCtx.moveTo(lastX, lastY);
-                            for (const ce of events) {
-                                if (ce.clientX == null || ce.clientY == null) continue;
-                                const p = pointerToCanvasXY(ce);
-                                if (!isFinite(p.x) || !isFinite(p.y)) continue;
-                                annoCtx.lineTo(p.x, p.y);
-                                lastX = p.x; lastY = p.y;
-                            }
-                            annoCtx.stroke();
-                            e.preventDefault();
-                            return;
+                if (optimizePenLatency && typeof e.getCoalescedEvents === 'function') {
+                    const events = e.getCoalescedEvents();
+                    if (events && events.length > 0) {
+                        annoCtx.beginPath();
+                        annoCtx.moveTo(lastX, lastY);
+                        for (const ce of events) {
+                            const p = pointerToCanvasXY(ce);
+                            annoCtx.lineTo(p.x, p.y);
+                            lastX = p.x; lastY = p.y;
                         }
-                    } catch(err) {}
+                        annoCtx.stroke();
+                        e.preventDefault();
+                        return;
+                    }
                 }
 
                 const p = pointerToCanvasXY(e);
@@ -9335,12 +9327,10 @@
         function saveDrawingForPage(pageNum, annoCanvas) {
             if (!currentDoc || !annoCanvas) return;
             if (optimizePenLatency) {
-                try {
-                    if (_pendingSaveDrawing && _pendingSaveDrawing.annoCanvas === annoCanvas) {
-                        if (typeof cancelIdleCallback === 'function') cancelIdleCallback(_pendingSaveDrawing.handle);
-                        else clearTimeout(_pendingSaveDrawing.handle);
-                    }
-                } catch(err) {}
+                if (_pendingSaveDrawing && _pendingSaveDrawing.annoCanvas === annoCanvas) {
+                    if (typeof cancelIdleCallback === 'function') cancelIdleCallback(_pendingSaveDrawing.handle);
+                    else clearTimeout(_pendingSaveDrawing.handle);
+                }
                 const docId = currentDoc.id;
                 const doSave = () => {
                     _pendingSaveDrawing = null;
@@ -9404,7 +9394,7 @@
                 entry._snapshotPending = true;
                 const captureSnapshot = () => {
                     if (entry._snapshotPending) {
-                        try { entry.imageData = ctx.getImageData(0, 0, w, h); } catch(err) {}
+                        entry.imageData = ctx.getImageData(0, 0, w, h);
                         entry._snapshotPending = false;
                     }
                 };
@@ -9432,14 +9422,12 @@
             }
             // 优化：如果延迟快照还未完成，强制解析
             if (entry._snapshotPending) {
-                try {
-                    if (entry._idleHandle) {
-                        if (typeof cancelIdleCallback === 'function') cancelIdleCallback(entry._idleHandle);
-                        else clearTimeout(entry._idleHandle);
-                    }
-                    const c = canvas.getContext('2d');
-                    entry.imageData = c.getImageData(0, 0, canvas.width, canvas.height);
-                } catch(err) {}
+                if (entry._idleHandle) {
+                    if (typeof cancelIdleCallback === 'function') cancelIdleCallback(entry._idleHandle);
+                    else clearTimeout(entry._idleHandle);
+                }
+                const c = canvas.getContext('2d');
+                entry.imageData = c.getImageData(0, 0, canvas.width, canvas.height);
                 entry._snapshotPending = false;
             }
             if (!entry.imageData) {
@@ -10246,18 +10234,13 @@
                     lx = x; ly = y;
                 }
 
-                if (optimizePenLatency) {
-                    try {
-                        const events = (typeof e.getCoalescedEvents === 'function') ? e.getCoalescedEvents() : null;
-                        if (events && events.length > 0) {
-                            for (const ce of events) {
-                                if (ce.clientX == null || ce.clientY == null) continue;
-                                drawNotePoint(ce);
-                            }
-                            e.preventDefault();
-                            return;
-                        }
-                    } catch(err) {}
+                if (optimizePenLatency && typeof e.getCoalescedEvents === 'function') {
+                    const events = e.getCoalescedEvents();
+                    if (events && events.length > 0) {
+                        for (const ce of events) drawNotePoint(ce);
+                        e.preventDefault();
+                        return;
+                    }
                 }
                 drawNotePoint(e);
                 e.preventDefault();
@@ -15575,24 +15558,20 @@ ${i18n('prompt_lecture_gen')}`;
             }
 
             // 优化：使用 getCoalescedEvents 获取所有中间点
-            if (optimizePenLatency) {
-                try {
-                    const events = (typeof e.getCoalescedEvents === 'function') ? e.getCoalescedEvents() : null;
-                    if (events && events.length > 0) {
-                        for (const ce of events) {
-                            if (ce.clientX == null || ce.clientY == null) continue;
-                            const pt = _lecturePointerToXY(ce);
-                            if (!isFinite(pt.x) || !isFinite(pt.y)) continue;
-                            drawLecturePenLine(lecturePenLastX, lecturePenLastY, pt.x, pt.y);
-                            if (lectureCurrentStroke) {
-                                lectureCurrentStroke.points.push({x: pt.x, y: pt.y});
-                            }
-                            lecturePenLastX = pt.x;
-                            lecturePenLastY = pt.y;
+            if (optimizePenLatency && typeof e.getCoalescedEvents === 'function') {
+                const events = e.getCoalescedEvents();
+                if (events && events.length > 0) {
+                    for (const ce of events) {
+                        const pt = _lecturePointerToXY(ce);
+                        drawLecturePenLine(lecturePenLastX, lecturePenLastY, pt.x, pt.y);
+                        if (lectureCurrentStroke) {
+                            lectureCurrentStroke.points.push({x: pt.x, y: pt.y});
                         }
-                        return;
+                        lecturePenLastX = pt.x;
+                        lecturePenLastY = pt.y;
                     }
-                } catch(err) {}
+                    return;
+                }
             }
 
             const pt = _lecturePointerToXY(e);
@@ -20642,17 +20621,12 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                     exLastY = y;
                 }
 
-                if (optimizePenLatency) {
-                    try {
-                        const events = (typeof e.getCoalescedEvents === 'function') ? e.getCoalescedEvents() : null;
-                        if (events && events.length > 0) {
-                            for (const ce of events) {
-                                if (ce.clientX == null || ce.clientY == null) continue;
-                                drawExPoint(ce.clientX, ce.clientY);
-                            }
-                            return;
-                        }
-                    } catch(err) {}
+                if (optimizePenLatency && typeof e.getCoalescedEvents === 'function') {
+                    const events = e.getCoalescedEvents();
+                    if (events && events.length > 0) {
+                        for (const ce of events) drawExPoint(ce.clientX, ce.clientY);
+                        return;
+                    }
                 }
                 drawExPoint(e.clientX, e.clientY);
             };
