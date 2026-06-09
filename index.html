@@ -985,6 +985,9 @@
         }
 
         /* ==================== E-Ink Mode ==================== */
+        body.eink-mode .annotation-canvas {
+            will-change: contents;
+        }
         body.eink-mode .reader-container {
             overflow: hidden !important;
         }
@@ -5075,6 +5078,23 @@
                 </div>
             </div>
 
+            <div class="setting-item">
+                <div class="setting-item-left">
+                    <div class="setting-item-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                    </div>
+                    <div>
+                        <div class="setting-item-label" data-i18n="optimize_pen_latency">优化书写延迟</div>
+                        <div class="setting-item-desc" data-i18n="optimize_pen_latency_desc">降低墨水屏等设备的笔迹延迟</div>
+                    </div>
+                </div>
+                <div class="setting-item-right">
+                    <div class="toggle" id="optimizePenLatencyToggle" onclick="toggleOptimizePenLatency()">
+                        <div class="toggle-knob"></div>
+                    </div>
+                </div>
+            </div>
+
             <div class="setting-item" onclick="manualRequestPersist()">
                 <div class="setting-item-left">
                     <div class="setting-item-icon">
@@ -5833,6 +5853,8 @@
                 apple_pencil:'Apple Pencil 模式',apple_pencil_desc:'仅 Pencil 书写，手指仅翻页缩放',
                 eink_mode:'墨水屏模式',eink_mode_desc:'点击屏幕翻页，适合墨水屏设备',
                 toast_eink_on:'墨水屏模式已开启',toast_eink_off:'墨水屏模式已关闭',
+                optimize_pen_latency:'优化书写延迟',optimize_pen_latency_desc:'降低墨水屏等设备的笔迹延迟',
+                toast_pen_latency_on:'书写延迟优化已开启',toast_pen_latency_off:'书写延迟优化已关闭',
                 eink_prev_page:'上一页',eink_next_page:'下一页',eink_page_indicator:'第 {0} 页 / 共 {1} 页',
                 storage_persist:'存储持久化',storage_persist_checking:'检测中…',storage_persist_btn:'请求授权',
                 ai_settings:'AI 设置',ai_avatar:'AI 头像',ai_name_label:'AI 名称',
@@ -6010,6 +6032,8 @@
                 apple_pencil:'Apple Pencil Mode',apple_pencil_desc:'Only Pencil writes; finger scrolls/zooms',
                 eink_mode:'E-Ink Mode',eink_mode_desc:'Tap screen to turn pages, for e-ink devices',
                 toast_eink_on:'E-Ink mode enabled',toast_eink_off:'E-Ink mode disabled',
+                optimize_pen_latency:'Optimize Pen Latency',optimize_pen_latency_desc:'Reduce writing latency for e-ink devices',
+                toast_pen_latency_on:'Pen latency optimization enabled',toast_pen_latency_off:'Pen latency optimization disabled',
                 eink_prev_page:'Previous',eink_next_page:'Next',eink_page_indicator:'Page {0} / {1}',
                 storage_persist:'Storage Persistence',storage_persist_checking:'Checking…',storage_persist_btn:'Request Permission',
                 ai_settings:'AI Settings',ai_avatar:'AI Avatar',ai_name_label:'AI Name',
@@ -6187,6 +6211,8 @@
                 apple_pencil:'Mode Apple Pencil',apple_pencil_desc:'Seul le Pencil écrit ; le doigt fait défiler/zoom',
                 eink_mode:'Mode E-Ink',eink_mode_desc:'Touchez l\'écran pour tourner les pages',
                 toast_eink_on:'Mode E-Ink activé',toast_eink_off:'Mode E-Ink désactivé',
+                optimize_pen_latency:'Optimiser la latence du stylet',optimize_pen_latency_desc:'Réduire la latence d\'écriture pour les appareils e-ink',
+                toast_pen_latency_on:'Optimisation de la latence activée',toast_pen_latency_off:'Optimisation de la latence désactivée',
                 eink_prev_page:'Précédent',eink_next_page:'Suivant',eink_page_indicator:'Page {0} / {1}',
                 storage_persist:'Persistance du stockage',storage_persist_checking:'Vérification…',storage_persist_btn:'Demander l\'autorisation',
                 ai_settings:'Paramètres IA',ai_avatar:'Avatar IA',ai_name_label:'Nom de l\'IA',
@@ -7623,7 +7649,9 @@
 
         function initDraftCanvas() {
             draftCanvas = document.getElementById('draftCanvas');
-            draftCtx = draftCanvas.getContext('2d');
+            draftCtx = optimizePenLatency
+                ? draftCanvas.getContext('2d', { desynchronized: true, willReadFrequently: true })
+                : draftCanvas.getContext('2d');
             
             // 绑定事件（只绑定一次）
             if (!draftCanvas.bindedEvents) {
@@ -7686,6 +7714,7 @@
         let draftPanActive = false;
         let draftPanLastX = 0;
         let draftPanLastY = 0;
+        let _draftCachedRect = null;
 
         function handleDraftTouchStart(e) {
             if (!draftPenEnabled && !draftEraserEnabled) return;
@@ -7694,6 +7723,7 @@
                 e.preventDefault();
                 e.stopPropagation();
                 draftDrawing = false;
+                _draftCachedRect = null;
                 draftPanActive = true;
                 const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
                 const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
@@ -7705,11 +7735,12 @@
             e.preventDefault();
             const touch = e.touches[0];
             const rect = draftCanvas.getBoundingClientRect();
+            if (optimizePenLatency) _draftCachedRect = rect;
             draftDrawing = true;
             draftLastX = touch.clientX - rect.left;
             draftLastY = touch.clientY - rect.top;
         }
-        
+
         function handleDraftTouchMove(e) {
             if (e.touches.length === 2 && draftPanActive) {
                 e.preventDefault();
@@ -7731,14 +7762,14 @@
             if (e.touches.length !== 1) return;
             e.preventDefault();
             const touch = e.touches[0];
-            const rect = draftCanvas.getBoundingClientRect();
+            const rect = (optimizePenLatency && _draftCachedRect) ? _draftCachedRect : draftCanvas.getBoundingClientRect();
             const x = touch.clientX - rect.left;
             const y = touch.clientY - rect.top;
-            
+
             draftCtx.beginPath();
             draftCtx.moveTo(draftLastX, draftLastY);
             draftCtx.lineTo(x, y);
-            
+
             if (draftEraserEnabled) {
                 draftCtx.globalCompositeOperation = 'destination-out';
                 draftCtx.strokeStyle = 'rgba(0,0,0,1)';
@@ -7751,17 +7782,18 @@
             draftCtx.lineCap = 'round';
             draftCtx.lineJoin = 'round';
             draftCtx.stroke();
-            
+
             draftLastX = x;
             draftLastY = y;
         }
-        
+
         function handleDraftTouchEnd(e) {
             if (e.touches.length < 2) {
                 draftPanActive = false;
             }
             if (draftDrawing) {
                 draftDrawing = false;
+                _draftCachedRect = null;
                 draftCtx.globalCompositeOperation = 'source-over';
                 saveDraftCanvasState();
                 debouncedSaveDraft();
@@ -7773,6 +7805,7 @@
             e.preventDefault();
             draftDrawing = true;
             const rect = draftCanvas.getBoundingClientRect();
+            if (optimizePenLatency) _draftCachedRect = rect;
             draftLastX = e.clientX - rect.left;
             draftLastY = e.clientY - rect.top;
         }
@@ -7780,14 +7813,14 @@
         function doDraftDraw(e) {
             if (!draftDrawing || (!draftPenEnabled && !draftEraserEnabled)) return;
             e.preventDefault();
-            const rect = draftCanvas.getBoundingClientRect();
+            const rect = (optimizePenLatency && _draftCachedRect) ? _draftCachedRect : draftCanvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
-            
+
             draftCtx.beginPath();
             draftCtx.moveTo(draftLastX, draftLastY);
             draftCtx.lineTo(x, y);
-            
+
             if (draftEraserEnabled) {
                 draftCtx.globalCompositeOperation = 'destination-out';
                 draftCtx.strokeStyle = 'rgba(0,0,0,1)';
@@ -7800,7 +7833,7 @@
             draftCtx.lineCap = 'round';
             draftCtx.lineJoin = 'round';
             draftCtx.stroke();
-            
+
             draftLastX = x;
             draftLastY = y;
         }
@@ -7808,6 +7841,7 @@
         function endDraftDraw(e) {
             if (draftDrawing) {
                 draftDrawing = false;
+                _draftCachedRect = null;
                 draftCtx.globalCompositeOperation = 'source-over';
                 saveDraftCanvasState();
                 debouncedSaveDraft();
@@ -8594,14 +8628,17 @@
             const annoCanvas = document.createElement('canvas');
             annoCanvas.className = 'annotation-canvas';
             annoCanvas.dataset.pageNum = pageNum;
-            annoCanvas.width = Math.round(viewport.width * dpr);
-            annoCanvas.height = Math.round(viewport.height * dpr);
+            const annoDpr = (optimizePenLatency && einkMode) ? 1 : dpr;
+            annoCanvas.width = Math.round(viewport.width * annoDpr);
+            annoCanvas.height = Math.round(viewport.height * annoDpr);
             annoCanvas.style.width = viewport.width + 'px';
             annoCanvas.style.height = viewport.height + 'px';
             annoCanvas.style.pointerEvents = penMode ? 'auto' : 'none';
 
-            const annoCtx = annoCanvas.getContext('2d');
-            annoCtx.scale(dpr, dpr);
+            const annoCtx = optimizePenLatency
+                ? annoCanvas.getContext('2d', { desynchronized: true, willReadFrequently: true })
+                : annoCanvas.getContext('2d');
+            annoCtx.scale(annoDpr, annoDpr);
 
             // 保存引用到 pageData 供其他模块使用
             pageData.annoCanvas = annoCanvas;
@@ -8649,26 +8686,54 @@
             let drawing = false;
             let lastX, lastY;
 
+            // 优化：缓存 getBoundingClientRect，避免每次 pointermove 都触发布局计算
+            let _cachedRect = null, _cachedRx = 1, _cachedRy = 1;
+
             function pointerToCanvasXY(e) {
+                if (optimizePenLatency && _cachedRect) {
+                    return {
+                        x: (e.clientX - _cachedRect.left) * _cachedRx,
+                        y: (e.clientY - _cachedRect.top) * _cachedRy
+                    };
+                }
                 const rect = annoCanvas.getBoundingClientRect();
                 const cssW = parseFloat(annoCanvas.style.width) || rect.width;
                 const cssH = parseFloat(annoCanvas.style.height) || rect.height;
                 const rx = rect.width > 0 ? (cssW / rect.width) : 1;
                 const ry = rect.height > 0 ? (cssH / rect.height) : 1;
+                if (optimizePenLatency) {
+                    _cachedRect = rect;
+                    _cachedRx = rx;
+                    _cachedRy = ry;
+                }
                 return { x: (e.clientX - rect.left) * rx, y: (e.clientY - rect.top) * ry };
             }
+
+            function clearCachedRect() { _cachedRect = null; }
 
             // 结束当前笔画（不 commit），把 canvas 恢复到本次 pointerdown 之前的状态
             function cancelCurrentStroke() {
                 if (!drawing) return;
                 drawing = false;
                 activePointerId = -1;
+                clearCachedRect();
                 annoCtx.globalCompositeOperation = 'source-over';
                 // strokeHistory 栈顶就是 pointerdown 时入栈的 pre-stroke 快照
                 const top = strokeHistory[strokeHistory.length - 1];
                 if (top && top.annoCanvas === annoCanvas) {
                     strokeHistory.pop();
-                    annoCtx.putImageData(top.imageData, 0, 0);
+                    // 优化：延迟快照可能还未完成，强制解析
+                    if (optimizePenLatency && top._snapshotPending) {
+                        if (top._idleHandle) {
+                            if (typeof cancelIdleCallback === 'function') cancelIdleCallback(top._idleHandle);
+                            else clearTimeout(top._idleHandle);
+                        }
+                        top.imageData = annoCtx.getImageData(0, 0, annoCanvas.width, annoCanvas.height);
+                        top._snapshotPending = false;
+                    }
+                    if (top.imageData) {
+                        annoCtx.putImageData(top.imageData, 0, 0);
+                    }
                     updateUndoRedoButtons();
                 }
             }
@@ -8686,12 +8751,14 @@
                 try { annoCanvas.setPointerCapture(e.pointerId); } catch(err) {}
                 activePointerId = e.pointerId;
                 // 入栈当前页快照，供撤销回滚（全局 stack 里带 pageNum）
-                saveStrokeState(pageNum, annoCanvas);
+                saveStrokeState(pageNum, annoCanvas, optimizePenLatency ? { lazy: true } : undefined);
                 drawing = true;
                 currentAnnoCanvas = annoCanvas;
                 currentAnnoCtx = annoCtx;
                 // 把"当前活动画笔"暴露出去，让多指手势能抢占
                 activePenStroke = { pageNum, annoCanvas, annoCtx, cancel: cancelCurrentStroke };
+                // 优化：刷新缓存 rect
+                clearCachedRect();
                 const p = pointerToCanvasXY(e);
                 lastX = p.x; lastY = p.y;
                 if (readerEraserMode) {
@@ -8708,16 +8775,47 @@
             });
 
             annoCanvas.addEventListener('pointermove', (e) => {
-                if (isPinching) { 
+                if (isPinching) {
                     // 多指手势已抢占，若还在 drawing，回滚并退出
                     if (drawing) cancelCurrentStroke();
-                    return; 
+                    return;
                 }
                 if (!penMode || !drawing) return;
                 // 只跟踪同一个 pointer
                 if (e.pointerId !== activePointerId) return;
                 // Apple Pencil 模式：忽略手指
                 if (applePencilMode && e.pointerType === 'touch') return;
+
+                // 优化：在第一次 pointermove 时解析延迟的 undo 快照（此时 canvas 还未被绘制）
+                if (optimizePenLatency) {
+                    const top = strokeHistory[strokeHistory.length - 1];
+                    if (top && top._snapshotPending && top.annoCanvas === annoCanvas) {
+                        if (top._idleHandle) {
+                            if (typeof cancelIdleCallback === 'function') cancelIdleCallback(top._idleHandle);
+                            else clearTimeout(top._idleHandle);
+                        }
+                        top.imageData = annoCtx.getImageData(0, 0, annoCanvas.width, annoCanvas.height);
+                        top._snapshotPending = false;
+                    }
+                }
+
+                // 优化：使用 getCoalescedEvents 获取所有中间点，绘制更平滑的笔画
+                if (optimizePenLatency && typeof e.getCoalescedEvents === 'function') {
+                    const events = e.getCoalescedEvents();
+                    if (events && events.length > 0) {
+                        annoCtx.beginPath();
+                        annoCtx.moveTo(lastX, lastY);
+                        for (const ce of events) {
+                            const p = pointerToCanvasXY(ce);
+                            annoCtx.lineTo(p.x, p.y);
+                            lastX = p.x; lastY = p.y;
+                        }
+                        annoCtx.stroke();
+                        e.preventDefault();
+                        return;
+                    }
+                }
+
                 const p = pointerToCanvasXY(e);
                 annoCtx.beginPath();
                 annoCtx.moveTo(lastX, lastY);
@@ -8729,10 +8827,11 @@
 
             annoCanvas.addEventListener('pointerup', (e) => {
                 if (e.pointerId !== activePointerId && activePointerId !== -1) return;
-                if (!penMode || !drawing) { drawing = false; activePenStroke = null; activePointerId = -1; return; }
+                if (!penMode || !drawing) { drawing = false; activePenStroke = null; activePointerId = -1; clearCachedRect(); return; }
                 drawing = false;
                 activePenStroke = null;
                 activePointerId = -1;
+                clearCachedRect();
                 redoHistory = [];
                 updateUndoRedoButtons();
                 annoCtx.globalCompositeOperation = 'source-over';
@@ -8742,10 +8841,11 @@
             annoCanvas.addEventListener('pointerleave', (e) => {
                 // setPointerCapture 后 pointerleave 不再意外触发，此处仅作保底
                 if (e.pointerId !== activePointerId && activePointerId !== -1) return;
-                if (!penMode || !drawing) { drawing = false; activePenStroke = null; activePointerId = -1; return; }
+                if (!penMode || !drawing) { drawing = false; activePenStroke = null; activePointerId = -1; clearCachedRect(); return; }
                 drawing = false;
                 activePenStroke = null;
                 activePointerId = -1;
+                clearCachedRect();
                 annoCtx.globalCompositeOperation = 'source-over';
                 saveDrawingForPage(pageNum, annoCanvas);
             });
@@ -9222,12 +9322,48 @@
         }
 
         // 把某页当前 canvas 的内容保存到文档（持久化）
+        let _pendingSaveDrawing = null;
+
         function saveDrawingForPage(pageNum, annoCanvas) {
             if (!currentDoc || !annoCanvas) return;
+            if (optimizePenLatency) {
+                if (_pendingSaveDrawing && _pendingSaveDrawing.annoCanvas === annoCanvas) {
+                    if (typeof cancelIdleCallback === 'function') cancelIdleCallback(_pendingSaveDrawing.handle);
+                    else clearTimeout(_pendingSaveDrawing.handle);
+                }
+                const docId = currentDoc.id;
+                const doSave = () => {
+                    _pendingSaveDrawing = null;
+                    if (!annoCanvas.isConnected) return;
+                    const dataUrl = annoCanvas.toDataURL('image/png');
+                    setDocAnnotation(docId, pageNum, 'drawing', dataUrl);
+                    saveData();
+                };
+                if (typeof requestIdleCallback === 'function') {
+                    _pendingSaveDrawing = { annoCanvas, handle: requestIdleCallback(doSave, { timeout: 2000 }) };
+                } else {
+                    _pendingSaveDrawing = { annoCanvas, handle: setTimeout(doSave, 50) };
+                }
+                return;
+            }
             const dataUrl = annoCanvas.toDataURL('image/png');
             setDocAnnotation(currentDoc.id, pageNum, 'drawing', dataUrl);
             saveData();
         }
+
+        window.addEventListener('beforeunload', () => {
+            if (_pendingSaveDrawing) {
+                const canvas = _pendingSaveDrawing.annoCanvas;
+                if (canvas && canvas.isConnected && currentDoc) {
+                    const dataUrl = canvas.toDataURL('image/png');
+                    setDocAnnotation(currentDoc.id,
+                        parseInt(canvas.dataset.pageNum) || currentPage,
+                        'drawing', dataUrl);
+                    saveData();
+                }
+                _pendingSaveDrawing = null;
+            }
+        });
 
         // 旧接口，作用于 currentAnnoCanvas（保持兼容，用在导出等路径）
         function saveDrawingToDoc() {
@@ -9239,18 +9375,39 @@
         // ---- Undo / Redo ----
         // strokeHistory / redoHistory 是全局栈，每个条目是 { pageNum, annoCanvas, imageData }
         // 按操作发生的时间顺序撤销，跨页
-        function saveStrokeState(pageNum, annoCanvas) {
+        function saveStrokeState(pageNum, annoCanvas, options) {
             annoCanvas = annoCanvas || currentAnnoCanvas;
             if (!annoCanvas) return;
             const ctx = annoCanvas.getContext('2d');
             const w = annoCanvas.width;
             const h = annoCanvas.height;
-            strokeHistory.push({
+
+            const entry = {
                 pageNum: pageNum || parseInt(annoCanvas.dataset.pageNum) || currentPage,
                 annoCanvas: annoCanvas,
-                imageData: ctx.getImageData(0, 0, w, h)
-            });
-            // 限制历史步数 30
+                imageData: null,
+                _snapshotPending: false,
+                _idleHandle: null
+            };
+
+            if (options && options.lazy) {
+                entry._snapshotPending = true;
+                const captureSnapshot = () => {
+                    if (entry._snapshotPending) {
+                        entry.imageData = ctx.getImageData(0, 0, w, h);
+                        entry._snapshotPending = false;
+                    }
+                };
+                if (typeof requestIdleCallback === 'function') {
+                    entry._idleHandle = requestIdleCallback(captureSnapshot, { timeout: 100 });
+                } else {
+                    entry._idleHandle = setTimeout(captureSnapshot, 0);
+                }
+            } else {
+                entry.imageData = ctx.getImageData(0, 0, w, h);
+            }
+
+            strokeHistory.push(entry);
             if (strokeHistory.length > 30) strokeHistory.shift();
         }
 
@@ -9262,6 +9419,20 @@
             if (!canvas || !canvas.isConnected) {
                 updateUndoRedoButtons();
                 return undoStroke(); // 尝试下一个
+            }
+            // 优化：如果延迟快照还未完成，强制解析
+            if (entry._snapshotPending) {
+                if (entry._idleHandle) {
+                    if (typeof cancelIdleCallback === 'function') cancelIdleCallback(entry._idleHandle);
+                    else clearTimeout(entry._idleHandle);
+                }
+                const c = canvas.getContext('2d');
+                entry.imageData = c.getImageData(0, 0, canvas.width, canvas.height);
+                entry._snapshotPending = false;
+            }
+            if (!entry.imageData) {
+                updateUndoRedoButtons();
+                return;
             }
             const ctx = canvas.getContext('2d');
             const w = canvas.width, h = canvas.height;
@@ -10017,7 +10188,9 @@
             canvas.style.width = container.clientWidth + 'px';
             canvas.style.height = container.clientHeight + 'px';
 
-            const ctx = canvas.getContext('2d');
+            const ctx = optimizePenLatency
+                ? canvas.getContext('2d', { desynchronized: true, willReadFrequently: true })
+                : canvas.getContext('2d');
             ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
             ctx.fillStyle = 'white';
             ctx.fillRect(0, 0, container.clientWidth, container.clientHeight);
@@ -10027,10 +10200,12 @@
 
             let drawing = false;
             let lx, ly;
+            let _noteCachedRect = null;
 
             canvas.onpointerdown = (e) => {
                 drawing = true;
                 const rect = canvas.getBoundingClientRect();
+                if (optimizePenLatency) _noteCachedRect = rect;
                 lx = e.clientX - rect.left;
                 ly = e.clientY - rect.top;
                 e.preventDefault();
@@ -10039,32 +10214,45 @@
             canvas.oncontextmenu = (e) => { e.preventDefault(); };
             canvas.onpointermove = (e) => {
                 if (!drawing) return;
-                const rect = canvas.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
-                if (noteEraserEnabled) {
-                    // 橡皮擦模式
-                    ctx.globalCompositeOperation = 'destination-out';
-                    ctx.lineWidth = 20;
-                } else {
-                    ctx.globalCompositeOperation = 'source-over';
-                    ctx.strokeStyle = noteColor;
-                    ctx.lineWidth = 2;
+                const rect = (optimizePenLatency && _noteCachedRect) ? _noteCachedRect : canvas.getBoundingClientRect();
+
+                function drawNotePoint(ce) {
+                    const x = ce.clientX - rect.left;
+                    const y = ce.clientY - rect.top;
+                    if (noteEraserEnabled) {
+                        ctx.globalCompositeOperation = 'destination-out';
+                        ctx.lineWidth = 20;
+                    } else {
+                        ctx.globalCompositeOperation = 'source-over';
+                        ctx.strokeStyle = noteColor;
+                        ctx.lineWidth = 2;
+                    }
+                    ctx.beginPath();
+                    ctx.moveTo(lx, ly);
+                    ctx.lineTo(x, y);
+                    ctx.stroke();
+                    lx = x; ly = y;
                 }
-                ctx.beginPath();
-                ctx.moveTo(lx, ly);
-                ctx.lineTo(x, y);
-                ctx.stroke();
-                lx = x; ly = y;
+
+                if (optimizePenLatency && typeof e.getCoalescedEvents === 'function') {
+                    const events = e.getCoalescedEvents();
+                    if (events && events.length > 0) {
+                        for (const ce of events) drawNotePoint(ce);
+                        e.preventDefault();
+                        return;
+                    }
+                }
+                drawNotePoint(e);
                 e.preventDefault();
             };
             canvas.onpointerup = () => {
                 drawing = false;
-                // 恢复正常绘制模式
+                _noteCachedRect = null;
                 ctx.globalCompositeOperation = 'source-over';
             };
             canvas.onpointerleave = () => {
                 drawing = false;
+                _noteCachedRect = null;
                 ctx.globalCompositeOperation = 'source-over';
             };
         }
@@ -10489,6 +10677,13 @@
             document.body.classList.toggle('eink-mode', einkMode);
             setupEinkReaderTapZones();
             setupEinkLectureTapZones();
+
+            // 优化书写延迟（仅本地存储，不参与云同步）
+            try {
+                optimizePenLatency = localStorage.getItem('optimizePenLatency') === 'true';
+            } catch(e) { optimizePenLatency = false; }
+            const penLatencyToggle = document.getElementById('optimizePenLatencyToggle');
+            if (penLatencyToggle) penLatencyToggle.classList.toggle('on', optimizePenLatency);
         }
 
         function saveSettings() {
@@ -10956,6 +11151,17 @@
             setupEinkReaderTapZones();
             setupEinkLectureTapZones();
             showToast(einkMode ? i18n('toast_eink_on') : i18n('toast_eink_off'));
+        }
+
+        // ==================== Optimize Pen Latency ====================
+        function toggleOptimizePenLatency() {
+            optimizePenLatency = !optimizePenLatency;
+            const toggle = document.getElementById('optimizePenLatencyToggle');
+            if (toggle) toggle.classList.toggle('on', optimizePenLatency);
+            try {
+                localStorage.setItem('optimizePenLatency', optimizePenLatency ? 'true' : 'false');
+            } catch(e) {}
+            showToast(optimizePenLatency ? i18n('toast_pen_latency_on') : i18n('toast_pen_latency_off'));
         }
 
         function setupEinkReaderTapZones() {
@@ -14948,6 +15154,8 @@ ${i18n('prompt_lecture_gen')}`;
         let applePencilMode = false;
         // 墨水屏模式（仅本地存储，不云同步）
         let einkMode = false;
+        // 优化书写延迟（仅本地存储，不云同步）
+        let optimizePenLatency = false;
         let einkLectureCurrentPage = 0;
         let einkLectureTotalPages = 1;
         // 讲义双指滑动支持
@@ -15029,7 +15237,9 @@ ${i18n('prompt_lecture_gen')}`;
             canvas.width = lectureBody.scrollWidth;
             canvas.height = lectureBody.scrollHeight;
             
-            lecturePenCtx = canvas.getContext('2d');
+            lecturePenCtx = optimizePenLatency
+                ? canvas.getContext('2d', { desynchronized: true, willReadFrequently: true })
+                : canvas.getContext('2d');
             // Reset history for new canvas
             lectureStrokeHistory = [];
             lectureRedoHistory = [];
@@ -15244,6 +15454,11 @@ ${i18n('prompt_lecture_gen')}`;
             const rect = canvas.getBoundingClientRect();
             const scaleX = canvas.width / rect.width;
             const scaleY = canvas.height / rect.height;
+            if (optimizePenLatency) {
+                _lectureCachedRect = rect;
+                _lectureCachedScaleX = scaleX;
+                _lectureCachedScaleY = scaleY;
+            }
             lecturePenLastX = (e.clientX - rect.left) * scaleX;
             lecturePenLastY = (e.clientY - rect.top) * scaleY;
             lecturePenDrawing = true;
@@ -15264,6 +15479,7 @@ ${i18n('prompt_lecture_gen')}`;
         }
 
         // 橡皮擦：检测并删除触碰到的整笔笔画
+        let _lectureCachedRect = null, _lectureCachedScaleX = 1, _lectureCachedScaleY = 1;
         let _lectureEraserErased = false;
         function eraseLectureStrokeAt(x, y) {
             const hitRadius = 15; // 命中半径
@@ -15303,11 +15519,28 @@ ${i18n('prompt_lecture_gen')}`;
             return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
         }
 
+        function _lecturePointerToXY(e) {
+            if (optimizePenLatency && _lectureCachedRect) {
+                return {
+                    x: (e.clientX - _lectureCachedRect.left) * _lectureCachedScaleX,
+                    y: (e.clientY - _lectureCachedRect.top) * _lectureCachedScaleY
+                };
+            }
+            const canvas = document.getElementById('lectureDrawCanvas');
+            if (!canvas) return { x: 0, y: 0 };
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: (e.clientX - rect.left) * (canvas.width / rect.width),
+                y: (e.clientY - rect.top) * (canvas.height / rect.height)
+            };
+        }
+
         function handleLecturePenPointerMove(e) {
             if (!lecturePenDrawing || !lecturePenMode) return;
             if (lecturePinching) {
                 lecturePenDrawing = false;
                 _lectureActivePointerId = -1;
+                _lectureCachedRect = null;
                 lectureCurrentStroke = null;
                 return;
             }
@@ -15315,25 +15548,39 @@ ${i18n('prompt_lecture_gen')}`;
             if (e.pointerId !== _lectureActivePointerId) return;
             if (shouldIgnoreLecturePointer(e)) return;
             e.preventDefault();
-            const canvas = e.target;
-            const rect = canvas.getBoundingClientRect();
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
-            const x = (e.clientX - rect.left) * scaleX;
-            const y = (e.clientY - rect.top) * scaleY;
 
             if (lecturePenEraser) {
-                // 橡皮擦模式：沿路径检测并删除笔画
-                eraseLectureStrokeAt(x, y);
-            } else {
-                // 画笔模式：画线并记录点
-                drawLecturePenLine(lecturePenLastX, lecturePenLastY, x, y);
-                if (lectureCurrentStroke) {
-                    lectureCurrentStroke.points.push({x, y});
+                const pt = _lecturePointerToXY(e);
+                eraseLectureStrokeAt(pt.x, pt.y);
+                lecturePenLastX = pt.x;
+                lecturePenLastY = pt.y;
+                return;
+            }
+
+            // 优化：使用 getCoalescedEvents 获取所有中间点
+            if (optimizePenLatency && typeof e.getCoalescedEvents === 'function') {
+                const events = e.getCoalescedEvents();
+                if (events && events.length > 0) {
+                    for (const ce of events) {
+                        const pt = _lecturePointerToXY(ce);
+                        drawLecturePenLine(lecturePenLastX, lecturePenLastY, pt.x, pt.y);
+                        if (lectureCurrentStroke) {
+                            lectureCurrentStroke.points.push({x: pt.x, y: pt.y});
+                        }
+                        lecturePenLastX = pt.x;
+                        lecturePenLastY = pt.y;
+                    }
+                    return;
                 }
             }
-            lecturePenLastX = x;
-            lecturePenLastY = y;
+
+            const pt = _lecturePointerToXY(e);
+            drawLecturePenLine(lecturePenLastX, lecturePenLastY, pt.x, pt.y);
+            if (lectureCurrentStroke) {
+                lectureCurrentStroke.points.push({x: pt.x, y: pt.y});
+            }
+            lecturePenLastX = pt.x;
+            lecturePenLastY = pt.y;
         }
 
         function handleLecturePenPointerUp(e) {
@@ -15341,6 +15588,7 @@ ${i18n('prompt_lecture_gen')}`;
             if (e.pointerId !== _lectureActivePointerId && _lectureActivePointerId !== -1) return;
             lecturePenDrawing = false;
             _lectureActivePointerId = -1;
+            _lectureCachedRect = null;
 
             if (lecturePenEraser) {
                 // 橡皮擦模式结束
@@ -15616,7 +15864,9 @@ ${i18n('prompt_lecture_gen')}`;
             lectureDraftCanvas = document.getElementById('lectureDraftCanvas');
             if (!lectureDraftCanvas || lectureDraftCanvas.bindedEvents) return;
             
-            lectureDraftCtx = lectureDraftCanvas.getContext('2d');
+            lectureDraftCtx = optimizePenLatency
+                ? lectureDraftCanvas.getContext('2d', { desynchronized: true, willReadFrequently: true })
+                : lectureDraftCanvas.getContext('2d');
             
             lectureDraftCanvas.addEventListener('touchstart', handleLectureDraftTouchStart, { passive: false });
             lectureDraftCanvas.addEventListener('touchmove', handleLectureDraftTouchMove, { passive: false });
@@ -15778,12 +16028,14 @@ ${i18n('prompt_lecture_gen')}`;
         let lectureDraftPanActive = false;
         let lectureDraftPanLastX = 0;
         let lectureDraftPanLastY = 0;
+        let _lectureDraftCachedRect = null;
 
         function handleLectureDraftTouchStart(e) {
             if (!lectureDraftPenEnabled && !lectureDraftEraserEnabled) return;
             if (e.touches.length === 2) {
                 e.preventDefault();
                 lectureDraftDrawing = false;
+                _lectureDraftCachedRect = null;
                 lectureDraftPanActive = true;
                 const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
                 const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
@@ -15796,6 +16048,7 @@ ${i18n('prompt_lecture_gen')}`;
             lectureDraftDrawing = true;
             const touch = e.touches[0];
             const rect = lectureDraftCanvas.getBoundingClientRect();
+            if (optimizePenLatency) _lectureDraftCachedRect = rect;
             lectureDraftLastX = touch.clientX - rect.left;
             lectureDraftLastY = touch.clientY - rect.top;
         }
@@ -15820,14 +16073,14 @@ ${i18n('prompt_lecture_gen')}`;
             if (e.touches.length !== 1) return;
             e.preventDefault();
             const touch = e.touches[0];
-            const rect = lectureDraftCanvas.getBoundingClientRect();
+            const rect = (optimizePenLatency && _lectureDraftCachedRect) ? _lectureDraftCachedRect : lectureDraftCanvas.getBoundingClientRect();
             const x = touch.clientX - rect.left;
             const y = touch.clientY - rect.top;
-            
+
             lectureDraftCtx.beginPath();
             lectureDraftCtx.moveTo(lectureDraftLastX, lectureDraftLastY);
             lectureDraftCtx.lineTo(x, y);
-            
+
             if (lectureDraftEraserEnabled) {
                 lectureDraftCtx.globalCompositeOperation = 'destination-out';
                 lectureDraftCtx.strokeStyle = 'rgba(0,0,0,1)';
@@ -15840,7 +16093,7 @@ ${i18n('prompt_lecture_gen')}`;
             lectureDraftCtx.lineCap = 'round';
             lectureDraftCtx.lineJoin = 'round';
             lectureDraftCtx.stroke();
-            
+
             lectureDraftLastX = x;
             lectureDraftLastY = y;
         }
@@ -15851,6 +16104,7 @@ ${i18n('prompt_lecture_gen')}`;
             }
             if (lectureDraftDrawing) {
                 lectureDraftDrawing = false;
+                _lectureDraftCachedRect = null;
                 lectureDraftCtx.globalCompositeOperation = 'source-over';
                 saveLectureDraftCanvasState();
                 debouncedSaveLectureDraft();
@@ -15861,20 +16115,21 @@ ${i18n('prompt_lecture_gen')}`;
             if (!lectureDraftPenEnabled && !lectureDraftEraserEnabled) return;
             lectureDraftDrawing = true;
             const rect = lectureDraftCanvas.getBoundingClientRect();
+            if (optimizePenLatency) _lectureDraftCachedRect = rect;
             lectureDraftLastX = e.clientX - rect.left;
             lectureDraftLastY = e.clientY - rect.top;
         }
 
         function doLectureDraftDraw(e) {
             if (!lectureDraftDrawing || (!lectureDraftPenEnabled && !lectureDraftEraserEnabled)) return;
-            const rect = lectureDraftCanvas.getBoundingClientRect();
+            const rect = (optimizePenLatency && _lectureDraftCachedRect) ? _lectureDraftCachedRect : lectureDraftCanvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
-            
+
             lectureDraftCtx.beginPath();
             lectureDraftCtx.moveTo(lectureDraftLastX, lectureDraftLastY);
             lectureDraftCtx.lineTo(x, y);
-            
+
             if (lectureDraftEraserEnabled) {
                 lectureDraftCtx.globalCompositeOperation = 'destination-out';
                 lectureDraftCtx.strokeStyle = 'rgba(0,0,0,1)';
@@ -15887,7 +16142,7 @@ ${i18n('prompt_lecture_gen')}`;
             lectureDraftCtx.lineCap = 'round';
             lectureDraftCtx.lineJoin = 'round';
             lectureDraftCtx.stroke();
-            
+
             lectureDraftLastX = x;
             lectureDraftLastY = y;
         }
@@ -15895,6 +16150,7 @@ ${i18n('prompt_lecture_gen')}`;
         function endLectureDraftDraw() {
             if (lectureDraftDrawing) {
                 lectureDraftDrawing = false;
+                _lectureDraftCachedRect = null;
                 lectureDraftCtx.globalCompositeOperation = 'source-over';
                 saveLectureDraftCanvasState();
                 debouncedSaveLectureDraft();
@@ -20304,7 +20560,9 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
             canvas.height = wrap.clientHeight * 2;
             canvas.style.width = wrap.clientWidth + 'px';
             canvas.style.height = wrap.clientHeight + 'px';
-            exCanvasCtx = canvas.getContext('2d');
+            exCanvasCtx = optimizePenLatency
+                ? canvas.getContext('2d', { desynchronized: true, willReadFrequently: true })
+                : canvas.getContext('2d');
             exCanvasCtx.scale(2, 2);
             exCanvasCtx.lineCap = 'round';
             exCanvasCtx.lineJoin = 'round';
@@ -20321,10 +20579,13 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
             canvas.onpointermove = null;
             canvas.onpointerup = null;
 
+            let _exCachedRect = null;
+
             canvas.onpointerdown = (e) => {
                 e.preventDefault();
                 exDrawing = true;
                 const rect = canvas.getBoundingClientRect();
+                if (optimizePenLatency) _exCachedRect = rect;
                 exLastX = e.clientX - rect.left;
                 exLastY = e.clientY - rect.top;
                 exCanvasCtx.beginPath();
@@ -20334,33 +20595,46 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
             canvas.onpointermove = (e) => {
                 if (!exDrawing) return;
                 e.preventDefault();
-                const rect = canvas.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
-                if (exEraserMode) {
-                    exCanvasCtx.save();
-                    exCanvasCtx.globalCompositeOperation = 'destination-out';
-                    exCanvasCtx.lineWidth = 20;
-                    exCanvasCtx.strokeStyle = 'rgba(0,0,0,1)';
-                    exCanvasCtx.lineTo(x, y);
-                    exCanvasCtx.stroke();
-                    exCanvasCtx.restore();
-                } else {
-                    exCanvasCtx.strokeStyle = exPenColor;
-                    exCanvasCtx.lineWidth = 2;
-                    exCanvasCtx.globalCompositeOperation = 'source-over';
-                    exCanvasCtx.lineTo(x, y);
-                    exCanvasCtx.stroke();
+                const rect = (optimizePenLatency && _exCachedRect) ? _exCachedRect : canvas.getBoundingClientRect();
+
+                function drawExPoint(px, py) {
+                    const x = px - rect.left;
+                    const y = py - rect.top;
+                    if (exEraserMode) {
+                        exCanvasCtx.save();
+                        exCanvasCtx.globalCompositeOperation = 'destination-out';
+                        exCanvasCtx.lineWidth = 20;
+                        exCanvasCtx.strokeStyle = 'rgba(0,0,0,1)';
+                        exCanvasCtx.lineTo(x, y);
+                        exCanvasCtx.stroke();
+                        exCanvasCtx.restore();
+                    } else {
+                        exCanvasCtx.strokeStyle = exPenColor;
+                        exCanvasCtx.lineWidth = 2;
+                        exCanvasCtx.globalCompositeOperation = 'source-over';
+                        exCanvasCtx.lineTo(x, y);
+                        exCanvasCtx.stroke();
+                    }
+                    exCanvasCtx.beginPath();
+                    exCanvasCtx.moveTo(x, y);
+                    exLastX = x;
+                    exLastY = y;
                 }
-                exCanvasCtx.beginPath();
-                exCanvasCtx.moveTo(x, y);
-                exLastX = x;
-                exLastY = y;
+
+                if (optimizePenLatency && typeof e.getCoalescedEvents === 'function') {
+                    const events = e.getCoalescedEvents();
+                    if (events && events.length > 0) {
+                        for (const ce of events) drawExPoint(ce.clientX, ce.clientY);
+                        return;
+                    }
+                }
+                drawExPoint(e.clientX, e.clientY);
             };
 
             canvas.onpointerup = (e) => {
                 if (exDrawing) {
                     exDrawing = false;
+                    _exCachedRect = null;
                     exSaveSnapshot();
                 }
             };
@@ -20368,6 +20642,7 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
             canvas.onpointerleave = () => {
                 if (exDrawing) {
                     exDrawing = false;
+                    _exCachedRect = null;
                     exSaveSnapshot();
                 }
             };
