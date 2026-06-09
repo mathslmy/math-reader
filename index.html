@@ -2013,6 +2013,33 @@
 
         .exercise-doing-toolbar .pen-color.active { border-color: var(--accent); }
 
+        .exercise-doing-toolbar .ex-tool-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            background: var(--bg-secondary);
+            border: none;
+            cursor: pointer;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            transition: background 0.15s, color 0.15s;
+        }
+
+        .exercise-doing-toolbar .ex-tool-btn:active { background: var(--border-color); }
+
+        .exercise-doing-toolbar .ex-tool-btn.active {
+            background: var(--accent);
+            color: #fff;
+        }
+
+        .exercise-doing-toolbar .ex-tool-btn:disabled {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+
         .exercise-doing-toolbar .clear-canvas-btn {
             margin-left: auto;
             padding: 4px 10px;
@@ -4888,6 +4915,15 @@
             <div class="pen-color active" style="background:#000" data-color="#000000" onclick="setExPenColor(this)"></div>
             <div class="pen-color" style="background:#3b82f6" data-color="#3b82f6" onclick="setExPenColor(this)"></div>
             <div class="pen-color" style="background:#ef4444" data-color="#ef4444" onclick="setExPenColor(this)"></div>
+            <button class="ex-tool-btn" id="exEraserBtn" onclick="toggleExEraser()" title="橡皮擦">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20H7L3 16c-.8-.8-.8-2 0-2.8L14.6 1.6c.8-.8 2-.8 2.8 0L21.4 5.6c.8.8.8 2 0 2.8L10 20"/><path d="M6 12l5 5"/></svg>
+            </button>
+            <button class="ex-tool-btn" id="exUndoBtn" onclick="exUndo()" title="撤销">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+            </button>
+            <button class="ex-tool-btn" id="exRedoBtn" onclick="exRedo()" title="重做">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.13-9.36L23 10"/></svg>
+            </button>
             <button class="clear-canvas-btn" onclick="clearExCanvas()" data-i18n="clear_btn">清除</button>
         </div>
         <div class="exercise-doing-canvas-wrap">
@@ -18112,6 +18148,8 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
         let exLastX = 0, exLastY = 0;
         let exCanvasCtx = null;
         let exStrokeHistory = [];
+        let exRedoStack = [];
+        let exEraserMode = false;
         // 每道题的书写内容缓存: key = `${taskId}_${questionIndex}`, value = dataURL
         let exDrawingCache = {};
 
@@ -18501,7 +18539,7 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
 
             if (!confirm(i18n('confirm_delete'))) return;
 
-            const systemPrompt = `你是一个严格的数学评分助手。请对用户提交的数学题作答进行评分。
+            const systemPrompt = `你是一个严格的数学评分助手。请对用户提交的数学题作答进行评分和详细点评。
 
 评分标准（满分10分）：
 1. 证明/解题是否正确（6分）
@@ -18509,7 +18547,16 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
 3. 结构是否清晰（2分）
 
 严格要求：只输出一个纯JSON对象，不要输出任何其他文字、解释、markdown标记。
-格式：{"score":数字,"correct":true或false,"rigor":"评价","structure":"评价","comment":"综合评价"}`;
+格式：
+{
+  "score": 数字(0-10),
+  "correct": true或false,
+  "solution": "正确的解题过程和方法（用LaTeX数学公式，步骤清晰完整）",
+  "rigor": "数学规范严谨性的具体建议（指出用语、符号、推导中不够规范的地方并给出改进建议）",
+  "knowledge_gaps": "根据作答错误暴露的知识点欠缺（具体说明哪些概念或定理掌握不牢）",
+  "similar_problem": "一道同类型的练习题（给出完整题目，难度相当，用于巩固薄弱点）",
+  "comment": "综合评价（总结优缺点和学习建议）"
+}`;
 
             let graded = 0;
             let failed = 0;
@@ -18523,11 +18570,11 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                         role: 'user',
                         content: [
                             { type: 'image_url', image_url: { url: drawing } },
-                            { type: 'text', text: `题目：${q.latex}\n\n请对上面图片中用户的手写作答进行评分。` }
+                            { type: 'text', text: `题目：${q.latex}\n\n请对上面图片中用户的手写作答进行评分和详细点评。` }
                         ]
                     }];
 
-                    const result = await callAI(systemPrompt, msgContent, { maxTokens: 2048, temperature: 0.3 });
+                    const result = await callAI(systemPrompt, msgContent, { maxTokens: 4096, temperature: 0.3 });
                     if (!result) { failed++; continue; }
 
                     let grading;
@@ -18538,13 +18585,16 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                         grading = {
                             score: scoreMatch ? parseInt(scoreMatch[1]) : 5,
                             correct: !/不正确|错误|incorrect/i.test(result),
-                            rigor: '-', structure: '-',
-                            comment: result.replace(/```json|```/g, '').trim().substring(0, 500)
+                            solution: '-',
+                            rigor: '-',
+                            knowledge_gaps: '-',
+                            similar_problem: '-',
+                            comment: result.replace(/```json|```/g, '').trim().substring(0, 1000)
                         };
                     }
 
                     const score = Math.min(10, Math.max(0, Math.round(grading.score || 0)));
-                    const comment = `正确性: ${grading.correct ? '✓' : '✗'}\n严谨性: ${grading.rigor || '-'}\n结构: ${grading.structure || '-'}\n综合: ${grading.comment || '-'}`;
+                    const comment = `**正确性:** ${grading.correct ? '✓ 正确' : '✗ 有误'}\n\n**✦ 正确做法:**\n${grading.solution || '-'}\n\n**✦ 严谨性建议:**\n${grading.rigor || '-'}\n\n**✦ 知识点欠缺:**\n${grading.knowledge_gaps || '-'}\n\n**✦ 同类练习题:**\n${grading.similar_problem || '-'}\n\n**✦ 综合评价:**\n${grading.comment || '-'}`;
 
                     // 更新题目数据
                     q.status = 'done';
@@ -20236,8 +20286,12 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
             exCanvasCtx.lineWidth = 2;
             exCanvasCtx.strokeStyle = exPenColor;
             exStrokeHistory = [];
+            exRedoStack = [];
+            exEraserMode = false;
+            updateExUndoRedoButtons();
+            const eraserBtn = document.getElementById('exEraserBtn');
+            if (eraserBtn) eraserBtn.classList.remove('active');
 
-            // Remove old listeners
             canvas.onpointerdown = null;
             canvas.onpointermove = null;
             canvas.onpointerup = null;
@@ -20258,9 +20312,21 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                 const rect = canvas.getBoundingClientRect();
                 const x = e.clientX - rect.left;
                 const y = e.clientY - rect.top;
-                exCanvasCtx.strokeStyle = exPenColor;
-                exCanvasCtx.lineTo(x, y);
-                exCanvasCtx.stroke();
+                if (exEraserMode) {
+                    exCanvasCtx.save();
+                    exCanvasCtx.globalCompositeOperation = 'destination-out';
+                    exCanvasCtx.lineWidth = 20;
+                    exCanvasCtx.strokeStyle = 'rgba(0,0,0,1)';
+                    exCanvasCtx.lineTo(x, y);
+                    exCanvasCtx.stroke();
+                    exCanvasCtx.restore();
+                } else {
+                    exCanvasCtx.strokeStyle = exPenColor;
+                    exCanvasCtx.lineWidth = 2;
+                    exCanvasCtx.globalCompositeOperation = 'source-over';
+                    exCanvasCtx.lineTo(x, y);
+                    exCanvasCtx.stroke();
+                }
                 exCanvasCtx.beginPath();
                 exCanvasCtx.moveTo(x, y);
                 exLastX = x;
@@ -20268,25 +20334,86 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
             };
 
             canvas.onpointerup = (e) => {
-                exDrawing = false;
+                if (exDrawing) {
+                    exDrawing = false;
+                    exSaveSnapshot();
+                }
             };
 
-            canvas.onpointerleave = () => { exDrawing = false; };
+            canvas.onpointerleave = () => {
+                if (exDrawing) {
+                    exDrawing = false;
+                    exSaveSnapshot();
+                }
+            };
 
-            // iOS: prevent native text selection / callout on canvas touch
             canvas.addEventListener('touchstart', (e) => { e.preventDefault(); }, { passive: false });
+        }
+
+        function exSaveSnapshot() {
+            const canvas = document.getElementById('exerciseDoingCanvas');
+            if (!canvas || !exCanvasCtx) return;
+            const snapshot = exCanvasCtx.getImageData(0, 0, canvas.width, canvas.height);
+            exStrokeHistory.push(snapshot);
+            exRedoStack = [];
+            updateExUndoRedoButtons();
+        }
+
+        function exUndo() {
+            if (exStrokeHistory.length === 0) return;
+            const canvas = document.getElementById('exerciseDoingCanvas');
+            if (!canvas || !exCanvasCtx) return;
+            const current = exCanvasCtx.getImageData(0, 0, canvas.width, canvas.height);
+            exRedoStack.push(current);
+            const prev = exStrokeHistory.pop();
+            exCanvasCtx.putImageData(prev, 0, 0);
+            updateExUndoRedoButtons();
+        }
+
+        function exRedo() {
+            if (exRedoStack.length === 0) return;
+            const canvas = document.getElementById('exerciseDoingCanvas');
+            if (!canvas || !exCanvasCtx) return;
+            const current = exCanvasCtx.getImageData(0, 0, canvas.width, canvas.height);
+            exStrokeHistory.push(current);
+            const next = exRedoStack.pop();
+            exCanvasCtx.putImageData(next, 0, 0);
+            updateExUndoRedoButtons();
+        }
+
+        function toggleExEraser() {
+            exEraserMode = !exEraserMode;
+            const btn = document.getElementById('exEraserBtn');
+            if (btn) btn.classList.toggle('active', exEraserMode);
+            const canvas = document.getElementById('exerciseDoingCanvas');
+            if (canvas) canvas.style.cursor = exEraserMode ? 'cell' : 'crosshair';
+        }
+
+        function updateExUndoRedoButtons() {
+            const undoBtn = document.getElementById('exUndoBtn');
+            const redoBtn = document.getElementById('exRedoBtn');
+            if (undoBtn) undoBtn.disabled = exStrokeHistory.length === 0;
+            if (redoBtn) redoBtn.disabled = exRedoStack.length === 0;
         }
 
         function setExPenColor(el) {
             document.querySelectorAll('.exercise-doing-toolbar .pen-color').forEach(c => c.classList.remove('active'));
             el.classList.add('active');
             exPenColor = el.dataset.color;
+            exEraserMode = false;
+            const eraserBtn = document.getElementById('exEraserBtn');
+            if (eraserBtn) eraserBtn.classList.remove('active');
+            const canvas = document.getElementById('exerciseDoingCanvas');
+            if (canvas) canvas.style.cursor = 'crosshair';
         }
 
         function clearExCanvas() {
             if (!exCanvasCtx) return;
             const canvas = document.getElementById('exerciseDoingCanvas');
             exCanvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+            exStrokeHistory = [];
+            exRedoStack = [];
+            updateExUndoRedoButtons();
             if (exDoingState) {
                 const key = `${exDoingState.taskId}_${exDoingState.questionIndex}`;
                 delete exDrawingCache[key];
@@ -20329,7 +20456,7 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
             // Show loading
             showToast(i18n('toast_asking_ai'));
 
-            const systemPrompt = `你是一个严格的数学评分助手。请对用户提交的数学题作答进行评分。
+            const systemPrompt = `你是一个严格的数学评分助手。请对用户提交的数学题作答进行评分和详细点评。
 
 评分标准（满分10分）：
 1. 证明/解题是否正确（6分）
@@ -20337,18 +20464,27 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
 3. 结构是否清晰（2分）
 
 严格要求：只输出一个纯JSON对象，不要输出任何其他文字、解释、markdown标记。
-格式：{"score":数字,"correct":true或false,"rigor":"评价","structure":"评价","comment":"综合评价"}`;
+格式：
+{
+  "score": 数字(0-10),
+  "correct": true或false,
+  "solution": "正确的解题过程和方法（用LaTeX数学公式，步骤清晰完整）",
+  "rigor": "数学规范严谨性的具体建议（指出用语、符号、推导中不够规范的地方并给出改进建议）",
+  "knowledge_gaps": "根据作答错误暴露的知识点欠缺（具体说明哪些概念或定理掌握不牢）",
+  "similar_problem": "一道同类型的练习题（给出完整题目，难度相当，用于巩固薄弱点）",
+  "comment": "综合评价（总结优缺点和学习建议）"
+}`;
 
             try {
                 const msgContent = [{
                     role: 'user',
                     content: [
                         { type: 'image_url', image_url: { url: userDrawing } },
-                        { type: 'text', text: `题目：${q.latex}\n\n请对上面图片中用户的手写作答进行评分。` }
+                        { type: 'text', text: `题目：${q.latex}\n\n请对上面图片中用户的手写作答进行评分和详细点评。` }
                     ]
                 }];
 
-                const result = await callAI(systemPrompt, msgContent, { maxTokens: 2048, temperature: 0.3 });
+                const result = await callAI(systemPrompt, msgContent, { maxTokens: 4096, temperature: 0.3 });
                 if (!result) { showToast(i18n('toast_ai_return_parse_fail')); return; }
 
                 let grading;
@@ -20356,19 +20492,20 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
                     grading = robustParseJSONObject(result);
                 } catch (e) {
                     console.error('评分JSON解析失败, AI原始返回:', result);
-                    // 兜底：尝试从文本中提取分数
                     const scoreMatch = result.match(/(\d+)\s*[\/／]\s*10/);
                     grading = {
                         score: scoreMatch ? parseInt(scoreMatch[1]) : 5,
                         correct: !/不正确|错误|incorrect/i.test(result),
+                        solution: '-',
                         rigor: '-',
-                        structure: '-',
-                        comment: result.replace(/```json|```/g, '').trim().substring(0, 500)
+                        knowledge_gaps: '-',
+                        similar_problem: '-',
+                        comment: result.replace(/```json|```/g, '').trim().substring(0, 1000)
                     };
                 }
 
                 const score = Math.min(10, Math.max(0, Math.round(grading.score || 0)));
-                const comment = `正确性: ${grading.correct ? '✓' : '✗'}\n严谨性: ${grading.rigor || '-'}\n结构: ${grading.structure || '-'}\n综合: ${grading.comment || '-'}`;
+                const comment = `**正确性:** ${grading.correct ? '✓ 正确' : '✗ 有误'}\n\n**✦ 正确做法:**\n${grading.solution || '-'}\n\n**✦ 严谨性建议:**\n${grading.rigor || '-'}\n\n**✦ 知识点欠缺:**\n${grading.knowledge_gaps || '-'}\n\n**✦ 同类练习题:**\n${grading.similar_problem || '-'}\n\n**✦ 综合评价:**\n${grading.comment || '-'}`;
 
                 if (isWrong) {
                     // Update wrong question
