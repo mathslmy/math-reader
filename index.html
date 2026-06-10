@@ -8504,12 +8504,14 @@
         let renderedPages = new Set();
         let pageElements = {};
         let isRenderingAllPages = false;
+        let _renderGeneration = 0;
 
         let suppressScrollWriteback = false;
 
         async function renderAllPDFPages() {
-            if (!pdfDoc || isRenderingAllPages) return;
+            const gen = ++_renderGeneration;
             isRenderingAllPages = true;
+            if (!pdfDoc) { isRenderingAllPages = false; return; }
 
             const wrapper = document.getElementById('pdfCanvasWrapper');
             wrapper.innerHTML = '';
@@ -8519,6 +8521,7 @@
             // 创建所有页面的占位符
             for (let i = 1; i <= totalPages; i++) {
                 const page = await pdfDoc.getPage(i);
+                if (gen !== _renderGeneration) return;
                 const scale = getReaderRenderScale(page);
                 const viewport = page.getViewport({ scale });
 
@@ -8530,10 +8533,12 @@
                 placeholder.style.background = '#fff';
                 placeholder.style.boxShadow = 'var(--shadow)';
                 placeholder.style.position = 'relative';
-                
+
                 pageElements[i] = { placeholder, viewport, rendered: false };
                 wrapper.appendChild(placeholder);
             }
+
+            if (gen !== _renderGeneration) return;
 
             if (einkMode) {
                 isRenderingAllPages = false;
@@ -8542,6 +8547,7 @@
             } else {
                 // 渲染可见页面和附近页面
                 await renderVisiblePages();
+                if (gen !== _renderGeneration) return;
 
                 // 滚动到当前页
                 if (currentPage > 1 && pageElements[currentPage]) {
@@ -16615,51 +16621,45 @@ ${paper.abstract ? i18n('prompt_abstract_original') + paper.abstract : ''}`;
         // 手指松开后把 userZoom 写入，重新渲染所有页面为真实尺寸，
         // 滚动位置按焦点页面精确修正。这样 scrollTop / offsetTop 永远准确。
         let isPinching = false;
-        let _pinchRebuildScheduled = false;
 
         async function rebuildPagesForZoom(newZoom, focusPageNum) {
-            if (_pinchRebuildScheduled) return;
-            _pinchRebuildScheduled = true;
             userZoom = newZoom;
 
             const container = document.getElementById('readerContainer');
             const wrapper = document.getElementById('pdfCanvasWrapper');
-            if (!container || !wrapper || !pdfDoc) { _pinchRebuildScheduled = false; return; }
+            if (!container || !wrapper || !pdfDoc) return;
 
+            // 去掉预览 transform
+            wrapper.style.transform = '';
+            wrapper.style.transformOrigin = '';
+
+            // 记住焦点页面在视口中的相对位置
+            const focusData = pageElements[focusPageNum];
+            const focusEl = focusData && focusData.placeholder;
+            let focusOffsetRatio = 0;
+            if (focusEl) {
+                const containerRect = container.getBoundingClientRect();
+                const elRect = focusEl.getBoundingClientRect();
+                focusOffsetRatio = (containerRect.top - elRect.top) / elRect.height;
+            }
+
+            // 重新渲染（会重建所有 placeholder 尺寸）
+            // renderAllPDFPages 内部用 generation 计数器自动取消旧的并发渲染
+            suppressScrollWriteback = true;
+            const savedPage = currentPage;
             try {
-                // 去掉预览 transform
-                wrapper.style.transform = '';
-                wrapper.style.transformOrigin = '';
-
-                // 记住焦点页面在视口中的相对位置
-                const focusData = pageElements[focusPageNum];
-                const focusEl = focusData && focusData.placeholder;
-                let focusOffsetRatio = 0;
-                if (focusEl) {
-                    const containerRect = container.getBoundingClientRect();
-                    const elRect = focusEl.getBoundingClientRect();
-                    focusOffsetRatio = (containerRect.top - elRect.top) / elRect.height;
-                }
-
-                // 重新渲染（会重建所有 placeholder 尺寸）
-                suppressScrollWriteback = true;
-                const savedPage = currentPage;
-                renderedPages.clear();
-                for (let k in pageElements) { if (pageElements[k]) pageElements[k].rendered = false; }
-                isRenderingAllPages = false;
                 await renderAllPDFPages();
 
                 // 恢复滚动位置：把焦点页面放回视口中原来的相对位置
                 const newFocusData = pageElements[focusPageNum];
                 const newFocusEl = newFocusData && newFocusData.placeholder;
                 if (newFocusEl) {
-                    container.scrollTop = newFocusEl.offsetTop + focusOffsetRatio * newFocusEl.offsetHeight * -1;
+                    container.scrollTop = newFocusEl.offsetTop + focusOffsetRatio * newFocusEl.offsetHeight;
                 }
                 currentPage = savedPage;
                 document.getElementById('pageInfo').textContent = `${currentPage} / ${totalPages}`;
             } finally {
                 suppressScrollWriteback = false;
-                _pinchRebuildScheduled = false;
             }
         }
 
